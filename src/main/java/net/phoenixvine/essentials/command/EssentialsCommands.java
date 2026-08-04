@@ -36,5 +36,7 @@ public final class EssentialsCommands {
         if (!configLoaded || EssentialsServerConfig.ENABLE_TOP.get()) TopCommand.register(dispatcher);
         if (!configLoaded || EssentialsServerConfig.ENABLE_TPX.get()) TpxCommand.register(dispatcher);
         if (!configLoaded || EssentialsServerConfig.ENABLE_TPFORCE.get()) TpForceCommand.register(dispatcher);
+
+        EssentialsTrashCommand.register(dispatcher);
     }
 }

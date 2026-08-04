@@ -13,6 +13,7 @@ import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.api.EssentialsAPI;
 import net.phoenixvine.essentials.api.event.TeleportEvent;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
+import net.phoenixvine.essentials.config.EssentialsPermissions;
 import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.NamedLocation;
 
@@ -26,8 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class TeleportExecutor {
 
     private record Pending(NamedLocation target, long readyAtMs, double startX, double startY, double startZ,
-                            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> startDim,
-                            String category, String destinationLabel, String successDetail) {}
+                           net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> startDim,
+                           String category, String destinationLabel, String successDetail) {}
 
     private static final Map<UUID, Pending> PENDING = new ConcurrentHashMap<>();
     private static final Map<UUID, Map<String, Long>> LAST_USE_MS = new ConcurrentHashMap<>();
@@ -39,7 +40,19 @@ public final class TeleportExecutor {
     }
 
     public static void request(ServerPlayer player, NamedLocation target, String category, String destinationLabel,
-                                String successDetail) {
+                               String successDetail) {
+        request(player, target, category, destinationLabel, successDetail, false);
+    }
+
+    public static void request(ServerPlayer player, NamedLocation target, String category, String destinationLabel,
+                               String successDetail, boolean bypassWarmupAndCooldown) {
+        
+        int defaultCooldown = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+        request(player, target, category, destinationLabel, successDetail, bypassWarmupAndCooldown, defaultCooldown);
+    }
+
+    public static void request(ServerPlayer player, NamedLocation target, String category, String destinationLabel,
+                               String successDetail, boolean bypassWarmupAndCooldown, int cooldownSeconds) {
 
         if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_TELEPORT, player.level().dimension().location())) {
             return;
@@ -52,18 +65,23 @@ public final class TeleportExecutor {
             return;
         }
 
-        long cooldownRemainingMs = cooldownRemainingMs(uuid, category);
-        if (cooldownRemainingMs > 0) {
-            long seconds = (cooldownRemainingMs + 999) / 1000;
-            player.sendSystemMessage(Component.literal("§cYou must wait " + seconds + "s before doing that again."));
-            return;
+        boolean canBypassCooldown = bypassWarmupAndCooldown ||
+                (EssentialsPermissions.BYPASS_COOLDOWN != null && EssentialsPermissions.check(player.createCommandSourceStack(), EssentialsPermissions.BYPASS_COOLDOWN));
+
+        if (!canBypassCooldown) {
+            long cooldownRemainingMs = cooldownRemainingMs(uuid, category, cooldownSeconds);
+            if (cooldownRemainingMs > 0) {
+                long seconds = (cooldownRemainingMs + 999) / 1000;
+                player.sendSystemMessage(Component.literal("§cYou must wait " + seconds + "s before doing that again."));
+                return;
+            }
         }
 
         TeleportEvent.Pre pre = new TeleportEvent.Pre(player, category, destinationLabel, target);
         MinecraftForge.EVENT_BUS.post(pre);
         if (pre.isCanceled()) return;
 
-        int warmupSeconds = EssentialsServerConfig.TELEPORT_WARMUP_SECONDS.get();
+        int warmupSeconds = bypassWarmupAndCooldown ? 0 : EssentialsServerConfig.TELEPORT_WARMUP_SECONDS.get();
         if (warmupSeconds <= 0) {
             executeNow(player, target, category, destinationLabel, successDetail);
             return;
@@ -88,7 +106,7 @@ public final class TeleportExecutor {
     }
 
     private static void executeNow(ServerPlayer player, NamedLocation target, String category, String destinationLabel,
-                                    String successDetail) {
+                                   String successDetail) {
         ServerLevel targetLevel = player.getServer().getLevel(target.dimension);
         if (targetLevel == null) {
             player.sendSystemMessage(Component.literal("§cThat destination's dimension is no longer loaded."));
@@ -108,8 +126,7 @@ public final class TeleportExecutor {
         MinecraftForge.EVENT_BUS.post(new TeleportEvent.Post(player, category, destinationLabel));
     }
 
-    private static long cooldownRemainingMs(UUID uuid, String category) {
-        int cooldownSeconds = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+    private static long cooldownRemainingMs(UUID uuid, String category, int cooldownSeconds) {
         if (cooldownSeconds <= 0) return 0;
         long last = LAST_USE_MS.getOrDefault(uuid, Map.of()).getOrDefault(category, 0L);
         long remaining = cooldownSeconds * 1000L - (System.currentTimeMillis() - last);

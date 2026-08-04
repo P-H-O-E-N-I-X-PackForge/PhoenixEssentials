@@ -10,7 +10,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.capability.PlayerEssentialsData;
 import net.phoenixvine.essentials.config.EssentialsPermissions;
+import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.NamedLocation;
+import net.phoenixvine.essentials.team.TeamCompat;
 
 import java.util.Map;
 import java.util.UUID;
@@ -69,7 +71,7 @@ public final class TpaCommand {
             return 0;
         }
 
-        int timeoutSeconds = net.phoenixvine.essentials.config.EssentialsServerConfig.TPA_TIMEOUT_SECONDS.get();
+        int timeoutSeconds = EssentialsServerConfig.TPA_TIMEOUT_SECONDS.get();
         PENDING.put(target.getUUID(), new Request(requester.getUUID(), requester.getName().getString(), here,
                 System.currentTimeMillis() + timeoutSeconds * 1000L));
 
@@ -104,10 +106,17 @@ public final class TpaCommand {
             return 1;
         }
 
+        boolean bypassDelay = EssentialsServerConfig.TPA_TEAMMATE_BYPASS_DELAY.get() &&
+                TeamCompat.areTeammates(requester, target);
+
+        int cooldown = EssentialsServerConfig.TPA_COOLDOWN_SECONDS.get();
+
         if (req.here()) {
-            TeleportExecutor.request(target, NamedLocation.of(requester), "tpa", requester.getName().getString());
+            TeleportExecutor.request(target, NamedLocation.of(requester), "tpa", requester.getName().getString(),
+                    null, bypassDelay, cooldown);
         } else {
-            TeleportExecutor.request(requester, NamedLocation.of(target), "tpa", target.getName().getString());
+            TeleportExecutor.request(requester, NamedLocation.of(target), "tpa", target.getName().getString(),
+                    null, bypassDelay, cooldown);
         }
         return 1;
     }

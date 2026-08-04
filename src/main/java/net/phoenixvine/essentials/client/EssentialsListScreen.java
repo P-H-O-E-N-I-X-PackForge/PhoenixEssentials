@@ -108,6 +108,7 @@ public class EssentialsListScreen extends Screen {
             if (mx >= r[0] && mx < r[0] + r[2] && my >= r[1] && my < r[1] + r[3]) {
                 Row row = rows.get(i);
                 if (!row.clickable()) return true;
+
                 switch (kind) {
                     case HOMES -> EssentialsNetwork.CHANNEL.sendToServer(
                             new C2SGuiTeleportPacket(C2SGuiTeleportPacket.Kind.HOME, row.actionName()));
@@ -116,7 +117,9 @@ public class EssentialsListScreen extends Screen {
                     case KITS -> EssentialsNetwork.CHANNEL.sendToServer(
                             new C2SGuiClaimKitPacket(row.actionName()));
                 }
-                onClose();
+                if (minecraft != null) {
+                    minecraft.setScreen(null);
+                }
                 return true;
             }
         }

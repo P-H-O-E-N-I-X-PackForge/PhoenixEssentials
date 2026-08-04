@@ -8,6 +8,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.phoenixvine.essentials.config.EssentialsPermissions;
+import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.NamedLocation;
 import net.phoenixvine.essentials.data.WarpRegistry;
 
@@ -48,7 +49,8 @@ public final class WarpCommand {
             return 0;
         }
 
-        TeleportExecutor.request(player, warp, "warp", "warp \"" + name + "\"");
+        int cooldown = EssentialsServerConfig.WARP_COOLDOWN_SECONDS.get();
+        TeleportExecutor.request(player, warp, "warp", "warp \"" + name + "\"", null, false, cooldown);
         return 1;
     }
 
@@ -76,7 +78,7 @@ public final class WarpCommand {
         if (names.isEmpty()) {
             source.sendSuccess(() -> Component.literal("§7No warps have been set."), false);
         } else {
-            source.sendSuccess(() -> Component.literal("§7Warps: §f" + String.join("§7, §f", names)), false);
+            source.sendSuccess(() -> Component.literal("§7Warps: §f" + String.join(", ", names)), false);
         }
         return 1;
     }

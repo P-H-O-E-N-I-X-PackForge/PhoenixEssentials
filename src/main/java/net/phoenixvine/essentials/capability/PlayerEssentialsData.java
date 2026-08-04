@@ -21,6 +21,7 @@ public class PlayerEssentialsData {
     private final Set<UUID> ignored = new HashSet<>();
     private long playtimeTicks = 0L;
     private final Map<String, Long> kitCooldownsMs = new LinkedHashMap<>();
+    private int homeLimitOverride = -1;
 
     public Map<String, NamedLocation> getHomes() {
         return homes;
@@ -91,6 +92,14 @@ public class PlayerEssentialsData {
         kitCooldownsMs.put(kitName.toLowerCase(), System.currentTimeMillis());
     }
 
+    public int getHomeLimitOverride() {
+        return homeLimitOverride;
+    }
+
+    public void setHomeLimitOverride(int homeLimitOverride) {
+        this.homeLimitOverride = homeLimitOverride;
+    }
+
     public CompoundTag serializeNBT() {
         CompoundTag root = new CompoundTag();
 
@@ -108,6 +117,7 @@ public class PlayerEssentialsData {
         root.putBoolean("Afk", afk);
         root.putLong("AfkSince", afkSinceMs);
         root.putLong("PlaytimeTicks", playtimeTicks);
+        root.putInt("HomeLimitOverride", homeLimitOverride);
 
         ListTag ignoredList = new ListTag();
         for (UUID u : ignored) ignoredList.add(net.minecraft.nbt.StringTag.valueOf(u.toString()));
@@ -149,6 +159,7 @@ public class PlayerEssentialsData {
         afk = root.getBoolean("Afk");
         afkSinceMs = root.getLong("AfkSince");
         playtimeTicks = root.getLong("PlaytimeTicks");
+        homeLimitOverride = root.contains("HomeLimitOverride") ? root.getInt("HomeLimitOverride") : -1;
 
         ListTag ignoredList = root.getList("Ignored", Tag.TAG_STRING);
         for (int i = 0; i < ignoredList.size(); i++) {

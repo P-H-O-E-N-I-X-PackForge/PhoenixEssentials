@@ -56,7 +56,9 @@ public final class RtpCommand {
                 landing.getZ() + 0.5, player.getYRot(), player.getXRot());
         String detail = distance + " blocks away, " + result.attempts() + " " +
                 (result.attempts() == 1 ? "try" : "tries");
-        TeleportExecutor.request(player, target, "rtp", "a random location", detail);
+
+        int cooldown = EssentialsServerConfig.RTP_COOLDOWN_SECONDS.get();
+        TeleportExecutor.request(player, target, "rtp", "a random location", detail, false, cooldown);
         return 1;
     }
 }

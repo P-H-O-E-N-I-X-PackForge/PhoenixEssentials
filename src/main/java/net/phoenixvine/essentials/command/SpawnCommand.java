@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.phoenixvine.essentials.config.EssentialsPermissions;
+import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.NamedLocation;
 import net.phoenixvine.essentials.data.SpawnRegistry;
 
@@ -31,7 +32,9 @@ public final class SpawnCommand {
 
         ServerLevel overworld = source.getServer().overworld();
         NamedLocation spawn = SpawnRegistry.getOrDefault(overworld);
-        TeleportExecutor.request(player, spawn, "spawn", "spawn");
+
+        int cooldown = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+        TeleportExecutor.request(player, spawn, "spawn", "spawn", null, false, cooldown);
         return 1;
     }
 

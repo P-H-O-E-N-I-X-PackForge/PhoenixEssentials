@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.phoenixvine.essentials.config.EssentialsPermissions;
+import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.NamedLocation;
 
 public final class TpxCommand {
@@ -38,8 +39,9 @@ public final class TpxCommand {
 
         NamedLocation target = new NamedLocation(targetLevel.dimension(), x + 0.5, y, z + 0.5,
                 player.getYRot(), player.getXRot());
-        TeleportExecutor.request(player, target, "tpx",
-                targetLevel.dimension().location().toString());
+
+        int cooldown = EssentialsServerConfig.TPX_COOLDOWN_SECONDS.get();
+        TeleportExecutor.request(player, target, "tpx", targetLevel.dimension().location().toString(), null, false, cooldown);
         return 1;
     }
 }

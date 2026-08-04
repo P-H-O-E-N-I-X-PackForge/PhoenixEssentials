@@ -14,15 +14,22 @@ public class EssentialsServerConfig {
     public static final ForgeConfigSpec.BooleanValue CANCEL_ON_MOVE;
     public static final ForgeConfigSpec.BooleanValue CANCEL_ON_DAMAGE;
 
+    public static final ForgeConfigSpec.IntValue WARP_COOLDOWN_SECONDS;
+    public static final ForgeConfigSpec.IntValue TPX_COOLDOWN_SECONDS;
+    public static final ForgeConfigSpec.IntValue TOP_COOLDOWN_SECONDS;
+
     public static final ForgeConfigSpec.IntValue HOMES_PER_PLAYER;
     public static final ForgeConfigSpec.BooleanValue BACK_AFTER_DEATH;
 
     public static final ForgeConfigSpec.IntValue RTP_MIN_RADIUS;
     public static final ForgeConfigSpec.IntValue RTP_MAX_RADIUS;
     public static final ForgeConfigSpec.IntValue RTP_MAX_ATTEMPTS;
+    public static final ForgeConfigSpec.IntValue RTP_COOLDOWN_SECONDS;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> RTP_ALLOWED_DIMENSIONS;
 
     public static final ForgeConfigSpec.IntValue TPA_TIMEOUT_SECONDS;
+    public static final ForgeConfigSpec.IntValue TPA_COOLDOWN_SECONDS;
+    public static final ForgeConfigSpec.BooleanValue TPA_TEAMMATE_BYPASS_DELAY;
 
     public static final ForgeConfigSpec.BooleanValue ENABLE_HOME;
     public static final ForgeConfigSpec.BooleanValue ENABLE_SPAWN;
@@ -48,16 +55,28 @@ public class EssentialsServerConfig {
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+
         builder.push("teleport");
 
         TELEPORT_WARMUP_SECONDS = builder
-                .comment("Seconds a player must stand still before a home/spawn/warp/rtp teleport fires. 0 = instant.")
-                .defineInRange("teleportWarmupSeconds", 3, 0, 300);
+                .comment("Seconds a player must stand still before a teleport fires. 0 = instant.")
+                .defineInRange("teleportWarmupSeconds", 5, 0, 300);
 
         TELEPORT_COOLDOWN_SECONDS = builder
-                .comment("Seconds a player must wait between teleports of the same kind (home/spawn/warp/rtp each " +
-                        "have their own independent cooldown timer). 0 = no cooldown.")
+                .comment("Default fallback cooldown in seconds for teleports (/home, /spawn, /back). 0 = no cooldown.")
                 .defineInRange("teleportCooldownSeconds", 5, 0, 3600);
+
+        WARP_COOLDOWN_SECONDS = builder
+                .comment("Cooldown in seconds between /warp uses. 0 = no cooldown.")
+                .defineInRange("warpCooldownSeconds", 5, 0, 3600);
+
+        TPX_COOLDOWN_SECONDS = builder
+                .comment("Cooldown in seconds between /tpx uses. 0 = no cooldown.")
+                .defineInRange("tpxCooldownSeconds", 5, 0, 3600);
+
+        TOP_COOLDOWN_SECONDS = builder
+                .comment("Cooldown in seconds between /top uses. 0 = no cooldown.")
+                .defineInRange("topCooldownSeconds", 50, 0, 3600);
 
         CANCEL_ON_MOVE = builder
                 .comment("If true, moving during the warmup countdown cancels the teleport.")
@@ -94,63 +113,53 @@ public class EssentialsServerConfig {
                 .comment("How many random locations to try before giving up and telling the player to try again.")
                 .defineInRange("rtpMaxAttempts", 20, 1, 200);
 
+        RTP_COOLDOWN_SECONDS = builder
+                .comment("Cooldown in seconds between /rtp uses. 0 = no cooldown.")
+                .defineInRange("rtpCooldownSeconds", 60, 0, 86400);
+
         RTP_ALLOWED_DIMENSIONS = builder
-                .comment("Dimension ids /rtp is allowed in (e.g. \"minecraft:overworld\"). Empty list = allowed " +
-                        "everywhere.")
+                .comment("Dimension ids /rtp is allowed in (e.g. \"minecraft:overworld\"). Empty list = allowed everywhere.")
                 .defineList("rtpAllowedDimensions", new ArrayList<String>(), o -> o instanceof String);
 
         builder.pop();
-        builder.push("social");
+        builder.push("tpa");
 
         TPA_TIMEOUT_SECONDS = builder
                 .comment("Seconds a /tpa or /tpahere request stays valid before it expires.")
-                .defineInRange("tpaTimeoutSeconds", 60, 5, 3600);
+                .defineInRange("tpaTimeoutSeconds", 120, 5, 3600);
+
+        TPA_COOLDOWN_SECONDS = builder
+                .comment("Cooldown in seconds between /tpa teleports. 0 = no cooldown.")
+                .defineInRange("tpaCooldownSeconds", 5, 0, 3600);
+
+        TPA_TEAMMATE_BYPASS_DELAY = builder
+                .comment("If true, accepting a /tpa or /tpahere request from a teammate skips the teleport warmup and cooldown.")
+                .define("tpaTeammateBypassDelay", true);
 
         builder.pop();
         builder.push("enabledCommands");
 
-        ENABLE_HOME = builder.comment("If false, disables /home, /sethome, /delhome, /homes entirely.")
-                .define("enableHome", true);
-        ENABLE_SPAWN = builder.comment("If false, disables /spawn and /setspawn entirely.")
-                .define("enableSpawn", true);
-        ENABLE_WARP = builder.comment("If false, disables /warp, /setwarp, /delwarp, /warps entirely.")
-                .define("enableWarp", true);
-        ENABLE_BACK = builder.comment("If false, disables /back entirely.")
-                .define("enableBack", true);
-        ENABLE_RTP = builder.comment("If false, disables /rtp entirely.")
-                .define("enableRtp", true);
-        ENABLE_TPA = builder.comment("If false, disables /tpa, /tpahere, /tpaccept, /tpdeny, /tpcancel entirely.")
-                .define("enableTpa", true);
-        ENABLE_MSG = builder.comment("If false, disables /msg, /tell, /r, /reply entirely.")
-                .define("enableMsg", true);
-        ENABLE_NICK = builder.comment("If false, disables /nick entirely.")
-                .define("enableNick", true);
-        ENABLE_IGNORE = builder.comment("If false, disables /ignore and /unignore entirely.")
-                .define("enableIgnore", true);
-        ENABLE_AFK = builder.comment("If false, disables /afk entirely.")
-                .define("enableAfk", true);
-        ENABLE_PLAYERINFO = builder.comment("If false, disables /playerinfo entirely.")
-                .define("enablePlayerInfo", true);
-        ENABLE_SEEN = builder.comment("If false, disables /seen entirely.")
-                .define("enableSeen", true);
-        ENABLE_PLAYTIME = builder.comment("If false, disables /playtime entirely.")
-                .define("enablePlaytime", true);
-        ENABLE_KIT = builder.comment("If false, disables /kit and /kits entirely.")
-                .define("enableKit", true);
-        ENABLE_HEAL_FEED = builder.comment("If false, disables /heal and /feed entirely.")
-                .define("enableHealFeed", true);
-        ENABLE_INVSEE = builder.comment("If false, disables /invsee entirely.")
-                .define("enableInvsee", true);
-        ENABLE_GODFLY = builder.comment("If false, disables /god and /fly entirely.")
-                .define("enableGodFly", true);
-        ENABLE_GAMEMODE_SHORTCUTS = builder.comment("If false, disables /gmc, /gms, /gma, /gmsp entirely.")
-                .define("enableGamemodeShortcuts", true);
-        ENABLE_TOP = builder.comment("If false, disables /top entirely.")
-                .define("enableTop", true);
-        ENABLE_TPX = builder.comment("If false, disables /tpx entirely.")
-                .define("enableTpx", true);
-        ENABLE_TPFORCE = builder.comment("If false, disables /tpforce and /tphere entirely.")
-                .define("enableTpforce", true);
+        ENABLE_HOME = builder.comment("If false, disables /home, /sethome, /delhome, /homes entirely.").define("enableHome", true);
+        ENABLE_SPAWN = builder.comment("If false, disables /spawn and /setspawn entirely.").define("enableSpawn", true);
+        ENABLE_WARP = builder.comment("If false, disables /warp, /setwarp, /delwarp, /warps entirely.").define("enableWarp", true);
+        ENABLE_BACK = builder.comment("If false, disables /back entirely.").define("enableBack", true);
+        ENABLE_RTP = builder.comment("If false, disables /rtp entirely.").define("enableRtp", true);
+        ENABLE_TPA = builder.comment("If false, disables /tpa, /tpahere, /tpaccept, /tpdeny, /tpcancel entirely.").define("enableTpa", true);
+        ENABLE_MSG = builder.comment("If false, disables /msg, /tell, /r, /reply entirely.").define("enableMsg", true);
+        ENABLE_NICK = builder.comment("If false, disables /nick entirely.").define("enableNick", true);
+        ENABLE_IGNORE = builder.comment("If false, disables /ignore and /unignore entirely.").define("enableIgnore", true);
+        ENABLE_AFK = builder.comment("If false, disables /afk entirely.").define("enableAfk", true);
+        ENABLE_PLAYERINFO = builder.comment("If false, disables /playerinfo entirely.").define("enablePlayerInfo", true);
+        ENABLE_SEEN = builder.comment("If false, disables /seen entirely.").define("enableSeen", true);
+        ENABLE_PLAYTIME = builder.comment("If false, disables /playtime entirely.").define("enablePlaytime", true);
+        ENABLE_KIT = builder.comment("If false, disables /kit and /kits entirely.").define("enableKit", true);
+        ENABLE_HEAL_FEED = builder.comment("If false, disables /heal and /feed entirely.").define("enableHealFeed", true);
+        ENABLE_INVSEE = builder.comment("If false, disables /invsee entirely.").define("enableInvsee", true);
+        ENABLE_GODFLY = builder.comment("If false, disables /god and /fly entirely.").define("enableGodFly", true);
+        ENABLE_GAMEMODE_SHORTCUTS = builder.comment("If false, disables /gmc, /gms, /gma, /gmsp entirely.").define("enableGamemodeShortcuts", true);
+        ENABLE_TOP = builder.comment("If false, disables /top entirely.").define("enableTop", true);
+        ENABLE_TPX = builder.comment("If false, disables /tpx entirely.").define("enableTpx", true);
+        ENABLE_TPFORCE = builder.comment("If false, disables /tpforce and /tphere entirely.").define("enableTpforce", true);
 
         builder.pop();
         SPEC = builder.build();

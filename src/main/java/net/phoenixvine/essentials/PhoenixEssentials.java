@@ -18,6 +18,7 @@ import net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.client.EssentialsClientProxy;
 import net.phoenixvine.essentials.command.EssentialsCommands;
+import net.phoenixvine.essentials.config.EssentialsConfigOverrides;
 import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.KitRegistry;
 import net.phoenixvine.essentials.data.SpawnRegistry;
@@ -40,6 +41,8 @@ public class PhoenixEssentials {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::clientSetup);
         modEventBus.addListener(EssentialsCapabilityProvider::register);
+        modEventBus.addListener(EssentialsConfigOverrides::onLoading);
+        modEventBus.addListener(EssentialsConfigOverrides::onReloading);
 
         MinecraftForge.EVENT_BUS.register(this);
 

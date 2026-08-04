@@ -17,6 +17,7 @@ public final class EssentialsPermissions {
     public static PermissionNode<Boolean> SETHOME;
     public static PermissionNode<Boolean> DELHOME;
     public static PermissionNode<Boolean> HOMES;
+    public static PermissionNode<Boolean> SETHOMELIMIT;
     public static PermissionNode<Boolean> SPAWN;
     public static PermissionNode<Boolean> SETSPAWN;
     public static PermissionNode<Boolean> WARP;
@@ -43,6 +44,10 @@ public final class EssentialsPermissions {
     public static PermissionNode<Boolean> TOP;
     public static PermissionNode<Boolean> TPX;
     public static PermissionNode<Boolean> TPFORCE;
+    public static PermissionNode<Boolean> WEATHER;
+
+    public static PermissionNode<Boolean> BYPASS_COOLDOWN;
+    public static PermissionNode<Boolean> BYPASS_WARMUP;
 
     private EssentialsPermissions() {}
 
@@ -52,6 +57,7 @@ public final class EssentialsPermissions {
         SETHOME = allByDefault("sethome");
         DELHOME = allByDefault("delhome");
         HOMES = allByDefault("homes");
+        SETHOMELIMIT = opByDefault("sethomelimit");
         SPAWN = allByDefault("spawn");
         SETSPAWN = opByDefault("setspawn");
         WARP = allByDefault("warp");
@@ -76,15 +82,19 @@ public final class EssentialsPermissions {
         FLY = allByDefault("fly");
         GAMEMODE = allByDefault("gamemode");
         TOP = allByDefault("top");
+        WEATHER = opByDefault("weather");
 
         INVSEE = opByDefault("invsee");
 
         TPX = opByDefault("tpx");
         TPFORCE = opByDefault("tpforce");
 
-        event.addNodes(HOME, SETHOME, DELHOME, HOMES, SPAWN, SETSPAWN, WARP, SETWARP, DELWARP, WARPS, BACK, RTP,
-                TPA, MSG, NICK, IGNORE, AFK, PLAYERINFO, SEEN, PLAYTIME, KIT, HEAL, FEED, INVSEE, GOD, FLY,
-                GAMEMODE, TOP, TPX, TPFORCE);
+        BYPASS_COOLDOWN = opByDefault("bypass_cooldown");
+        BYPASS_WARMUP = opByDefault("bypass_warmup");
+
+        event.addNodes(HOME, SETHOME, DELHOME, HOMES, SETHOMELIMIT, SPAWN, SETSPAWN, WARP, SETWARP, DELWARP, WARPS,
+                BACK, RTP, TPA, MSG, NICK, IGNORE, AFK, PLAYERINFO, SEEN, PLAYTIME, KIT, HEAL, FEED, INVSEE, GOD, FLY,
+                GAMEMODE, TOP, WEATHER, TPX, TPFORCE, BYPASS_COOLDOWN, BYPASS_WARMUP);
     }
 
     private static PermissionNode<Boolean> allByDefault(String path) {

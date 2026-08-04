@@ -8,10 +8,7 @@ import net.phoenixvine.guilds.data.GuildManager;
 import dev.ftb.mods.ftbteams.api.FTBTeamsAPI;
 import dev.ftb.mods.ftbteams.api.Team;
 
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public final class TeamCompat {
 
@@ -19,7 +16,7 @@ public final class TeamCompat {
 
     public static Optional<String> getTeamId(ServerPlayer player) {
         if (ModList.get().isLoaded("phoenix_guilds")) {
-            Optional<Guild> guild = GuildManager.get(player.getServer().overworld()).getGuildFor(player.getUUID());
+            Optional<Guild> guild = GuildManager.get(Objects.requireNonNull(player.getServer()).overworld()).getGuildFor(player.getUUID());
             if (guild.isPresent()) return Optional.of("guild:" + guild.get().getId());
         }
 
@@ -35,7 +32,7 @@ public final class TeamCompat {
 
     public static Optional<String> getTeamName(ServerPlayer player) {
         if (ModList.get().isLoaded("phoenix_guilds")) {
-            Optional<Guild> guild = GuildManager.get(player.getServer().overworld()).getGuildFor(player.getUUID());
+            Optional<Guild> guild = GuildManager.get(Objects.requireNonNull(player.getServer()).overworld()).getGuildFor(player.getUUID());
             if (guild.isPresent()) return Optional.of(guild.get().getName());
         }
 
@@ -51,7 +48,7 @@ public final class TeamCompat {
 
     public static Set<UUID> getTeammates(ServerPlayer player) {
         if (ModList.get().isLoaded("phoenix_guilds")) {
-            Optional<Guild> guild = GuildManager.get(player.getServer().overworld()).getGuildFor(player.getUUID());
+            Optional<Guild> guild = GuildManager.get(Objects.requireNonNull(player.getServer()).overworld()).getGuildFor(player.getUUID());
             if (guild.isPresent()) {
                 Set<UUID> members = new java.util.LinkedHashSet<>(guild.get().getMembers());
                 members.remove(player.getUUID());

@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.capability.PlayerEssentialsData;
 import net.phoenixvine.essentials.config.EssentialsPermissions;
+import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.NamedLocation;
 
 public final class BackCommand {
@@ -34,7 +35,8 @@ public final class BackCommand {
             return 0;
         }
 
-        TeleportExecutor.request(player, back, "back", "your previous location");
+        int cooldown = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+        TeleportExecutor.request(player, back, "back", "your previous location", null, false, cooldown);
         return 1;
     }
 }

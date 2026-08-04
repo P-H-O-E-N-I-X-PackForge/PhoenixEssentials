@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.phoenixvine.essentials.config.EssentialsPermissions;
+import net.phoenixvine.essentials.config.EssentialsServerConfig;
 import net.phoenixvine.essentials.data.NamedLocation;
 
 public final class TopCommand {
@@ -32,7 +33,9 @@ public final class TopCommand {
 
         NamedLocation target = new NamedLocation(level.dimension(), x + 0.5, y, z + 0.5,
                 player.getYRot(), player.getXRot());
-        TeleportExecutor.request(player, target, "top", "the surface");
+
+        int cooldown = EssentialsServerConfig.TOP_COOLDOWN_SECONDS.get();
+        TeleportExecutor.request(player, target, "top", "the surface", null, false, cooldown);
         return 1;
     }
 }
