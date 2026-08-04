@@ -1,7 +1,7 @@
-site_name: Phoenix's Fission Wiki
-site_url: https://omicron-industries.github.io/Phoenix_Fission/Development/
+site_name: PhoenixSuite Wiki
+site_url: https://omicron-industries.github.io/PhoenixSuite_Wiki
 repo_name: PhoenixFission
-repo_url: https://omicron-industries.github.io/Phoenix_Fission/Development/
+repo_url: https://omicron-industries.github.io/PhoenixSuite_Wiki
 edit_uri: blob/main/docs/content/
 docs_dir: content
 site_dir: site

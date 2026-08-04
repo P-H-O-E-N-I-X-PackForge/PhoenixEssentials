@@ -129,8 +129,28 @@ public class EssentialsSuiteBarButton {
         };
     }
 
+    /**
+     * SETTINGS ships as its own full-color artwork (a distinct "brand" icon) and is blitted as-is.
+     * The other four are plain white-ink-on-transparent textures, tinted here to the current
+     * theme's dim text color to match - this is what the vector-drawn glyphs they replaced already
+     * did (see git history), and keeps them from just rendering as flat white regardless of theme.
+     */
     private static void drawIcon(GuiGraphics g, Icon icon, int x, int y) {
-        g.blit(texture(icon), x + 2, y + 2, 0, 0, 16, 16, 16, 16);
+        ResourceLocation tex = texture(icon);
+        if (icon == Icon.SETTINGS) {
+            g.blit(tex, x + 2, y + 2, 0, 0, 16, 16, 16, 16);
+            return;
+        }
+
+        int color = EssentialsThemePalette.TEXT_DIM;
+        float a = ((color >>> 24) & 0xFF) / 255f;
+        com.mojang.blaze3d.systems.RenderSystem.setShaderColor(((color >> 16) & 0xFF) / 255f,
+                ((color >> 8) & 0xFF) / 255f, (color & 0xFF) / 255f, a > 0f ? a : 1f);
+        try {
+            g.blit(tex, x + 2, y + 2, 0, 0, 16, 16, 16, 16);
+        } finally {
+            com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        }
     }
 
     private static void draw(GuiGraphics g, Minecraft mc, double hoverMx, double hoverMy) {
