@@ -1,7 +1,7 @@
 site_name: PhoenixSuite Wiki
-site_url: https://omicron-industries.github.io/PhoenixSuite_Wiki
+site_url: https://omicron-industries.github.io/PhoenixEssentials/
 repo_name: PhoenixSuite Wiki
-repo_url: https://omicron-industries.github.io/PhoenixSuite_Wiki
+repo_url: https://omicron-industries.github.io/PhoenixEssentials/
 edit_uri: blob/main/docs/content/
 docs_dir: content
 site_dir: site
