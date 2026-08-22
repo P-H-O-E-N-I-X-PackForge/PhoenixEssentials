@@ -1,3 +1,5 @@
 nav:
   - 'Home': 'index.md'
-  - 'Phantasia': 'Phantasia'
+  - 'Gameplay'
+  - 'Modpack Development'
+  - 'Development'

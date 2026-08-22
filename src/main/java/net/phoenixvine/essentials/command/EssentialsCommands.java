@@ -38,5 +38,6 @@ public final class EssentialsCommands {
         if (!configLoaded || EssentialsServerConfig.ENABLE_TPFORCE.get()) TpForceCommand.register(dispatcher);
 
         EssentialsTrashCommand.register(dispatcher);
+        EssentialsAutoTrashCommand.register(dispatcher);
     }
 }

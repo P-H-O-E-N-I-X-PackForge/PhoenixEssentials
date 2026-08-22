@@ -1,11 +1,13 @@
 package net.phoenixvine.essentials.client;
 
+import net.phoenixvine.wiki.theme.PhoenixTheme;
+
 public class EssentialsThemePalette {
 
     public static int BG, PANEL, HEADER, BORDER, ACCENT;
     public static int TEXT, TEXT_DIM, TEXT_FAINT;
 
-    public static void refresh(EssentialsTheme t) {
+    public static void refresh(PhoenixTheme t) {
         BG = t.bg.getColor();
         PANEL = t.panel.getColor();
         HEADER = t.header.getColor();

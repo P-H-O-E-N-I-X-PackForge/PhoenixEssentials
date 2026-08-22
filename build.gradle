@@ -63,6 +63,11 @@ legacyForge {
             systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
             programArguments.addAll('--nogui')
         }
+        gameTestServer {
+            type = 'gameTestServer'
+            sourceSet = sourceSets.main
+            systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
+        }
         data {
             data()
             sourceSet = sourceSets.main
@@ -80,27 +85,40 @@ legacyForge {
 dependencies {
     compileOnly("org.jetbrains:annotations:26.0.1")
 
-    // FTB Teams and Phoenix Guilds - both soft dependencies, same pattern PhoenixChronicles
-    // already uses (see GTCEuCompat/TeamKeyResolver there): guarded behind ModList.isLoaded(...)
-    // at every call site, only needs to be on the classpath to compile against.
+
     modCompileOnly("dev.ftb.mods:ftb-library-forge:${ftblibrary_version}")
     modCompileOnly("dev.ftb.mods:ftb-teams-forge:${ftbteams_version}")
     modRuntimeOnly("dev.ftb.mods:ftb-library-forge:${ftblibrary_version}")
     modRuntimeOnly("dev.ftb.mods:ftb-teams-forge:${ftbteams_version}")
-    // FTB Library/Teams both hard-depend on Architectury API - needed at runtime for the dev
-    // environment to even load them (not otherwise used by this mod directly).
+
     modRuntimeOnly("dev.architectury:architectury-forge:${architectury_version}")
 
     modCompileOnly('local:phoenix_guilds:0.1.0')
     modRuntimeOnly('local:phoenix_guilds:0.1.0')
 
-    // FTB Chunks and Phoenix Domains - soft dependencies for claim-protection compat (see
-    // net.phoenixvine.essentials.compat), guarded behind ModList.isLoaded(...) at every call site.
     modCompileOnly("dev.ftb.mods:ftb-chunks-forge:${ftbchunks_version}")
     modRuntimeOnly("dev.ftb.mods:ftb-chunks-forge:${ftbchunks_version}")
 
     modCompileOnly('local:phoenix_domains:0.1.0')
     modRuntimeOnly('local:phoenix_domains:0.1.0')
+
+
+    jarJar(modImplementation("local:phoenix_wiki:0.1.0"))
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+sourceSets {
+    test {
+
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
 }
 
 tasks.named('processResources', ProcessResources).configure {

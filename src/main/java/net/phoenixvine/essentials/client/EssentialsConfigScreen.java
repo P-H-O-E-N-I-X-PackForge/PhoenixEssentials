@@ -4,6 +4,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.phoenixvine.essentials.network.packet.C2SRequestSyncPacket;
+import net.phoenixvine.wiki.PhoenixWikiAPI;
+import net.phoenixvine.wiki.client.screen.WikiTheme;
+import net.phoenixvine.wiki.theme.PhoenixTheme;
+import net.phoenixvine.wiki.theme.PhoenixThemeEditorScreen;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,12 +16,13 @@ public class EssentialsConfigScreen extends Screen {
 
     private static final int ROW_H = 18;
     private static final int PANEL_W = 260;
-    private static final int PANEL_H = 200;
+    private static final int PANEL_H = 238;
 
     private final Screen parent;
     private int panelX, panelY;
     private int themeRowY, afkRowY;
-    private int homesBtnY, warpsBtnY, kitsBtnY;
+    private int homesBtnY, warpsBtnY, kitsBtnY, autoTrashBtnY;
+    private int editThemeX, editThemeW, wikiX, wikiW, themeLinksY;
 
     public EssentialsConfigScreen(Screen parent) {
         super(Component.literal("Phoenix Essentials"));
@@ -32,7 +37,7 @@ public class EssentialsConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float partial) {
-        EssentialsThemePalette.refresh(EssentialsTheme.current());
+        EssentialsThemePalette.refresh(PhoenixTheme.current());
         EssentialsSettings s = EssentialsSettings.get();
 
         EssentialsUIKit.drawModalChrome(g, font, width, height, panelX, panelY, PANEL_W, PANEL_H, 20,
@@ -46,9 +51,23 @@ public class EssentialsConfigScreen extends Screen {
         themeRowY = ty;
         boolean themeHov = hov(mx, my, x, ty, PANEL_W - 24);
         if (themeHov) g.fill(x - 2, ty, x + PANEL_W - 24, ty + ROW_H, 0x22FFFFFF);
-        g.drawString(font, "§7Theme: §f" + EssentialsTheme.getActiveName() + " §8(click to cycle)", x, ty + 5,
+        g.drawString(font, "§7Theme: §f" + PhoenixTheme.getActiveName() + " §8(click to cycle)", x, ty + 5,
                 EssentialsThemePalette.TEXT, false);
-        ty += ROW_H + 4;
+        ty += ROW_H;
+
+        themeLinksY = ty;
+        editThemeX = x;
+        editThemeW = font.width("✎ Edit colors...");
+        boolean editThemeHov = hov(mx, my, editThemeX, ty, editThemeW);
+        g.drawString(font, editThemeHov ? "§b✎ Edit colors..." : "§8✎ Edit colors...",
+                editThemeX, ty + 5, EssentialsThemePalette.TEXT_DIM, false);
+
+        wikiX = editThemeX + editThemeW + 14;
+        wikiW = font.width("📖 Wiki");
+        boolean wikiHov = hov(mx, my, wikiX, ty, wikiW);
+        g.drawString(font, wikiHov ? "§b📖 Wiki" : "§8📖 Wiki", wikiX, ty + 5,
+                EssentialsThemePalette.TEXT_DIM, false);
+        ty += ROW_H;
 
         afkRowY = ty;
         boolean afkHov = hov(mx, my, x, ty, PANEL_W - 24);
@@ -67,6 +86,10 @@ public class EssentialsConfigScreen extends Screen {
 
         kitsBtnY = ty;
         drawMenuButton(g, x, ty, PANEL_W - 24, "Kits", mx, my);
+        ty += ROW_H + 4;
+
+        autoTrashBtnY = ty;
+        drawMenuButton(g, x, ty, PANEL_W - 24, "Auto-Trash", mx, my);
 
         super.render(g, mx, my, partial);
     }
@@ -91,6 +114,14 @@ public class EssentialsConfigScreen extends Screen {
             cycleTheme();
             return true;
         }
+        if (hov((int) mx, (int) my, editThemeX, themeLinksY, editThemeW)) {
+            if (minecraft != null) minecraft.setScreen(new PhoenixThemeEditorScreen(this, "Phoenix Essentials"));
+            return true;
+        }
+        if (hov((int) mx, (int) my, wikiX, themeLinksY, wikiW)) {
+            openWiki();
+            return true;
+        }
         if (hov((int) mx, (int) my, x, afkRowY, w)) {
             EssentialsSettings s = EssentialsSettings.get();
             s.setShowAfkOverlay(!s.isShowAfkOverlay());
@@ -109,6 +140,10 @@ public class EssentialsConfigScreen extends Screen {
             open(C2SRequestSyncPacket.Kind.KITS, "Kits");
             return true;
         }
+        if (hov((int) mx, (int) my, x, autoTrashBtnY, w)) {
+            open(C2SRequestSyncPacket.Kind.TRASH, "Auto-Trash");
+            return true;
+        }
 
         return super.mouseClicked(mx, my, btn);
     }
@@ -118,11 +153,21 @@ public class EssentialsConfigScreen extends Screen {
     }
 
     private void cycleTheme() {
-        List<String> names = new ArrayList<>(EssentialsTheme.REGISTRY.keySet());
+        List<String> names = new ArrayList<>(PhoenixTheme.REGISTRY.keySet());
         if (names.isEmpty()) return;
-        int idx = names.indexOf(EssentialsTheme.getActiveName());
+        int idx = names.indexOf(PhoenixTheme.getActiveName());
         String next = names.get((idx + 1) % names.size());
-        EssentialsTheme.setCurrent(next);
+        PhoenixTheme.setCurrent(next);
+    }
+
+    private void openWiki() {
+        if (minecraft == null) return;
+        PhoenixTheme t = PhoenixTheme.current();
+        WikiTheme wikiTheme = new WikiTheme(
+                t.bg.getColor(), t.panel.getColor(), t.header.getColor(), t.border.getColor(),
+                t.accent.getColor(), t.text.getColor(), t.textDim.getColor(), t.textFaint.getColor(),
+                t.done.getColor(), t.activeColor.getColor());
+        PhoenixWikiAPI.open(this, "phoenix_essentials", "wiki", wikiTheme);
     }
 
     @Override

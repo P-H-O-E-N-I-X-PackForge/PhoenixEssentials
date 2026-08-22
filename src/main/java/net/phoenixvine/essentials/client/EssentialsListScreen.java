@@ -3,10 +3,15 @@ package net.phoenixvine.essentials.client;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 import net.phoenixvine.essentials.network.EssentialsNetwork;
 import net.phoenixvine.essentials.network.packet.C2SGuiClaimKitPacket;
 import net.phoenixvine.essentials.network.packet.C2SGuiTeleportPacket;
 import net.phoenixvine.essentials.network.packet.C2SRequestSyncPacket;
+import net.phoenixvine.wiki.theme.PhoenixTheme;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +48,7 @@ public class EssentialsListScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float partial) {
-        EssentialsThemePalette.refresh(EssentialsTheme.current());
+        EssentialsThemePalette.refresh(PhoenixTheme.current());
 
         EssentialsUIKit.drawModalChrome(g, font, width, height, panelX, panelY, PANEL_W, PANEL_H, 20,
                 "§f" + getTitle().getString());
@@ -98,7 +103,21 @@ public class EssentialsListScreen extends Screen {
                 }
                 yield out;
             }
+            case TRASH -> {
+                List<Row> out = new ArrayList<>();
+                for (String id : EssentialsClientCache.getAutoTrash()) {
+                    String label = "§7" + displayNameOf(id) + " §8(click to remove)";
+                    out.add(new Row(label, id, true));
+                }
+                yield out;
+            }
         };
+    }
+
+    private static String displayNameOf(String id) {
+        ResourceLocation loc = ResourceLocation.tryParse(id);
+        Item item = loc == null ? null : ForgeRegistries.ITEMS.getValue(loc);
+        return item == null ? id : new ItemStack(item).getHoverName().getString();
     }
 
     @Override
@@ -109,6 +128,14 @@ public class EssentialsListScreen extends Screen {
                 Row row = rows.get(i);
                 if (!row.clickable()) return true;
 
+                if (kind == C2SRequestSyncPacket.Kind.TRASH) {
+                    if (minecraft != null && minecraft.player != null) {
+                        minecraft.player.connection.sendCommand("essentialsautotrash remove " + row.actionName());
+                    }
+                    EssentialsNetwork.CHANNEL.sendToServer(new C2SRequestSyncPacket(kind));
+                    return true;
+                }
+
                 switch (kind) {
                     case HOMES -> EssentialsNetwork.CHANNEL.sendToServer(
                             new C2SGuiTeleportPacket(C2SGuiTeleportPacket.Kind.HOME, row.actionName()));
@@ -116,6 +143,7 @@ public class EssentialsListScreen extends Screen {
                             new C2SGuiTeleportPacket(C2SGuiTeleportPacket.Kind.WARP, row.actionName()));
                     case KITS -> EssentialsNetwork.CHANNEL.sendToServer(
                             new C2SGuiClaimKitPacket(row.actionName()));
+                    case TRASH -> {} 
                 }
                 if (minecraft != null) {
                     minecraft.setScreen(null);

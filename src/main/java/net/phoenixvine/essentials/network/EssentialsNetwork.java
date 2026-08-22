@@ -7,6 +7,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import net.phoenixvine.essentials.network.packet.C2SGuiClaimKitPacket;
 import net.phoenixvine.essentials.network.packet.C2SGuiTeleportPacket;
 import net.phoenixvine.essentials.network.packet.C2SRequestSyncPacket;
+import net.phoenixvine.essentials.network.packet.S2CAutoTrashSyncPacket;
 import net.phoenixvine.essentials.network.packet.S2CHomesSyncPacket;
 import net.phoenixvine.essentials.network.packet.S2CKitsSyncPacket;
 import net.phoenixvine.essentials.network.packet.S2CWarpsSyncPacket;
@@ -67,6 +68,13 @@ public class EssentialsNetwork {
                 S2CKitsSyncPacket::encode,
                 S2CKitsSyncPacket::new,
                 S2CKitsSyncPacket::handle,
+                Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+
+        CHANNEL.registerMessage(id++,
+                S2CAutoTrashSyncPacket.class,
+                S2CAutoTrashSyncPacket::encode,
+                S2CAutoTrashSyncPacket::new,
+                S2CAutoTrashSyncPacket::handle,
                 Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 }

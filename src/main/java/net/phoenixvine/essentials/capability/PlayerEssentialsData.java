@@ -3,6 +3,7 @@ package net.phoenixvine.essentials.capability;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 import net.phoenixvine.essentials.data.NamedLocation;
 
 import java.util.HashSet;
@@ -22,6 +23,7 @@ public class PlayerEssentialsData {
     private long playtimeTicks = 0L;
     private final Map<String, Long> kitCooldownsMs = new LinkedHashMap<>();
     private int homeLimitOverride = -1;
+    private final Set<ResourceLocation> alwaysTrash = new HashSet<>();
 
     public Map<String, NamedLocation> getHomes() {
         return homes;
@@ -100,6 +102,26 @@ public class PlayerEssentialsData {
         this.homeLimitOverride = homeLimitOverride;
     }
 
+    public Set<ResourceLocation> getAlwaysTrash() {
+        return alwaysTrash;
+    }
+
+    public boolean isAlwaysTrash(ResourceLocation id) {
+        return alwaysTrash.contains(id);
+    }
+
+    public boolean toggleAlwaysTrash(ResourceLocation id) {
+        if (!alwaysTrash.add(id)) {
+            alwaysTrash.remove(id);
+            return false;
+        }
+        return true;
+    }
+
+    public void removeAlwaysTrash(ResourceLocation id) {
+        alwaysTrash.remove(id);
+    }
+
     public CompoundTag serializeNBT() {
         CompoundTag root = new CompoundTag();
 
@@ -132,6 +154,10 @@ public class PlayerEssentialsData {
         });
         root.put("KitCooldowns", kitCooldownList);
 
+        ListTag alwaysTrashList = new ListTag();
+        for (ResourceLocation id : alwaysTrash) alwaysTrashList.add(net.minecraft.nbt.StringTag.valueOf(id.toString()));
+        root.put("AlwaysTrash", alwaysTrashList);
+
         return root;
     }
 
@@ -140,6 +166,7 @@ public class PlayerEssentialsData {
         back = null;
         ignored.clear();
         kitCooldownsMs.clear();
+        alwaysTrash.clear();
 
         ListTag homesList = root.getList("Homes", Tag.TAG_COMPOUND);
         for (int i = 0; i < homesList.size(); i++) {
@@ -172,6 +199,12 @@ public class PlayerEssentialsData {
         for (int i = 0; i < kitCooldownList.size(); i++) {
             CompoundTag e = kitCooldownList.getCompound(i);
             kitCooldownsMs.put(e.getString("name"), e.getLong("time"));
+        }
+
+        ListTag alwaysTrashList = root.getList("AlwaysTrash", Tag.TAG_STRING);
+        for (int i = 0; i < alwaysTrashList.size(); i++) {
+            ResourceLocation id = ResourceLocation.tryParse(alwaysTrashList.getString(i));
+            if (id != null) alwaysTrash.add(id);
         }
     }
 }

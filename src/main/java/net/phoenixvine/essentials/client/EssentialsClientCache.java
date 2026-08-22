@@ -10,6 +10,7 @@ public final class EssentialsClientCache {
     private static int homesCap = 0;
     private static List<String> warps = List.of();
     private static List<KitEntry> kits = List.of();
+    private static List<String> autoTrash = List.of();
 
     private EssentialsClientCache() {}
 
@@ -40,5 +41,13 @@ public final class EssentialsClientCache {
 
     public static List<KitEntry> getKits() {
         return kits;
+    }
+
+    public static void setAutoTrash(List<String> ids) {
+        autoTrash = ids;
+    }
+
+    public static List<String> getAutoTrash() {
+        return autoTrash;
     }
 }

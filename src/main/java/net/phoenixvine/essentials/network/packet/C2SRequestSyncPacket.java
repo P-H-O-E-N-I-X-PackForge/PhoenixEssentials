@@ -18,7 +18,7 @@ import java.util.function.Supplier;
 
 public class C2SRequestSyncPacket {
 
-    public enum Kind { HOMES, WARPS, KITS }
+    public enum Kind { HOMES, WARPS, KITS, TRASH }
 
     private final Kind kind;
 
@@ -67,6 +67,14 @@ public class C2SRequestSyncPacket {
                     entries.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
                     EssentialsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                             new S2CKitsSyncPacket(entries));
+                }
+                case TRASH -> {
+                    PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                            .orElse(null);
+                    List<String> ids = data == null ? List.of() :
+                            data.getAlwaysTrash().stream().map(Object::toString).sorted().toList();
+                    EssentialsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                            new S2CAutoTrashSyncPacket(ids));
                 }
             }
         });
