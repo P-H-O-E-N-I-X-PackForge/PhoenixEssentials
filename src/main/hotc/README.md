@@ -17,7 +17,7 @@ The switch is `EssentialsHcMode`; `EssentialsCommands.registerAll` picks per com
 gated by each `ENABLE_*` config), and the Java event handlers early-return in takeover mode so each
 event runs once. Parity carried across so a takeover doesn't loosen anything: every command applies its
 `EssentialsPermissions` node (`EssentialsHcMode.allowed`), the op-level-2 gate on the `<player>`
-forms, and the per-dimension `social`/`kits` feature toggles. `/sethomelimit` stays Java.
+forms, and the per-dimension `social`/`kits` feature toggles.
 
 Two Java entry points still open the ORIGINAL config screen (they live in `EssentialsClientProxy`,
 which has uncommitted work, and pass a parent screen the HC screen doesn't take yet): the Mods-menu
@@ -53,20 +53,20 @@ config button and the suite-bar button.
 | `EssentialsKitRegistry.hotc` | `KitRegistry` -- HC kit store + `kits.json` codec (reuses the registries' JSON reader, extended for nested arrays); `KitRegistry.java` builds `KitDefinition` POJOs from scalar accessors |
 | `EssentialsClientSettings.hotc` | `EssentialsSettings` (client settings JSON) + `EssentialsSuiteBarButton`'s gamemode/weather/time cycling logic; the Java classes are facades (`EssentialsKeyBindings` and `EssentialsClientProxy` stay Java) |
 | `EssentialsAutoTrash.hotc` | `EssentialsAutoTrashEvents` -- item-pickup cancel + 10-tick inventory sweep for always-trash items (Java handlers early-return in takeover) |
+| `EssentialsTeamCompat.hotc` | `TeamCompat` -- direct calls into the optional Phoenix Guilds / FTB Teams APIs (extern bindings behind `ModList.isLoaded`); `TeamCompat.java` is a facade, original kept as `TeamCompatJava` |
+| `EssentialsSetHomeLimitCommand.hotc` | `/sethomelimit` incl. the `team` branch (calls `EssentialsTeamCompat.hotc`) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
 
 ## Not ported / known differences
 
-* `TeamCompat` (teammate teleport-delay bypass is applied in the Java `tpa` shim; `/sethomelimit
-  team` is Java) is not ported.
 * Warp/back/spawn/top/tpx teleports use the 4-arg `TeleportExecutor.request`, so they share the
   default cooldown rather than each command's own `*_COOLDOWN_SECONDS`.
 * `/hctpx` deliberately improves on the original: it force-loads the target chunk (the original
   drops you into the void) and scans for floor in ceilinged dimensions like the Nether.
 * `/hcplayerinfo` is plain text (no section-sign colors).
-* `/sethomelimit`, auto-AFK detection, the
-  remaining systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
+* Auto-AFK detection, `EssentialsAPI`, permissions/config registration and the remaining systems are
+  still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
   sync the flag to the client) and doesn't resync on login.
 
 ## HC gotchas found while porting

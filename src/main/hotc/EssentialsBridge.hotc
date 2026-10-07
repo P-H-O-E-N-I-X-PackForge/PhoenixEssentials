@@ -104,7 +104,6 @@ extern class EssentialsServerConfigHc = "net.phoenixvine.essentials.config.Essen
 
 extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.EssentialsHcServerBridge" {
     
-    static fn setTeamHomeLimit(source: &CommandSourceStackHc, anchorName: String, count: Int) -> Int;
     static fn homeNamesCsv(data: &EssentialsPlayerDataHc) -> String;
     static fn homeCount(data: &EssentialsPlayerDataHc) -> Int;
     static fn warpNamesCsv() -> String;

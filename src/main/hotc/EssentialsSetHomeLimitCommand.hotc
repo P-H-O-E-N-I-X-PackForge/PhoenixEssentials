@@ -29,6 +29,60 @@ fn shl_player_data(player: &ServerPlayer) -> EssentialsPlayerDataHc {
     return data as EssentialsPlayerDataHc;
 }
 
+// `/sethomelimit team <player> <count>` -- the anchor plus every ONLINE teammate (offline members are
+// skipped), via `EssentialsTeamCompat.hotc`'s direct calls into the optional team mods.
+fn hc_set_team_home_limit(source: CommandSourceStackHc, anchor_name: String, count: Int) -> Int {
+    let anchor = source.getServer().getPlayerList().getPlayerByName(anchor_name);
+    if anchor == null {
+        source.sendFailure(Component::literal("§cPlayer \"{anchor_name}\" isn't online.") as Component);
+        return 0;
+    }
+    if tc_any_backend() == 0 {
+        source.sendFailure(Component::literal("§cNo team/guild backend is loaded - use /sethomelimit <player> <count> instead.") as Component);
+        return 0;
+    }
+    let anchor_display = anchor.getGameProfile().getName();
+    if tc_team_id(&anchor) == "" {
+        source.sendFailure(Component::literal("§c{anchor_display} isn't on a team.") as Component);
+        return 0;
+    }
+    var updated = 0;
+    let anchor_data = shl_player_data(&anchor);
+    if anchor_data != null {
+        anchor_data.setHomeLimitOverride(count);
+        updated = updated + 1;
+    }
+    var rest = tc_teammates(&anchor);
+    while rest != "" {
+        var piece = rest;
+        var cut = rest.indexOf("
+");
+        if cut < 0 {
+            rest = "";
+        } else {
+            piece = rest.substring(0, cut);
+            rest = rest.substring(cut + 1, rest.length());
+        }
+        let mate = EssentialsHcServerBridgeHc::playerByUuid(piece);
+        if mate != null {
+            let data = shl_player_data(&mate);
+            if data != null {
+                data.setHomeLimitOverride(count);
+                updated = updated + 1;
+            }
+        }
+    }
+    var team_name = tc_team_name(&anchor);
+    if team_name == "" { team_name = "their team"; }
+    if count < 0 {
+        let default_limit = EssentialsServerConfigHc::HOMES_PER_PLAYER.get() as Int;
+        source.sendSuccess(|| { return Component::literal("§aCleared the home-limit override for §f{updated}§a online member(s) of §f{team_name}§a - they now use the server default of §f{default_limit}§a.") as JObjectCmd; }, true);
+    } else {
+        source.sendSuccess(|| { return Component::literal("§aSet the home limit to §f{count}§a for §f{updated}§a online member(s) of §f{team_name}§a.") as JObjectCmd; }, true);
+    }
+    return updated;
+}
+
 pub fn register_real_sethomelimit_command(dispatcher: CommandDispatcherSrc) {
     let count_arg = CommandsHc::argument("count", IntegerArgumentTypeSrc::integer(-1, 256) as ArgumentTypeSrc)
         .executes(|ctx| {
@@ -41,8 +95,7 @@ pub fn register_real_sethomelimit_command(dispatcher: CommandDispatcherSrc) {
 
     let team_count_arg = CommandsHc::argument("count", IntegerArgumentTypeSrc::integer(-1, 256) as ArgumentTypeSrc)
         .executes(|ctx| {
-            let source = ctx.getSource() as CommandSourceStackHc;
-            return EssentialsHcServerBridgeHc::setTeamHomeLimit(&source,
+            return hc_set_team_home_limit(ctx.getSource() as CommandSourceStackHc,
                 StringArgumentTypeSrc::getString(ctx, "player"),
                 IntegerArgumentTypeSrc::getInteger(ctx, "count"));
         });
