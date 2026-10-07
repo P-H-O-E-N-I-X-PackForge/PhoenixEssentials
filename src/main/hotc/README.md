@@ -16,7 +16,7 @@ exactly as they were -- the HC versions then register as `hc`-prefixed twins (`/
 The switch is `EssentialsHcMode`; `EssentialsCommands.registerAll` picks per command group (still
 gated by each `ENABLE_*` config), and the Java event handlers early-return in takeover mode so each
 event runs once. Parity carried across so a takeover doesn't loosen anything: every command applies its
-`EssentialsPermissions` node (`EssentialsHcMode.allowed`), the op-level-2 gate on the `<player>`
+`EssentialsPermissions` node (`perm_allowed`), the op-level-2 gate on the `<player>`
 forms, and the per-dimension `social`/`kits` feature toggles.
 
 Two Java entry points still open the ORIGINAL config screen (they live in `EssentialsClientProxy`,
@@ -54,6 +54,7 @@ config button and the suite-bar button.
 | `EssentialsClientSettings.hotc` | `EssentialsSettings` (client settings JSON) + `EssentialsSuiteBarButton`'s gamemode/weather/time cycling logic; the Java classes are facades (`EssentialsKeyBindings` and `EssentialsClientProxy` stay Java) |
 | `EssentialsAutoTrash.hotc` | `EssentialsAutoTrashEvents` -- item-pickup cancel + 10-tick inventory sweep for always-trash items (Java handlers early-return in takeover) |
 | `EssentialsTeamCompat.hotc` | `TeamCompat` -- direct calls into the optional Phoenix Guilds / FTB Teams APIs (extern bindings behind `ModList.isLoaded`); `TeamCompat.java` is a facade, original kept as `TeamCompatJava` |
+| `EssentialsPermissions.hotc` | `EssentialsPermissions` -- builds/registers the 34 boolean permission nodes (always, even with `use_java`) and does the by-name gate lookup (`perm_allowed`) that replaced the old reflection; `EssentialsPermissions.java` copies the HC nodes into its static fields |
 | `EssentialsSetHomeLimitCommand.hotc` | `/sethomelimit` incl. the `team` branch (calls `EssentialsTeamCompat.hotc`) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |

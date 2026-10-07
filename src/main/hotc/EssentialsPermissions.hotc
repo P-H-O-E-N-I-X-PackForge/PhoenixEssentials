@@ -1,0 +1,89 @@
+// --- HC port of EssentialsPermissions (Forge boolean permission nodes) ---
+//
+// Builds the 34 `phoenix_essentials:<path>` boolean `PermissionNode`s (hotc-mc `permission.hc`
+// bindings) and registers them from the `PermissionGatherEvent.Nodes` handler. Defaults are unchanged:
+// everyone for most nodes, op level 2 for the admin ones (`setwarp`, `tpx`, `invsee`, `bypass_cooldown`,
+// ...). Lookup by FIELD NAME ("HOME", "BYPASS_COOLDOWN", ...) is plain HC now (`perm_find`) -- it
+// replaces the reflection (`Class.getField`) the Java `EssentialsHcMode.allowed` used.
+//
+// `EssentialsPermissions.java` stays as a facade: in takeover mode its `gather` handler calls
+// `perm_gather` here, then copies each HC node into its public static field so the remaining Java
+// commands' `EssentialsPermissions.check(source, HOME)` calls keep working with the SAME node objects.
+
+extern class PermPlayerHc = "net.minecraft.server.level.ServerPlayer" {
+    fn hasPermissions(&self, level: Int) -> Bool;
+}
+
+static perm_names: [String] = [
+    "HOME", "SETHOME", "DELHOME", "HOMES", "SETHOMELIMIT", "SPAWN", "SETSPAWN", "WARP", "SETWARP",
+    "DELWARP", "WARPS", "BACK", "RTP", "TPA", "MSG", "NICK", "IGNORE", "AFK", "PLAYERINFO", "SEEN",
+    "PLAYTIME", "KIT", "HEAL", "FEED", "INVSEE", "GOD", "FLY", "GAMEMODE", "TOP", "TPX", "TPFORCE",
+    "WEATHER", "BYPASS_COOLDOWN", "BYPASS_WARMUP"
+];
+static perm_nodes: [PermissionNodeSrc] = [null as PermissionNodeSrc; 0];
+
+// Nodes whose default is "op level 2" rather than "everyone".
+fn perm_is_op_default(name: String) -> Bool {
+    if name == "SETHOMELIMIT" || name == "SETSPAWN" || name == "SETWARP" || name == "DELWARP" { return true; }
+    if name == "WEATHER" || name == "INVSEE" || name == "TPX" || name == "TPFORCE" { return true; }
+    if name == "BYPASS_COOLDOWN" || name == "BYPASS_WARMUP" { return true; }
+    return false;
+}
+
+extern class PermStr = "java.lang.String" {
+    fn toLowerCase(&self) -> String;
+}
+
+// The path is the field name lower-cased ("BYPASS_COOLDOWN" -> "bypass_cooldown").
+fn perm_path(name: String) -> String {
+    return (name as PermStr).toLowerCase();
+}
+
+fn perm_make(path: String, op: Bool) -> PermissionNodeSrc {
+    if op {
+        return PermissionNodeSrc::new("phoenix_essentials", path, PermissionTypesHc::BOOLEAN, |player, player_uuid, contexts| {
+            if player == null { return JBooleanPerm::valueOf(false) as JObjectCmd; }
+            return JBooleanPerm::valueOf((player as PermPlayerHc).hasPermissions(2)) as JObjectCmd;
+        }, [null as PermissionDynamicContextKeySrc; 0]);
+    }
+    return PermissionNodeSrc::new("phoenix_essentials", path, PermissionTypesHc::BOOLEAN, |player, player_uuid, contexts| {
+        return JBooleanPerm::valueOf(true) as JObjectCmd;
+    }, [null as PermissionDynamicContextKeySrc; 0]);
+}
+
+// Called by `EssentialsPermissions.gather` (takeover mode): builds and registers every node.
+pub fn perm_gather(gather_ev: PermissionGatherEventNodesHc) {
+    var built = [null as PermissionNodeSrc; perm_names.length];
+    var i = 0;
+    while i < perm_names.length {
+        built[i] = perm_make(perm_path(perm_names[i]), perm_is_op_default(perm_names[i]));
+        i = i + 1;
+    }
+    perm_nodes = built;
+    gather_ev.addNodes(perm_nodes);
+}
+
+// The node for a field name, or `null` if the nodes haven't been gathered yet / unknown name.
+pub fn perm_node(name: String) -> PermissionNodeSrc? {
+    var i = 0;
+    while i < perm_names.length {
+        if perm_names[i] == name {
+            if perm_nodes.length == 0 { return null; }
+            return perm_nodes[i];
+        }
+        i = i + 1;
+    }
+    return null;
+}
+
+// The gate every ported command applies via `.requires(...)`: "" = no gate; before the nodes exist (or
+// for a non-player source such as the console) the command is allowed, same as the Java check.
+pub fn perm_allowed(source: CommandSourceStackHc, name: String) -> Bool {
+    if name == "" { return true; }
+    let node = perm_node(name);
+    if node == null { return true; }
+    let player = source.getPlayer();
+    if player == null { return true; }
+    let result = PermissionAPIHc::getPermission(player, node, [null as PermissionDynamicContextSrc; 0]) as JBooleanPerm;
+    return result.booleanValue();
+}

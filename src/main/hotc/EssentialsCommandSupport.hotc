@@ -3,13 +3,12 @@
 extern class EssentialsHcModeHc = "net.phoenixvine.essentials.EssentialsHcMode" {
     static fn takeover() -> Bool;
     static fn literal(real_name: String, twin_name: String) -> String;
-    static fn allowed(source: CommandSourceStackHc, node: String) -> Bool;
     static fn featureEnabled(player: &ServerPlayer, feature: String) -> Bool;
 }
 
 fn ess_literal(real_name: String, twin_name: String, node: String) -> ArgumentBuilderSrc {
     return CommandsHc::literal(EssentialsHcModeHc::literal(real_name, twin_name))
-        .requires(|src| { return EssentialsHcModeHc::allowed(src as CommandSourceStackHc, node); });
+        .requires(|src| { return perm_allowed(src as CommandSourceStackHc, node); });
 }
 
 fn ess_op_required(source: JObjectCmd) -> Bool {

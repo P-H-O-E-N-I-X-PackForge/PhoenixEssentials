@@ -7,8 +7,8 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.permission.PermissionAPI;
 import net.minecraftforge.server.permission.events.PermissionGatherEvent;
 import net.minecraftforge.server.permission.nodes.PermissionNode;
-import net.minecraftforge.server.permission.nodes.PermissionTypes;
 import net.phoenixvine.essentials.PhoenixEssentials;
+import net.phoenixvine.essentials.hc.hcCompileMerged1;
 
 @Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
 public final class EssentialsPermissions {
@@ -51,60 +51,51 @@ public final class EssentialsPermissions {
 
     private EssentialsPermissions() {}
 
+    // The nodes themselves are built and registered by the Hot Chocolate port
+    // (`EssentialsPermissions.hotc`, `perm_gather`); this copies each one into the public static field so
+    // the Java commands' `check(source, HOME)` calls use the very same node objects.
     @SubscribeEvent
     public static void gather(PermissionGatherEvent.Nodes event) {
-        HOME = allByDefault("home");
-        SETHOME = allByDefault("sethome");
-        DELHOME = allByDefault("delhome");
-        HOMES = allByDefault("homes");
-        SETHOMELIMIT = opByDefault("sethomelimit");
-        SPAWN = allByDefault("spawn");
-        SETSPAWN = opByDefault("setspawn");
-        WARP = allByDefault("warp");
-        SETWARP = opByDefault("setwarp");
-        DELWARP = opByDefault("delwarp");
-        WARPS = allByDefault("warps");
-        BACK = allByDefault("back");
-        RTP = allByDefault("rtp");
-        TPA = allByDefault("tpa");
-        MSG = allByDefault("msg");
-        NICK = allByDefault("nick");
-        IGNORE = allByDefault("ignore");
-        AFK = allByDefault("afk");
-        PLAYERINFO = allByDefault("playerinfo");
-        SEEN = allByDefault("seen");
-        PLAYTIME = allByDefault("playtime");
-        KIT = allByDefault("kit");
-        HEAL = allByDefault("heal");
-        FEED = allByDefault("feed");
-
-        GOD = allByDefault("god");
-        FLY = allByDefault("fly");
-        GAMEMODE = allByDefault("gamemode");
-        TOP = allByDefault("top");
-        WEATHER = opByDefault("weather");
-
-        INVSEE = opByDefault("invsee");
-
-        TPX = opByDefault("tpx");
-        TPFORCE = opByDefault("tpforce");
-
-        BYPASS_COOLDOWN = opByDefault("bypass_cooldown");
-        BYPASS_WARMUP = opByDefault("bypass_warmup");
-
-        event.addNodes(HOME, SETHOME, DELHOME, HOMES, SETHOMELIMIT, SPAWN, SETSPAWN, WARP, SETWARP, DELWARP, WARPS,
-                BACK, RTP, TPA, MSG, NICK, IGNORE, AFK, PLAYERINFO, SEEN, PLAYTIME, KIT, HEAL, FEED, INVSEE, GOD, FLY,
-                GAMEMODE, TOP, WEATHER, TPX, TPFORCE, BYPASS_COOLDOWN, BYPASS_WARMUP);
+        hcCompileMerged1.perm_gather(event);
+        HOME = node("HOME");
+        SETHOME = node("SETHOME");
+        DELHOME = node("DELHOME");
+        HOMES = node("HOMES");
+        SETHOMELIMIT = node("SETHOMELIMIT");
+        SPAWN = node("SPAWN");
+        SETSPAWN = node("SETSPAWN");
+        WARP = node("WARP");
+        SETWARP = node("SETWARP");
+        DELWARP = node("DELWARP");
+        WARPS = node("WARPS");
+        BACK = node("BACK");
+        RTP = node("RTP");
+        TPA = node("TPA");
+        MSG = node("MSG");
+        NICK = node("NICK");
+        IGNORE = node("IGNORE");
+        AFK = node("AFK");
+        PLAYERINFO = node("PLAYERINFO");
+        SEEN = node("SEEN");
+        PLAYTIME = node("PLAYTIME");
+        KIT = node("KIT");
+        HEAL = node("HEAL");
+        FEED = node("FEED");
+        INVSEE = node("INVSEE");
+        GOD = node("GOD");
+        FLY = node("FLY");
+        GAMEMODE = node("GAMEMODE");
+        TOP = node("TOP");
+        TPX = node("TPX");
+        TPFORCE = node("TPFORCE");
+        WEATHER = node("WEATHER");
+        BYPASS_COOLDOWN = node("BYPASS_COOLDOWN");
+        BYPASS_WARMUP = node("BYPASS_WARMUP");
     }
 
-    private static PermissionNode<Boolean> allByDefault(String path) {
-        return new PermissionNode<>(PhoenixEssentials.MOD_ID, path, PermissionTypes.BOOLEAN,
-                (player, uuid, context) -> true);
-    }
-
-    private static PermissionNode<Boolean> opByDefault(String path) {
-        return new PermissionNode<>(PhoenixEssentials.MOD_ID, path, PermissionTypes.BOOLEAN,
-                (player, uuid, context) -> player != null && player.hasPermissions(2));
+    @SuppressWarnings("unchecked")
+    private static PermissionNode<Boolean> node(String fieldName) {
+        return (PermissionNode<Boolean>) hcCompileMerged1.perm_node(fieldName);
     }
 
     public static boolean check(CommandSourceStack source, PermissionNode<Boolean> node) {

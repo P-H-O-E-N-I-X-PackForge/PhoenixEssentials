@@ -1,14 +1,8 @@
 package net.phoenixvine.essentials;
 
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.server.permission.nodes.PermissionNode;
 import net.phoenixvine.essentials.api.EssentialsAPI;
-import net.phoenixvine.essentials.config.EssentialsPermissions;
 
-import java.lang.reflect.Field;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 // Switch + parity helpers for the Hot Chocolate takeover (src/main/hotc, see its README).
 //
@@ -18,7 +12,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class EssentialsHcMode {
 
     private static final boolean TAKEOVER = !Boolean.getBoolean("phoenix_essentials.use_java");
-    private static final Map<String, PermissionNode<Boolean>> NODES = new ConcurrentHashMap<>();
 
     private EssentialsHcMode() {}
 
@@ -30,27 +23,6 @@ public final class EssentialsHcMode {
     // over, the `hc` twin otherwise.
     public static String literal(String realName, String twinName) {
         return TAKEOVER ? realName : twinName;
-    }
-
-    // Same gate the Java commands apply with `.requires(source -> EssentialsPermissions.check(...))`.
-    // `nodeName` is the EssentialsPermissions field name ("HOME", "GOD", ...); empty = no gate.
-    @SuppressWarnings("unchecked")
-    public static boolean allowed(CommandSourceStack source, String nodeName) {
-        if (nodeName == null || nodeName.isEmpty()) return true;
-        PermissionNode<Boolean> node = NODES.get(nodeName);
-        if (node == null) {
-            try {
-                Field f = EssentialsPermissions.class.getField(nodeName);
-                node = (PermissionNode<Boolean>) f.get(null);
-            } catch (ReflectiveOperationException e) {
-                PhoenixEssentials.LOGGER.error("[hc] unknown permission node '{}'", nodeName, e);
-                return false;
-            }
-            // The fields are filled during PermissionGatherEvent -- never cache a not-yet-set null.
-            if (node != null) NODES.put(nodeName, node);
-        }
-        if (node == null) return true;
-        return EssentialsPermissions.check(source, node);
     }
 
     // `feature` is one of "teleport" / "kits" / "social" (EssentialsAPI.FEATURE_*).
