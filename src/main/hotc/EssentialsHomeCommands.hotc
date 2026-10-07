@@ -1,0 +1,143 @@
+// --- Real, capability-backed port of HomeCommand.java's own core four commands ---
+//
+// Unlike Ganache's own `essentials_home_example.hc` (a different project, stub in-memory
+// storage), this port reads/writes the REAL `PlayerEssentialsData` Forge capability (NBT-
+// persisted, survives a restart) and calls the REAL `TeleportExecutor` (warmup/cooldown/cancel-
+// on-move/cancel-on-damage, `TeleportExecutor.java`'s own already-built machinery) -- nothing
+// about persistence or teleport behavior is reimplemented here, only the Brigadier command
+// surface itself (`command.hc`'s own bindings), same "call the real Java directly" approach
+// `EssentialsConfigScreenHc.hotc`/`EssentialsListScreenPort.hotc` already established for the
+// two ported screens.
+//
+// `hc`-prefixed command literals (`/hchome`, not `/home`) -- same "don't collide with the real
+// mod's own commands" reasoning `command_example.hc`'s own `hcspawn`/`hcheal`/`hcnick` already
+// established; the real `/home`/`/sethome`/`/delhome`/`/homes` (`HomeCommand.java`, registered via
+// `EssentialsCommands.registerAll`) stay registered, completely untouched, reachable alongside
+// these the whole time -- a deliberate side-by-side pilot, not a replacement, until this port (and
+// a real `/sethomelimit`-equivalent, not attempted here) is trusted enough to take over the real
+// names.
+//
+// Not ported: `/sethomelimit`/`/sethomelimit team` (needs `TeamCompat`, a separate third-party-
+// integration surface untouched this pass) and `HOME_NAME_SUGGESTIONS` tab-complete
+// (`command.hc`'s own header already discloses this pilot stops short of `.suggests(...)`) -- the
+// same two real, disclosed scope cuts the Ganache stub version already had.
+
+// `&CommandSourceStackHc`/`&EssentialsPlayerDataHc` throughout below -- `source`/`data` are each
+// reused across several calls within one command (a receiver call AND an argument pass, or an
+// argument pass more than once); declaring these by value would move-check-fail after the first
+// such use, the same "real reference type, `&` needed to reuse across multiple calls" rule
+// `EssentialsConfigScreenHc.hotc`'s own `gfx`/`EssentialsUIKitHc` bindings already hit. No real
+// runtime difference either way (`&`/`&mut` are pure compile-time annotations).
+fn ess_player_data(source: &CommandSourceStackHc) -> EssentialsPlayerDataHc {
+    let player = source.getPlayer();
+    if player == null { return null; }
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data = opt.orElse(null);
+    if data == null { return null; }
+    return data as EssentialsPlayerDataHc;
+}
+
+fn ess_home_limit(data: &EssentialsPlayerDataHc) -> Int {
+    let override_limit = data.getHomeLimitOverride();
+    if override_limit >= 0 { return override_limit; }
+    return EssentialsServerConfigHc::HOMES_PER_PLAYER.get() as Int;
+}
+
+fn hc_teleport_home2(source: CommandSourceStackHc, name: String) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let home = data.getHome(name);
+    if home == null {
+        source.sendFailure(Component::literal("No home named \"{name}\" - set one with /hcsethome {name}") as Component);
+        return 0;
+    }
+    TeleportExecutorHc::request(player, home, "home", "home \"{name}\"");
+    return 1;
+}
+
+fn hc_set_home2(source: CommandSourceStackHc, name: String) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let limit = ess_home_limit(&data);
+    if data.getHome(name) == null && EssentialsHcServerBridgeHc::homeCount(&data) >= limit {
+        source.sendFailure(Component::literal("You've reached your limit of {limit} homes - delete one with /hcdelhome first.") as Component);
+        return 0;
+    }
+    data.setHome(name, NamedLocationHc::of(player));
+    source.sendSuccess(|| { return Component::literal("Home \"{name}\" set.") as JObjectCmd; }, false);
+    return 1;
+}
+
+fn hc_delete_home2(source: CommandSourceStackHc, name: String) -> Int {
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    if !data.deleteHome(name) {
+        source.sendFailure(Component::literal("No home named \"{name}\".") as Component);
+        return 0;
+    }
+    source.sendSuccess(|| { return Component::literal("Home \"{name}\" deleted.") as JObjectCmd; }, false);
+    return 1;
+}
+
+fn hc_list_homes2(source: CommandSourceStackHc) -> Int {
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let csv = EssentialsHcServerBridgeHc::homeNamesCsv(&data);
+    let count = EssentialsHcServerBridgeHc::homeCount(&data);
+    if count == 0 {
+        source.sendSuccess(|| { return Component::literal("You have no homes set. Use /hcsethome <name>.") as JObjectCmd; }, false);
+    } else {
+        let limit = ess_home_limit(&data);
+        source.sendSuccess(|| { return Component::literal("Homes ({count}/{limit}): {csv}") as JObjectCmd; }, false);
+    }
+    return 1;
+}
+
+// Real tab-complete -- the player's own current home names, same real source `HomeCommand.java`'s
+// own `HOME_NAME_SUGGESTIONS` reads from (just without the `ctx.getSource().getEntity() instanceof
+// ServerPlayer` guard, since `ess_player_data` already handles a non-player/no-capability source by
+// returning `null`, suggesting nothing).
+fn hc_suggest_home_names(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
+    let source = ctx.getSource() as CommandSourceStackHc;
+    let data = ess_player_data(&source);
+    if data == null { return builder.buildFuture(); }
+    let csv = EssentialsHcServerBridgeHc::homeNamesCsv(&data);
+    return ess_suggest_from_csv(builder, csv).buildFuture();
+}
+
+pub fn register_real_home_commands(dispatcher: CommandDispatcherSrc) {
+    let home_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .suggests(|ctx, builder| { return hc_suggest_home_names(ctx, builder); })
+        .executes(|ctx| {
+        return hc_teleport_home2(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
+    });
+    let home_builder = CommandsHc::literal("hchome")
+        .executes(|ctx| { return hc_teleport_home2(ctx.getSource() as CommandSourceStackHc, "home"); })
+        .then(home_name_arg);
+    dispatcher.register(home_builder as LiteralArgumentBuilderSrc);
+
+    let sethome_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_set_home2(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
+    });
+    let sethome_builder = CommandsHc::literal("hcsethome")
+        .executes(|ctx| { return hc_set_home2(ctx.getSource() as CommandSourceStackHc, "home"); })
+        .then(sethome_name_arg);
+    dispatcher.register(sethome_builder as LiteralArgumentBuilderSrc);
+
+    let delhome_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .suggests(|ctx, builder| { return hc_suggest_home_names(ctx, builder); })
+        .executes(|ctx| {
+        return hc_delete_home2(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
+    });
+    let delhome_builder = CommandsHc::literal("hcdelhome").then(delhome_name_arg);
+    dispatcher.register(delhome_builder as LiteralArgumentBuilderSrc);
+
+    let homes_builder = CommandsHc::literal("hchomes").executes(|ctx| {
+        return hc_list_homes2(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(homes_builder as LiteralArgumentBuilderSrc);
+}

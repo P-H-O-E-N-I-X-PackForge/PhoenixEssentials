@@ -1,0 +1,287 @@
+// --- Real bridge bindings: the REAL PhoenixEssentials Java classes, bound directly ---
+//
+// The point of this file: a pixel/color-faithful HC port of `EssentialsConfigScreen` doesn't
+// reimplement its chrome-drawing logic -- it calls the SAME real `EssentialsUIKit`/
+// `EssentialsThemePalette`/`PhoenixTheme` Java classes the original screen already calls, via
+// ordinary `extern class` bindings (confirmed directly: `extern class` static FIELD access is
+// real, genuine `GETSTATIC`/`PUTSTATIC` -- `Codegen.hotc`'s own `extern_field_static_list`, not a
+// guess). Identical output follows automatically from calling the identical code, rather than
+// trying to hand-copy colors/pixel math into HC and hoping they stay in sync.
+//
+// `EssentialsNetwork.CHANNEL` -- this port reuses the REAL mod's own existing networking channel
+// and real packets (`C2SRequestSyncPacket`) rather than standing up a second, parallel hotc-mc
+// `ui_channel` -- the whole point of porting INTO this project instead of building a side demo in
+// Ganache is interoperating with what's already here, not duplicating it.
+
+extern class EssentialsThemePaletteHc = "net.phoenixvine.essentials.client.EssentialsThemePalette" {
+    static BG: Int;
+    static PANEL: Int;
+    static HEADER: Int;
+    static BORDER: Int;
+    static ACCENT: Int;
+    static TEXT: Int;
+    static TEXT_DIM: Int;
+    static TEXT_FAINT: Int;
+    static fn refresh(t: PhoenixThemeHc);
+}
+
+// Mostly opaque -- round-tripped from `PhoenixTheme::current()` straight into
+// `EssentialsThemePaletteHc::refresh(...)`, exactly like the original screen's own
+// `EssentialsThemePalette.refresh(PhoenixTheme.current())` call. The 10 real public INSTANCE
+// fields (confirmed via `javap`) are bound too, needed only by `open_wiki` below to rebuild a
+// `WikiTheme` the same way the original screen's own `openWiki()` does.
+extern class PhoenixThemeHc = "net.phoenixvine.wiki.theme.PhoenixTheme" {
+    static fn current() -> PhoenixThemeHc;
+    static fn getActiveName() -> String;
+    bg: ThemeColorHc;
+    panel: ThemeColorHc;
+    header: ThemeColorHc;
+    border: ThemeColorHc;
+    accent: ThemeColorHc;
+    text: ThemeColorHc;
+    textDim: ThemeColorHc;
+    textFaint: ThemeColorHc;
+    done: ThemeColorHc;
+    activeColor: ThemeColorHc;
+}
+
+extern class ThemeColorHc = "net.phoenixvine.wiki.theme.PhoenixTheme$ThemeColor" {
+    fn getColor(&self) -> Int;
+}
+
+// Tiny, disclosed Java shim (`EssentialsHcBridge.java`, same directory as the other real client
+// classes) -- the exact same `cycleTheme()` logic `EssentialsConfigScreen.java` already has,
+// exposed as one static method so this HC port doesn't need a brand-new
+// `java.util.Map`/`Set`/iteration binding surface in hotc-mc itself for this one real caller (same
+// "a tiny Java shim over a real gap" precedent `GanacheNet.java` already set for Ganache).
+extern class EssentialsHcBridgeHc = "net.phoenixvine.essentials.client.EssentialsHcBridge" {
+    static fn cycleTheme();
+}
+
+extern class EssentialsUIKitHc = "net.phoenixvine.essentials.client.EssentialsUIKit" {
+    // `g: &GuiGraphicsHc` -- `gfx` (the real `render`/`mouseClicked` override's own by-value param)
+    // is reused across several real draw calls within the same render pass (`ess_draw_menu_button`
+    // alone is called 4 times per frame); declaring this param by value would move-check-fail after
+    // the first call, the same "real reference type, `&` needed to reuse across multiple calls"
+    // rule `ui_render.hc`'s own helpers already follow. `font` stays plain `FontHc` -- every real
+    // call site below fetches a FRESH `Minecraft::getInstance().font` read inline rather than
+    // reusing one shared local, so there's no tracked value to move-check in the first place (see
+    // `EssentialsConfigScreenHc.hotc`'s own `ess_compute_layout` header for why). No real runtime
+    // difference either way (`&`/`&mut` are pure compile-time annotations).
+    static fn drawModalChrome(g: &GuiGraphicsHc, font: FontHc, screenW: Int, screenH: Int, panelX: Int, panelY: Int, panelW: Int, panelH: Int, headerH: Int, title: String);
+    static fn drawBorder(g: &GuiGraphicsHc, x: Int, y: Int, w: Int, h: Int, color: Int);
+}
+
+extern class EssentialsSettingsHc = "net.phoenixvine.essentials.client.EssentialsSettings" {
+    static fn get() -> EssentialsSettingsHc;
+    fn isShowAfkOverlay(&self) -> Bool;
+    fn setShowAfkOverlay(&self, v: Bool);
+    fn save(&self);
+}
+
+// Opaque pass-through -- never constructed here, only forwarded to
+// `PhoenixThemeEditorScreenHc::new(...)`/`EssentialsListScreenHc::new(...)` below as a `parent`
+// screen, the same "no real inheritance between extern aliases" convention
+// `command_example.hc`'s own `Player`/`ServerPlayer` split already established -- `self as ScreenHc`
+// at the one real call site covers it.
+
+// The real "Edit colors..." link target -- a screen from the separate `phoenix_wiki` mod this
+// project already depends on (`modCompileOnly`/`modRuntimeOnly` in `build.gradle`). Bound as an
+// opaque `extends`-free extern class purely to construct-and-open it; this port does not
+// reimplement the theme editor itself.
+extern class PhoenixThemeEditorScreenHc = "net.phoenixvine.wiki.theme.PhoenixThemeEditorScreen" {
+    fn new(parent: ScreenHc, title: String) -> Self;
+}
+
+extern class PhoenixWikiAPIHc = "net.phoenixvine.wiki.PhoenixWikiAPI" {
+    static fn open(parent: ScreenHc, modid: String, page: String, theme: WikiThemeHc);
+}
+
+extern class WikiThemeHc = "net.phoenixvine.wiki.client.screen.WikiTheme" {
+    fn new(bg: Int, panel: Int, header: Int, border: Int, accent: Int, text: Int, textDim: Int, textFaint: Int, done: Int, activeColor: Int) -> Self;
+}
+
+// Real nested-enum binding, same "`$`-qualified binary name, static field per constant" pattern
+// `networking.hc`'s own `PacketDistributorHc::PLAYER` already established for a plain Java enum.
+extern class C2SRequestSyncKindHc = "net.phoenixvine.essentials.network.packet.C2SRequestSyncPacket$Kind" {
+    static HOMES: C2SRequestSyncKindHc;
+    static WARPS: C2SRequestSyncKindHc;
+    static KITS: C2SRequestSyncKindHc;
+    static TRASH: C2SRequestSyncKindHc;
+}
+
+extern class C2SRequestSyncPacketHc = "net.phoenixvine.essentials.network.packet.C2SRequestSyncPacket" {
+    fn new(kind: C2SRequestSyncKindHc) -> Self;
+}
+
+// The real mod's own shared channel -- see this file's own header for why this port reuses it
+// instead of standing up a second one. `EssentialsNetwork.init()` (real Java, unchanged) already
+// populates this before any screen can open, same as the original `EssentialsConfigScreen`/
+// `EssentialsListScreen` already assume.
+extern class EssentialsNetworkHc = "net.phoenixvine.essentials.network.EssentialsNetwork" {
+    static CHANNEL: SimpleChannel;
+}
+
+// The real, UNCHANGED `EssentialsListScreen` -- this pass ports `EssentialsConfigScreen` only (see
+// `README.md` in this directory); its own four nav buttons open this REAL Java screen exactly as
+// the original Java config screen does, rather than re-deriving a second, not-yet-pixel-matched HC
+// version of the list screen. A later pass can port this one too and swap this binding for a real
+// HC `extends ScreenHc` struct instead.
+extern class EssentialsListScreenHc = "net.phoenixvine.essentials.client.EssentialsListScreen" {
+    fn new(parent: ScreenHc, kind: C2SRequestSyncKindHc, title: String) -> Self;
+}
+
+// --- Real bridge bindings, part 2: the list screen's own real data/network surface ---
+//
+// `EssentialsClientCache` -- the real client-side cache `EssentialsListScreen.java` itself reads
+// from (`getHomes`/`getWarps`/`getKits`/`getAutoTrash`), populated by the real
+// `S2CHomesSyncPacket`/`S2CWarpsSyncPacket`/`S2CKitsSyncPacket`/`S2CAutoTrashSyncPacket` handlers
+// (unchanged Java -- this port reads the cache the same way the original screen already does, it
+// doesn't re-implement the sync packets themselves).
+extern class EssentialsClientCacheHc = "net.phoenixvine.essentials.client.EssentialsClientCache" {
+    static fn getHomes() -> JListHc;
+    static fn getHomesCap() -> Int;
+    static fn getWarps() -> JListHc;
+    static fn getKits() -> JListHc;
+    static fn getAutoTrash() -> JListHc;
+}
+
+// The real nested record `EssentialsClientCache.KitEntry(String name, int cooldownRemainingSeconds)`
+// -- a real Java record's own auto-generated accessors (`name()`/`cooldownRemainingSeconds()`),
+// same binding shape as any other extern method.
+extern class EssentialsKitEntryHc = "net.phoenixvine.essentials.client.EssentialsClientCache$KitEntry" {
+    fn name(&self) -> String;
+    fn cooldownRemainingSeconds(&self) -> Int;
+}
+
+extern class C2SGuiTeleportKindHc = "net.phoenixvine.essentials.network.packet.C2SGuiTeleportPacket$Kind" {
+    static HOME: C2SGuiTeleportKindHc;
+    static WARP: C2SGuiTeleportKindHc;
+    static BACK: C2SGuiTeleportKindHc;
+}
+
+extern class C2SGuiTeleportPacketHc = "net.phoenixvine.essentials.network.packet.C2SGuiTeleportPacket" {
+    fn new(kind: C2SGuiTeleportKindHc, name: String) -> Self;
+}
+
+extern class C2SGuiClaimKitPacketHc = "net.phoenixvine.essentials.network.packet.C2SGuiClaimKitPacket" {
+    fn new(name: String) -> Self;
+}
+
+// --- Real bridge bindings, part 3: real per-player home persistence + real teleport ---
+//
+// Reuses the REAL, UNCHANGED `PlayerEssentialsData`/`EssentialsCapabilityProvider` (a genuine
+// Forge Capability, NBT-persisted) and `TeleportExecutor` (real warmup/cooldown/cancel-on-move/
+// cancel-on-damage logic, `TeleportExecutor.java`'s own already-built machinery) instead of
+// Ganache's own in-memory stub (`essentials_home_example.hc`, a different project entirely) --
+// this is the real thing, not a demo of the mechanism.
+
+// `CapabilityHc`/`LazyOptionalHc`/`ServerPlayer.getCapability` live in hotc-mc itself now
+// (`ForgeCapability.hotc`) -- real, stable, mod-agnostic Forge types, not something specific to
+// this mod (unlike `EssentialsCapabilityProviderHc` right below, which genuinely IS mod-specific).
+
+extern class EssentialsCapabilityProviderHc = "net.phoenixvine.essentials.capability.EssentialsCapabilityProvider" {
+    static PLAYER_ESSENTIALS: CapabilityHc;
+}
+
+extern class EssentialsPlayerDataHc = "net.phoenixvine.essentials.capability.PlayerEssentialsData" {
+    fn getHome(&self, name: String) -> NamedLocationHc;
+    fn setHome(&self, name: String, loc: NamedLocationHc);
+    fn deleteHome(&self, name: String) -> Bool;
+    fn getHomeLimitOverride(&self) -> Int;
+    // Real, nullable -- `null` until `TeleportExecutor`'s own `executeNow` sets it on every real
+    // teleport (`essentials_bridge.hc`'s `TeleportExecutorHc::request` already triggers this as a
+    // side effect of a successful home/warp/spawn teleport). First real caller: `/hcback`.
+    fn getBack(&self) -> NamedLocationHc;
+    fn setNickname(&self, nickname: String);
+    fn isAfk(&self) -> Bool;
+    fn setAfk(&self, afk: Bool);
+    // Real auto-trash set ops -- `toggleAlwaysTrash` returns `true` if the id is NOW trashed.
+    fn toggleAlwaysTrash(&self, id: ResourceLocation) -> Bool;
+    fn removeAlwaysTrash(&self, id: ResourceLocation);
+}
+
+// Shared (not mod-specific) additions this port needed live in hotc-mc: `ServerPlayer.
+// getMainHandItem`, `ForgeRegistryItem.getKey`, and `ResourceLocationArgumentSrc` (already bound).
+
+// Opaque -- never reads/writes its own fields from HC at all, only round-tripped from
+// `NamedLocationHc::of(player)` straight into `TeleportExecutorHc::request(...)`/
+// `EssentialsPlayerDataHc::setHome(...)`.
+extern class NamedLocationHc = "net.phoenixvine.essentials.data.NamedLocation" {
+    static fn of(player: ServerPlayer) -> Self;
+}
+
+// Real, already-built warmup/cooldown/cancel-on-move/cancel-on-damage machinery
+// (`TeleportExecutor.java`) -- this port calls straight into it rather than re-implementing any
+// of that logic. The 4-arg overload (`category`/`destinationLabel`, no explicit
+// `successDetail`/`bypassWarmupAndCooldown`) matches the original `HomeCommand.java`'s own
+// `teleportHome` call exactly.
+extern class TeleportExecutorHc = "net.phoenixvine.essentials.command.TeleportExecutor" {
+    static fn request(player: ServerPlayer, target: NamedLocationHc, category: String, destinationLabel: String);
+    // Real, instant, no warmup/cooldown -- first caller: `/hctpforce`/`/hctphere`.
+    static fn forceTeleport(player: ServerPlayer, target: NamedLocationHc, category: String, destinationLabel: String);
+}
+
+// Real, confirmed bug fixed here: `HOMES_PER_PLAYER` names the real `ForgeConfigSpec$IntValue`
+// HOLDER object itself, not an `Int` -- reading the field and casting it `as Int` directly
+// (`JObjectForgeCap as Int`) threw a real `ClassCastException` at runtime (CHECKCAST against
+// `Integer` on an actual `IntValue` instance), silently swallowed by Brigadier's own command
+// dispatch with no chat feedback and no visible stack trace in this session's own log -- the exact
+// "no feedback at all" symptom that surfaced it. `ConfigValue<T>.get()` erases to `Object get()`
+// (confirmed via `javap` -- `IntValue` doesn't covariantly override it), so a caller needs BOTH
+// the `.get()` call AND the `as Int` unboxing cast, not just the cast alone.
+extern class ForgeConfigIntValueHc = "net.minecraftforge.common.ForgeConfigSpec$IntValue" {
+    fn get(&self) -> JObjectForgeCap;
+}
+
+extern class EssentialsServerConfigHc = "net.phoenixvine.essentials.config.EssentialsServerConfig" {
+    static HOMES_PER_PLAYER: ForgeConfigIntValueHc;
+}
+
+extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.EssentialsHcServerBridge" {
+    static fn homeNamesCsv(data: &EssentialsPlayerDataHc) -> String;
+    static fn homeCount(data: &EssentialsPlayerDataHc) -> Int;
+    static fn warpNamesCsv() -> String;
+    static fn kitNamesCsv() -> String;
+    static fn kitExists(name: String) -> Bool;
+    static fn kitCooldownRemainingSeconds(data: &EssentialsPlayerDataHc, name: String) -> Int;
+    static fn claimKit(player: ServerPlayer, data: &EssentialsPlayerDataHc, name: String);
+    static fn playtimeFormatted(data: &EssentialsPlayerDataHc) -> String;
+    // Real, nullable -- `null` means no record of that player at all.
+    static fn seenMessage(server: MinecraftServerHc, name: String) -> String?;
+    static fn topLocation(player: ServerPlayer) -> NamedLocationHc;
+    // Real, nullable -- `null` means the player is already in that dimension.
+    static fn tpxLocation(player: ServerPlayer, target_level: ServerLevel) -> NamedLocationHc;
+    static fn dimensionLabel(level: ServerLevel) -> String;
+    // Real, nullable -- `null` on success (teleport requested), else the error to show.
+    static fn rtp(player: ServerPlayer) -> String?;
+    // Real, nullable -- `null` if the target has no essentials data.
+    static fn playerInfo(target: ServerPlayer) -> String?;
+    static fn openTrash(player: ServerPlayer);
+    static fn autoTrashCsv(data: &EssentialsPlayerDataHc) -> String;
+    // Real, nullable -- an error message string on failure, `null` on success.
+    static fn sendDirectMessage(sender: ServerPlayer, target: ServerPlayer, message: String) -> String?;
+    static fn getLastMessagedName(server: MinecraftServerHc, player: ServerPlayer) -> String?;
+    static fn setIgnored(data: &EssentialsPlayerDataHc, target: ServerPlayer, ignore: Bool);
+    // Real /tpa family -- each returns `null` on success, or an error message to show via sendFailure.
+    static fn tpaRequest(requester: ServerPlayer, target: ServerPlayer, here: Bool) -> String?;
+    static fn tpaRespond(server: MinecraftServerHc, target: ServerPlayer, accept: Bool) -> String?;
+    static fn tpaCancel(requester: ServerPlayer) -> String?;
+}
+
+extern class WarpRegistryHc = "net.phoenixvine.essentials.data.WarpRegistry" {
+    static fn get(name: String) -> NamedLocationHc;
+    static fn set(name: String, loc: NamedLocationHc);
+    static fn remove(name: String) -> Bool;
+}
+
+extern class SpawnRegistryHc = "net.phoenixvine.essentials.data.SpawnRegistry" {
+    static fn set(loc: NamedLocationHc);
+    static fn getOrDefault(overworld: ServerLevel) -> NamedLocationHc;
+}
+
+// Shim with its own container-close event handler (hotc-mc has no event-subscription binding) --
+// see `EssentialsHcInvsee.java`'s own header. Returns `null` on success, else the error to show.
+extern class EssentialsHcInvseeHc = "net.phoenixvine.essentials.EssentialsHcInvsee" {
+    static fn open(viewer: ServerPlayer, target: ServerPlayer) -> String?;
+}

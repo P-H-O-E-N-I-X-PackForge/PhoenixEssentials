@@ -1,0 +1,90 @@
+// --- Real port of HealFeedCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command in this project uses --
+// every effect (`setHealth`/`getMaxHealth`/`removeAllEffects` via `target as LivingEntity`,
+// `getFoodData()`/`clearFire()` directly on `ServerPlayer`) is a real, already-bound method call,
+// nothing reimplemented.
+//
+// `hc`-prefixed command literals (`/hcheal`/`/hcfeed`) -- same side-by-side-pilot reasoning every
+// other ported command file in this project already gives; the real `/heal`/`/feed`
+// (`HealFeedCommand.java`) stay registered and untouched.
+//
+// Real, disclosed scope cut: the original's own optional `<player>` argument additionally
+// `.requires(source -> source.hasPermission(2))` (op-only when targeting someone else) -- not
+// ported; this port's own optional-target form has no extra permission gate. A real deployment
+// wanting that back would add `.requires(...)` the same way `command_example.hc`'s own `hcheal`
+// pilot already demonstrates.
+
+// `&CommandSourceStackHc` -- `source` is reused across these calls (once to resolve the target,
+// again to report success), the same move-checker reasoning every other multi-use `source`/`data`
+// param in this project's ported commands already follows.
+fn hc_resolve_target(source: &CommandSourceStackHc, target_name: String) -> ServerPlayer {
+    let target = source.getServer().getPlayerList().getPlayerByName(target_name);
+    if target == null {
+        source.sendFailure(Component::literal("Player \"{target_name}\" isn't online.") as Component);
+    }
+    return target;
+}
+
+fn hc_heal(source: &CommandSourceStackHc, target: ServerPlayer, named: Bool) -> Int {
+    let living = target as LivingEntity;
+    living.setHealth(living.getMaxHealth());
+    target.getFoodData().setFoodLevel(20);
+    target.getFoodData().setSaturation(20.0f);
+    target.clearFire();
+    living.removeAllEffects();
+    target.sendSystemMessage(Component::literal("You have been healed.") as Component);
+    if named {
+        let display_name = target.getGameProfile().getName();
+        source.sendSuccess(|| { return Component::literal("Healed {display_name}.") as JObjectCmd; }, true);
+    }
+    return 1;
+}
+
+fn hc_feed(source: &CommandSourceStackHc, target: ServerPlayer, named: Bool) -> Int {
+    target.getFoodData().setFoodLevel(20);
+    target.getFoodData().setSaturation(20.0f);
+    target.sendSystemMessage(Component::literal("You have been fed.") as Component);
+    if named {
+        let display_name = target.getGameProfile().getName();
+        source.sendSuccess(|| { return Component::literal("Fed {display_name}.") as JObjectCmd; }, true);
+    }
+    return 1;
+}
+
+pub fn register_real_heal_feed_commands(dispatcher: CommandDispatcherSrc) {
+    let heal_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        let source = ctx.getSource() as CommandSourceStackHc;
+        let target = hc_resolve_target(&source, StringArgumentTypeSrc::getString(ctx, "player"));
+        if target == null { return 0; }
+        return hc_heal(&source, target, true);
+    });
+    // `hcheal2`, not `hcheal` -- hotc-mc's own `command_example.hc` (vendored into this same merged
+    // compile) already declares a `register_hcheal` with that literal; same latent-collision
+    // avoidance `EssentialsBackSpawnCommands.hotc`'s own `hcspawn2` already explains.
+    let heal_builder = CommandsHc::literal("hcheal2")
+        .executes(|ctx| {
+            let source = ctx.getSource() as CommandSourceStackHc;
+            let player = source.getPlayer();
+            if player == null { return 0; }
+            return hc_heal(&source, player, false);
+        })
+        .then(heal_player_arg);
+    dispatcher.register(heal_builder as LiteralArgumentBuilderSrc);
+
+    let feed_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        let source = ctx.getSource() as CommandSourceStackHc;
+        let target = hc_resolve_target(&source, StringArgumentTypeSrc::getString(ctx, "player"));
+        if target == null { return 0; }
+        return hc_feed(&source, target, true);
+    });
+    let feed_builder = CommandsHc::literal("hcfeed")
+        .executes(|ctx| {
+            let source = ctx.getSource() as CommandSourceStackHc;
+            let player = source.getPlayer();
+            if player == null { return 0; }
+            return hc_feed(&source, player, false);
+        })
+        .then(feed_player_arg);
+    dispatcher.register(feed_builder as LiteralArgumentBuilderSrc);
+}

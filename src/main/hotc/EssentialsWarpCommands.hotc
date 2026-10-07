@@ -1,0 +1,75 @@
+
+
+fn hc_teleport_warp(source: CommandSourceStackHc, name: String) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let warp = WarpRegistryHc::get(name);
+    if warp == null {
+        source.sendFailure(Component::literal("No warp named \"{name}\".") as Component);
+        return 0;
+    }
+    TeleportExecutorHc::request(player, warp, "warp", "warp \"{name}\"");
+    return 1;
+}
+
+fn hc_set_warp(source: CommandSourceStackHc, name: String) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    WarpRegistryHc::set(name, NamedLocationHc::of(player));
+    source.sendSuccess(|| { return Component::literal("Warp \"{name}\" set.") as JObjectCmd; }, true);
+    return 1;
+}
+
+fn hc_delete_warp(source: CommandSourceStackHc, name: String) -> Int {
+    if !WarpRegistryHc::remove(name) {
+        source.sendFailure(Component::literal("No warp named \"{name}\".") as Component);
+        return 0;
+    }
+    source.sendSuccess(|| { return Component::literal("Warp \"{name}\" deleted.") as JObjectCmd; }, true);
+    return 1;
+}
+
+fn hc_list_warps(source: CommandSourceStackHc) -> Int {
+    let csv = EssentialsHcServerBridgeHc::warpNamesCsv();
+    if csv == "" {
+        source.sendSuccess(|| { return Component::literal("No warps have been set.") as JObjectCmd; }, false);
+    } else {
+        source.sendSuccess(|| { return Component::literal("Warps: {csv}") as JObjectCmd; }, false);
+    }
+    return 1;
+}
+
+
+fn hc_suggest_warp_names(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
+    let csv = EssentialsHcServerBridgeHc::warpNamesCsv();
+    return ess_suggest_from_csv(builder, csv).buildFuture();
+}
+
+pub fn register_real_warp_commands(dispatcher: CommandDispatcherSrc) {
+    let warp_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .suggests(|ctx, builder| { return hc_suggest_warp_names(ctx, builder); })
+        .executes(|ctx| {
+        return hc_teleport_warp(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
+    });
+    let warp_builder = CommandsHc::literal("hcwarp").then(warp_name_arg);
+    dispatcher.register(warp_builder as LiteralArgumentBuilderSrc);
+
+    let setwarp_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_set_warp(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
+    });
+    let setwarp_builder = CommandsHc::literal("hcsetwarp").then(setwarp_name_arg);
+    dispatcher.register(setwarp_builder as LiteralArgumentBuilderSrc);
+
+    let delwarp_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .suggests(|ctx, builder| { return hc_suggest_warp_names(ctx, builder); })
+        .executes(|ctx| {
+        return hc_delete_warp(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
+    });
+    let delwarp_builder = CommandsHc::literal("hcdelwarp").then(delwarp_name_arg);
+    dispatcher.register(delwarp_builder as LiteralArgumentBuilderSrc);
+
+    let warps_builder = CommandsHc::literal("hcwarps").executes(|ctx| {
+        return hc_list_warps(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(warps_builder as LiteralArgumentBuilderSrc);
+}

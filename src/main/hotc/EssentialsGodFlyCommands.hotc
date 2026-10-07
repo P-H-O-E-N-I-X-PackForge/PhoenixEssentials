@@ -1,0 +1,85 @@
+// --- Real port of GodFlyCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command in this project uses --
+// reads and writes the real `Abilities.invulnerable`/`mayfly`/`flying` public fields directly
+// (`context.hc`'s own new `AbilitiesHc`), then `onUpdateAbilities()` to push the change to the
+// client, exactly like the original.
+//
+// `hc`-prefixed command literals (`/hcgod`/`/hcfly`) -- same side-by-side-pilot reasoning every
+// other ported command file in this project already gives; the real `/god`/`/fly`
+// (`GodFlyCommand.java`) stay registered and untouched. Same disclosed scope cut as
+// `EssentialsHealFeedCommands.hotc`: the original's own `<player>` argument also requires op level
+// 2, not ported here.
+
+fn hc_god_resolve(source: &CommandSourceStackHc, target_name: String) -> ServerPlayer {
+    let target = source.getServer().getPlayerList().getPlayerByName(target_name);
+    if target == null {
+        source.sendFailure(Component::literal("Player \"{target_name}\" isn't online.") as Component);
+    }
+    return target;
+}
+
+fn hc_toggle_god(source: &CommandSourceStackHc, target: ServerPlayer, named: Bool) -> Int {
+    var abilities = target.getAbilities();
+    let now_invulnerable = !abilities.invulnerable;
+    abilities.invulnerable = now_invulnerable;
+    target.onUpdateAbilities();
+    var status = "disabled.";
+    if now_invulnerable { status = "enabled."; }
+    target.sendSystemMessage(Component::literal("God mode {status}") as Component);
+    if named {
+        let display_name = target.getGameProfile().getName();
+        source.sendSuccess(|| { return Component::literal("Set god mode for {display_name} to {now_invulnerable}.") as JObjectCmd; }, true);
+    }
+    return 1;
+}
+
+fn hc_toggle_fly(source: &CommandSourceStackHc, target: ServerPlayer, named: Bool) -> Int {
+    var abilities = target.getAbilities();
+    let now_flying = !abilities.mayfly;
+    abilities.mayfly = now_flying;
+    if !now_flying { abilities.flying = false; }
+    target.onUpdateAbilities();
+    var status = "disabled.";
+    if now_flying { status = "enabled."; }
+    target.sendSystemMessage(Component::literal("Flight {status}") as Component);
+    if named {
+        let display_name = target.getGameProfile().getName();
+        source.sendSuccess(|| { return Component::literal("Set flight for {display_name} to {now_flying}.") as JObjectCmd; }, true);
+    }
+    return 1;
+}
+
+pub fn register_real_god_fly_commands(dispatcher: CommandDispatcherSrc) {
+    let god_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        let source = ctx.getSource() as CommandSourceStackHc;
+        let target = hc_god_resolve(&source, StringArgumentTypeSrc::getString(ctx, "player"));
+        if target == null { return 0; }
+        return hc_toggle_god(&source, target, true);
+    });
+    let god_builder = CommandsHc::literal("hcgod")
+        .executes(|ctx| {
+            let source = ctx.getSource() as CommandSourceStackHc;
+            let player = source.getPlayer();
+            if player == null { return 0; }
+            return hc_toggle_god(&source, player, false);
+        })
+        .then(god_player_arg);
+    dispatcher.register(god_builder as LiteralArgumentBuilderSrc);
+
+    let fly_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        let source = ctx.getSource() as CommandSourceStackHc;
+        let target = hc_god_resolve(&source, StringArgumentTypeSrc::getString(ctx, "player"));
+        if target == null { return 0; }
+        return hc_toggle_fly(&source, target, true);
+    });
+    let fly_builder = CommandsHc::literal("hcfly")
+        .executes(|ctx| {
+            let source = ctx.getSource() as CommandSourceStackHc;
+            let player = source.getPlayer();
+            if player == null { return 0; }
+            return hc_toggle_fly(&source, player, false);
+        })
+        .then(fly_player_arg);
+    dispatcher.register(fly_builder as LiteralArgumentBuilderSrc);
+}

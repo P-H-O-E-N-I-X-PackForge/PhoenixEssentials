@@ -1,0 +1,22 @@
+// --- Shared tab-complete helper for the ported home/warp/kit commands ---
+//
+// `command.hc`'s own new `CmdSuggestionProvider`/`SuggestionsBuilderHc` bindings are generic
+// Brigadier plumbing; this one helper is the actual real logic every `.suggests(...)` call site in
+// this project needs -- turn a comma-joined name list (`EssentialsHcServerBridgeHc`'s own
+// `homeNamesCsv`/`warpNamesCsv`/`kitNamesCsv`) into real suggestion entries. `String.split(...)`
+// resolves here even though `csv`'s own declared type is plain `String`, not an extern alias --
+// `essentials_list_example.hc`'s own `JStringEssentials` (bound elsewhere in this same merged
+// compile) already registers `split` against the real `java.lang.String` binary name, and the
+// checker resolves extern methods by binary name, not by which alias declared them.
+fn ess_suggest_from_csv(builder: SuggestionsBuilderHc, csv: String) -> SuggestionsBuilderHc {
+    var b = builder;
+    if csv.length() > 0 {
+        let names = csv.split(",");
+        var i = 0;
+        while i < names.length {
+            b = b.suggest(names[i]);
+            i = i + 1;
+        }
+    }
+    return b;
+}

@@ -1,0 +1,33 @@
+// --- Real port of InvseeCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command uses. The snapshot-and-
+// write-back inventory viewer needs a container-close EVENT HANDLER, and hotc-mc has no event-
+// subscription binding -- so the open + write-back pair is a direct Java copy
+// (`EssentialsHcInvsee`, with its own session map so `/hcinvsee` and the real `/invsee` can't
+// cross-wire) and HC just resolves the target and calls `open`. `hc`-prefixed literal, same
+// side-by-side-pilot reasoning; the real `/invsee` stays registered. Needs two online players to
+// exercise fully.
+
+fn hc_invsee(source: CommandSourceStackHc, target_name: String) -> Int {
+    let viewer = source.getPlayer();
+    if viewer == null { return 0; }
+    let target = source.getServer().getPlayerList().getPlayerByName(target_name);
+    if target == null {
+        source.sendFailure(Component::literal("Player \"{target_name}\" isn't online.") as Component);
+        return 0;
+    }
+    let error = EssentialsHcInvseeHc::open(viewer, target);
+    if error != null {
+        source.sendFailure(Component::literal(error) as Component);
+        return 0;
+    }
+    return 1;
+}
+
+pub fn register_real_invsee_command(dispatcher: CommandDispatcherSrc) {
+    let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_invsee(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"));
+    });
+    let invsee_builder = CommandsHc::literal("hcinvsee").then(player_arg);
+    dispatcher.register(invsee_builder as LiteralArgumentBuilderSrc);
+}

@@ -1,0 +1,66 @@
+// --- Real, capability + registry backed port of KitCommand.java's own two commands ---
+//
+// Same "call the real Java directly" approach every other ported command/screen this project uses
+// -- `EssentialsHcServerBridgeHc::claimKit`/`kitCooldownRemainingSeconds` (`EssentialsBridge.hotc`)
+// consolidate `KitCommand.java`'s own item-granting loop and cooldown math into two real calls
+// rather than binding `java.util.List<KitItemEntry>` iteration, `KitDefinition`'s own fields,
+// `Inventory.add`, and `System.currentTimeMillis()` individually for this one real caller.
+//
+// `hc`-prefixed command literals (`/hckit`, not `/kit`) -- same side-by-side-pilot reasoning every
+// other ported command file in this project already gives; the real `/kit`/`/kits`
+// (`KitCommand.java`) stay registered and untouched.
+//
+// Real, disclosed scope cut: `EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_KITS, ...)`
+// (a per-dimension feature toggle the original checks first) is not ported -- a real, separate
+// binding surface (`EssentialsAPI`) not touched this pass; this port's own `/hckit` is always
+// enabled, everywhere.
+
+fn hc_claim_kit(source: CommandSourceStackHc, name: String) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    if !EssentialsHcServerBridgeHc::kitExists(name) {
+        source.sendFailure(Component::literal("No kit named \"{name}\".") as Component);
+        return 0;
+    }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let remaining = EssentialsHcServerBridgeHc::kitCooldownRemainingSeconds(&data, name);
+    if remaining > 0 {
+        source.sendFailure(Component::literal("You can claim \"{name}\" again in {remaining}s.") as Component);
+        return 0;
+    }
+    EssentialsHcServerBridgeHc::claimKit(player, &data, name);
+    source.sendSuccess(|| { return Component::literal("Claimed kit \"{name}\".") as JObjectCmd; }, false);
+    return 1;
+}
+
+fn hc_list_kits(source: CommandSourceStackHc) -> Int {
+    let csv = EssentialsHcServerBridgeHc::kitNamesCsv();
+    if csv == "" {
+        source.sendSuccess(|| { return Component::literal("No kits are configured.") as JObjectCmd; }, false);
+    } else {
+        source.sendSuccess(|| { return Component::literal("Kits: {csv}") as JObjectCmd; }, false);
+    }
+    return 1;
+}
+
+// Real tab-complete -- every configured kit's own name (server-wide, same shape as warps' own).
+fn hc_suggest_kit_names(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
+    let csv = EssentialsHcServerBridgeHc::kitNamesCsv();
+    return ess_suggest_from_csv(builder, csv).buildFuture();
+}
+
+pub fn register_real_kit_commands(dispatcher: CommandDispatcherSrc) {
+    let kit_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .suggests(|ctx, builder| { return hc_suggest_kit_names(ctx, builder); })
+        .executes(|ctx| {
+        return hc_claim_kit(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
+    });
+    let kit_builder = CommandsHc::literal("hckit").then(kit_name_arg);
+    dispatcher.register(kit_builder as LiteralArgumentBuilderSrc);
+
+    let kits_builder = CommandsHc::literal("hckits").executes(|ctx| {
+        return hc_list_kits(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(kits_builder as LiteralArgumentBuilderSrc);
+}

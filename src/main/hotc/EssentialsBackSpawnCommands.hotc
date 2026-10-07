@@ -1,0 +1,64 @@
+// --- Real port of BackCommand.java + SpawnCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command in this project uses.
+// `/hcback` reads the real per-player `getBack()` (set automatically as a side effect of
+// `TeleportExecutor`'s own `executeNow`, on every successful home/warp/spawn teleport this port or
+// the original Java commands trigger -- shared state, not reimplemented). `/hcspawn`/`/hcsetspawn`
+// read/write the real server-wide `SpawnRegistry`.
+//
+// `hc`-prefixed command literals -- same side-by-side-pilot reasoning every other ported command
+// file in this project already gives; the real `/back`/`/spawn`/`/setspawn` stay registered and
+// untouched. Same disclosed cooldown-pool simplification `EssentialsWarpCommands.hotc`'s own
+// header already discloses (the simpler 4-arg `TeleportExecutorHc::request` overload, not the
+// original's own cooldown-config-reading 6-arg one).
+
+fn hc_teleport_back(source: CommandSourceStackHc) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let back = data.getBack();
+    if back == null {
+        source.sendFailure(Component::literal("You have nowhere to go back to.") as Component);
+        return 0;
+    }
+    TeleportExecutorHc::request(player, back, "back", "your previous location");
+    return 1;
+}
+
+fn hc_teleport_spawn(source: CommandSourceStackHc) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let overworld = source.getServer().overworld();
+    let spawn = SpawnRegistryHc::getOrDefault(overworld);
+    TeleportExecutorHc::request(player, spawn, "spawn", "spawn");
+    return 1;
+}
+
+fn hc_set_spawn(source: CommandSourceStackHc) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    SpawnRegistryHc::set(NamedLocationHc::of(player));
+    source.sendSuccess(|| { return Component::literal("Server spawn set to your current location.") as JObjectCmd; }, true);
+    return 1;
+}
+
+pub fn register_real_back_spawn_commands(dispatcher: CommandDispatcherSrc) {
+    let back_builder = CommandsHc::literal("hcback").executes(|ctx| {
+        return hc_teleport_back(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(back_builder as LiteralArgumentBuilderSrc);
+
+    // `hcspawn2`, not `hcspawn` -- hotc-mc's own `command_example.hc` (vendored into this same
+    // merged compile) already declares a `register_hcspawn` with that literal; nothing currently
+    // calls it from this project, but the name is avoided here to not create a latent collision.
+    let spawn_builder = CommandsHc::literal("hcspawn2").executes(|ctx| {
+        return hc_teleport_spawn(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(spawn_builder as LiteralArgumentBuilderSrc);
+
+    let setspawn_builder = CommandsHc::literal("hcsetspawn").executes(|ctx| {
+        return hc_set_spawn(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(setspawn_builder as LiteralArgumentBuilderSrc);
+}

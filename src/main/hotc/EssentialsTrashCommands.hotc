@@ -1,0 +1,81 @@
+// --- Real port of EssentialsTrashCommand.java + EssentialsAutoTrashCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command uses.
+//   * `/hctrash` -- `EssentialsHcServerBridge::openTrash`, a direct copy of the original's virtual
+//     9x4 void-container menu (avoids binding SimpleContainer/SimpleMenuProvider/ChestMenu/MenuType
+//     and the menu-factory lambda for one real caller).
+//   * `/hcautotrash` (toggle the held item) and `/hcautotrash remove <item>` -- pure HC against the
+//     real `PlayerEssentialsData.alwaysTrash` set (NBT-persisted, also what the real pickup handler
+//     and the list screen's Auto-Trash page read): `getMainHandItem`, `IForgeRegistry.getKey`,
+//     `ResourceLocationArgument`, `toggleAlwaysTrash`/`removeAlwaysTrash`.
+// `hc`-prefixed literals, same side-by-side-pilot reasoning; the real `/essentialstrash` and
+// `/essentialsautotrash` stay registered and untouched (the ported list screen still sends the real
+// `essentialsautotrash remove ...` command for its click-to-remove rows).
+
+fn hc_open_trash(source: CommandSourceStackHc) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    EssentialsHcServerBridgeHc::openTrash(player);
+    return 1;
+}
+
+fn hc_toggle_held_autotrash(source: CommandSourceStackHc) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let held = player.getMainHandItem();
+    if held.isEmpty() {
+        player.sendSystemMessage(Component::literal("Hold an item first.") as Component);
+        return 0;
+    }
+    let id = ForgeRegistriesItem::ITEMS.getKey(held.getItem() as JObjectItem);
+    if id == null { return 0; }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let id_text = id.toString();
+    if data.toggleAlwaysTrash(id) {
+        player.sendSystemMessage(Component::literal("Will now auto-trash \"{id_text}\" on pickup.") as Component);
+    } else {
+        player.sendSystemMessage(Component::literal("No longer auto-trashing \"{id_text}\".") as Component);
+    }
+    return 1;
+}
+
+fn hc_remove_autotrash(source: CommandSourceStackHc, id: ResourceLocation) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let id_text = id.toString();
+    data.removeAlwaysTrash(id);
+    player.sendSystemMessage(Component::literal("No longer auto-trashing \"{id_text}\".") as Component);
+    return 1;
+}
+
+// Tab-complete for `remove <item>` -- the player's own current auto-trash ids (the original
+// offers none, which made `remove` awkward to use by hand; the list screen's click-to-remove rows
+// are the original's intended path).
+fn hc_suggest_autotrash_ids(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
+    let source = ctx.getSource() as CommandSourceStackHc;
+    let data = ess_player_data(&source);
+    if data == null { return builder.buildFuture(); }
+    let csv = EssentialsHcServerBridgeHc::autoTrashCsv(&data);
+    return ess_suggest_from_csv(builder, csv).buildFuture();
+}
+
+pub fn register_real_trash_commands(dispatcher: CommandDispatcherSrc) {
+    let trash_builder = CommandsHc::literal("hctrash").executes(|ctx| {
+        return hc_open_trash(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(trash_builder as LiteralArgumentBuilderSrc);
+
+    let item_arg = CommandsHc::argument("item", ResourceLocationArgumentSrc::id() as ArgumentTypeSrc)
+        .suggests(|ctx, builder| { return hc_suggest_autotrash_ids(ctx, builder); })
+        .executes(|ctx| {
+        return hc_remove_autotrash(ctx.getSource() as CommandSourceStackHc, ResourceLocationArgumentSrc::getId(ctx, "item"));
+    });
+    let remove_literal = CommandsHc::literal("remove").then(item_arg);
+    let autotrash_builder = CommandsHc::literal("hcautotrash")
+        .executes(|ctx| { return hc_toggle_held_autotrash(ctx.getSource() as CommandSourceStackHc); })
+        .then(remove_literal);
+    dispatcher.register(autotrash_builder as LiteralArgumentBuilderSrc);
+}

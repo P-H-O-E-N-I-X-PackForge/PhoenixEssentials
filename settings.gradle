@@ -1,4 +1,9 @@
 pluginManagement {
+    // Local composite build, resolving the `hc` plugin straight from a HotChocolate checkout --
+    // see build.gradle's own `hotChocolate { }` block. Same convention Ganache's own
+    // settings.gradle already established -- see that file's own header for why a plain
+    // `includeBuild` works fine here (no bleeding-edge-JDK requirement from this Gradle process).
+    includeBuild '../../PhoenixVineDigital/HotChocolate'
     // when using additional gradle plugins like shadow,
     // add their repositories to this list!
     repositories {

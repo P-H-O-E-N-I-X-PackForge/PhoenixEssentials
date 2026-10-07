@@ -1,0 +1,30 @@
+// --- Real port of AfkCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command uses -- toggles the real
+// `PlayerEssentialsData.afk` flag (NBT-persisted, also what the real AFK overlay/detection reads)
+// and broadcasts to everyone via `PlayerList.broadcastSystemMessage`. `hcafk2`, not `hcafk` --
+// kept distinct from any future/vendored `hcafk` literal, same latent-collision avoidance the
+// other `...2` literals in this project explain. The real `/afk` stays registered and untouched.
+// Same disclosed scope cut as the other social commands: `EssentialsAPI.isFeatureEnabled(
+// FEATURE_SOCIAL, ...)` is not ported.
+
+fn hc_toggle_afk(source: CommandSourceStackHc) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    let now_afk = !data.isAfk();
+    data.setAfk(now_afk);
+    let display_name = player.getName().getString();
+    var suffix = "is no longer AFK.";
+    if now_afk { suffix = "is now AFK."; }
+    source.getServer().getPlayerList().broadcastSystemMessage(Component::literal("{display_name} {suffix}") as Component, false);
+    return 1;
+}
+
+pub fn register_real_afk_command(dispatcher: CommandDispatcherSrc) {
+    let afk_builder = CommandsHc::literal("hcafk2").executes(|ctx| {
+        return hc_toggle_afk(ctx.getSource() as CommandSourceStackHc);
+    });
+    dispatcher.register(afk_builder as LiteralArgumentBuilderSrc);
+}

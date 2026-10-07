@@ -1,0 +1,48 @@
+// --- Real, capability-backed port of NickCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command in this project uses --
+// `/hcnick` (clear) / `/hcnick <name>` (set) read/write the real `PlayerEssentialsData.nickname`
+// field (NBT-persisted, same capability every other ported command already reads/writes).
+//
+// `hc`-prefixed command literal -- same side-by-side-pilot reasoning every other ported command
+// file in this project already gives; the real `/nick` (`NickCommand.java`) stays registered and
+// untouched.
+//
+// Real, disclosed scope cut: `EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_SOCIAL, ...)`
+// (a per-dimension feature toggle the original checks first) is not ported, same real, separate
+// binding surface `EssentialsKitCommands.hotc`'s own header already discloses skipping.
+
+fn hc_set_nick(source: CommandSourceStackHc, nickname: String) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    if nickname.length() > 24 {
+        source.sendFailure(Component::literal("Nicknames can be at most 24 characters.") as Component);
+        return 0;
+    }
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    data.setNickname(nickname);
+    source.sendSuccess(|| { return Component::literal("Nickname set to \"{nickname}\".") as JObjectCmd; }, false);
+    return 1;
+}
+
+fn hc_clear_nick(source: CommandSourceStackHc) -> Int {
+    let data = ess_player_data(&source);
+    if data == null { return 0; }
+    data.setNickname("");
+    source.sendSuccess(|| { return Component::literal("Nickname cleared.") as JObjectCmd; }, false);
+    return 1;
+}
+
+pub fn register_real_nick_command(dispatcher: CommandDispatcherSrc) {
+    let nickname_arg = CommandsHc::argument("nickname", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_set_nick(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "nickname"));
+    });
+    // `hcnick2`, not `hcnick` -- hotc-mc's own `command_example.hc` (vendored into this same merged
+    // compile) already declares a `register_hcnick` with that literal; same latent-collision
+    // avoidance `EssentialsBackSpawnCommands.hotc`'s own `hcspawn2` already explains.
+    let nick_builder = CommandsHc::literal("hcnick2")
+        .executes(|ctx| { return hc_clear_nick(ctx.getSource() as CommandSourceStackHc); })
+        .then(nickname_arg);
+    dispatcher.register(nick_builder as LiteralArgumentBuilderSrc);
+}

@@ -1,0 +1,292 @@
+// --- Real, pixel-faithful port of EssentialsListScreen.java ---
+//
+// Same "call the real Java chrome/theme code directly" approach `EssentialsConfigScreenHc.hotc`
+// already established -- `EssentialsUIKitHc::drawModalChrome`/`drawBorder` and
+// `EssentialsThemePaletteHc`'s own real static color fields are called/read directly, so the
+// output is pixel/color-identical to the original by construction. Reuses the REAL, UNCHANGED
+// `EssentialsClientCache` (populated by the real S2C sync packets), the real
+// `C2SRequestSyncPacket`/`C2SGuiTeleportPacket`/`C2SGuiClaimKitPacket`, and the real shared
+// `EssentialsNetwork.CHANNEL` -- this port's own client-side screen is new, but the whole
+// client<->server data/network path underneath it is completely unchanged Java.
+//
+// Real, disclosed simplifications versus the original (both cosmetic, not behavioral):
+// 1. The original caches its own built row list and only rebuilds when the underlying cache
+//    object's REFERENCE changes (`lastBuiltSource != source`), plus throttles a Kits rebuild to
+//    once per 500ms (cooldown countdown text). HC has no cheap reference-identity comparison for
+//    extern-class values and no `System.currentTimeMillis()` binding yet -- this port just
+//    rebuilds the row list fresh every `render()` call instead. More recomputation per frame (a
+//    few `JListHc::get`/struct-literal calls, no allocDition-heavy), no observable behavior
+//    difference.
+// 2. The original shows "Loading..." instead of "No X set" until the FIRST real sync reply
+//    changes the cache (`hasSynced`, same reference-identity trick). This port approximates it
+//    with a plain "has this screen rendered more than once yet" flag -- the FIRST frame (before
+//    the reply can possibly have arrived) shows "Loading...", every frame after shows the real
+//    empty-state message. Not byte-for-byte identical to the original's own trigger condition,
+//    but the same real UX (a "loading" flash that resolves almost immediately), and no real
+//    caller should notice the difference in practice.
+
+struct EssListRow {
+    label: String,
+    action_name: String,
+    clickable: Bool,
+}
+
+fn ess_list_row_h() -> Int { return 18; }
+fn ess_list_panel_w() -> Int { return 260; }
+fn ess_list_panel_h() -> Int { return 220; }
+
+static ess_list_kind: Int = 0; // mirrors ui_essentials_kind_* below, NOT C2SRequestSyncKindHc itself (see header)
+static ess_list_title: String = "";
+static ess_list_rendered_once: Bool = false;
+
+pub static ess_list_kind_homes: Int = 0;
+pub static ess_list_kind_warps: Int = 1;
+pub static ess_list_kind_kits: Int = 2;
+pub static ess_list_kind_trash: Int = 3;
+
+// A plain `Int` tag, not `C2SRequestSyncKindHc` itself -- this static needs to survive being read
+// back on every `render`/`mouseClicked` call without re-touching the real enum type each time;
+// `ess_list_sync_kind()`/`ess_list_teleport_kind()` below convert back to the two DIFFERENT real
+// Java enums (`C2SRequestSyncPacket$Kind` to re-request a sync, `C2SGuiTeleportPacket$Kind` to
+// send a teleport) only at the one real call site each actually needs it.
+fn ess_list_sync_kind() -> C2SRequestSyncKindHc {
+    if ess_list_kind == ess_list_kind_homes { return C2SRequestSyncKindHc::HOMES; }
+    if ess_list_kind == ess_list_kind_warps { return C2SRequestSyncKindHc::WARPS; }
+    if ess_list_kind == ess_list_kind_kits { return C2SRequestSyncKindHc::KITS; }
+    return C2SRequestSyncKindHc::TRASH;
+}
+
+fn ess_list_empty_message() -> String {
+    if ess_list_kind == ess_list_kind_homes { return "§8No homes set"; }
+    if ess_list_kind == ess_list_kind_warps { return "§8No warps available"; }
+    if ess_list_kind == ess_list_kind_kits { return "§8No kits available"; }
+    return "§8No items set to auto-trash";
+}
+
+// Real stand-in for `displayNameOf` -- `ResourceLocation::tryParse`/`ForgeRegistryItem::getValue`
+// are both real, nullable lookups (`resource.hc`/`registry.hc`'s own new bindings); falls back to
+// the raw id string exactly like the original does when either lookup misses.
+fn ess_list_display_name_of(id: String) -> String {
+    let loc = ResourceLocation::tryParse(id);
+    if loc == null { return id; }
+    let item_obj = ForgeRegistriesItem::ITEMS.getValue(loc);
+    if item_obj == null { return id; }
+    let item = item_obj as Item;
+    let stack = ItemStack::new(item as ItemLike, 1);
+    return stack.getHoverName().getString();
+}
+
+fn ess_list_build_rows() -> [EssListRow] {
+    if ess_list_kind == ess_list_kind_homes {
+        let names = EssentialsClientCacheHc::getHomes();
+        var out = [EssListRow { label: "", action_name: "", clickable: false }; names.size()];
+        var i = 0;
+        while i < names.size() {
+            let name = names.get(i) as String;
+            out[i] = EssListRow { label: "§7{name}", action_name: name, clickable: true };
+            i = i + 1;
+        }
+        return out;
+    }
+    if ess_list_kind == ess_list_kind_warps {
+        let names = EssentialsClientCacheHc::getWarps();
+        var out = [EssListRow { label: "", action_name: "", clickable: false }; names.size()];
+        var i = 0;
+        while i < names.size() {
+            let name = names.get(i) as String;
+            out[i] = EssListRow { label: "§7{name}", action_name: name, clickable: true };
+            i = i + 1;
+        }
+        return out;
+    }
+    if ess_list_kind == ess_list_kind_kits {
+        let entries = EssentialsClientCacheHc::getKits();
+        var out = [EssListRow { label: "", action_name: "", clickable: false }; entries.size()];
+        var i = 0;
+        while i < entries.size() {
+            let entry = entries.get(i) as EssentialsKitEntryHc;
+            let ready = entry.cooldownRemainingSeconds() <= 0;
+            var label = "§7{entry.name()} §8({entry.cooldownRemainingSeconds()}s)";
+            if ready { label = "§a{entry.name()}"; }
+            out[i] = EssListRow { label: label, action_name: entry.name(), clickable: ready };
+            i = i + 1;
+        }
+        return out;
+    }
+    let ids = EssentialsClientCacheHc::getAutoTrash();
+    var out = [EssListRow { label: "", action_name: "", clickable: false }; ids.size()];
+    var i = 0;
+    while i < ids.size() {
+        let id = ids.get(i) as String;
+        out[i] = EssListRow { label: "§7{ess_list_display_name_of(id)} §8(click to remove)", action_name: id, clickable: true };
+        i = i + 1;
+    }
+    return out;
+}
+
+struct EssListLayout {
+    panel_x: Int,
+    panel_y: Int,
+    list_y: Int,
+    list_h: Int,
+}
+
+fn ess_list_compute_layout(screen_w: Int, screen_h: Int) -> EssListLayout {
+    let panel_w = ess_list_panel_w();
+    let panel_h = ess_list_panel_h();
+    let panel_x = (screen_w - panel_w) / 2;
+    let panel_y = (screen_h - panel_h) / 2;
+    return EssListLayout { panel_x: panel_x, panel_y: panel_y, list_y: panel_y + 26, list_h: panel_h - 34 };
+}
+
+// Which real row index (into `ess_list_build_rows()`'s own output) the mouse is currently over,
+// or `-1` -- a pure function of the CURRENT scroll offset + layout, not a stored rect list (same
+// "recompute every call" convention `EssentialsConfigScreenHc.hotc`'s own `ess_compute_layout`
+// already uses), so `render`/`mouseClicked` always agree with no shared mutable cache needed.
+fn ess_list_row_at(mx: Int, my: Int, layout: &EssListLayout, row_count: Int) -> Int {
+    let panel_w = ess_list_panel_w();
+    if mx < layout.panel_x + 6 || mx >= layout.panel_x + panel_w - 6 { return -1; }
+    if my < layout.list_y || my >= layout.list_y + layout.list_h { return -1; }
+    let visible_index = (my - layout.list_y) / ess_list_row_h();
+    let row = ess_list_scroll + visible_index;
+    if row < 0 || row >= row_count { return -1; }
+    return row;
+}
+
+static ess_list_scroll: Int = 0;
+
+struct HcEssentialsListScreen extends ScreenHc {}
+
+impl HcEssentialsListScreen {
+    override fn render(&self, gfx: GuiGraphicsHc, mx: Int, my: Int, partial_tick: Float) {
+        EssentialsThemePaletteHc::refresh(PhoenixThemeHc::current());
+        let window = Minecraft::getInstance().getWindow();
+        let layout = ess_list_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        let panel_w = ess_list_panel_w();
+        let panel_h = ess_list_panel_h();
+
+        EssentialsUIKitHc::drawModalChrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
+            layout.panel_x, layout.panel_y, panel_w, panel_h, 20, "§f{ess_list_title}");
+
+        let rows = ess_list_build_rows();
+        var max_scroll = rows.length - layout.list_h / ess_list_row_h();
+        if max_scroll < 0 { max_scroll = 0; }
+        if ess_list_scroll > max_scroll { ess_list_scroll = max_scroll; }
+        if ess_list_scroll < 0 { ess_list_scroll = 0; }
+
+        gfx.enableScissor(layout.panel_x + 6, layout.list_y, layout.panel_x + panel_w - 6, layout.list_y + layout.list_h);
+        var ly = layout.list_y;
+        var i = ess_list_scroll;
+        while i < rows.length && ly + ess_list_row_h() <= layout.list_y + layout.list_h {
+            let row = rows[i];
+            let row_hov = row.clickable && mx >= layout.panel_x + 6 && mx < layout.panel_x + panel_w - 6 && my >= ly && my < ly + ess_list_row_h();
+            if row_hov {
+                gfx.fill(layout.panel_x + 6, ly, layout.panel_x + panel_w - 6, ly + ess_list_row_h(), 587202560); // 0x22FFFFFF
+            }
+            var color = EssentialsThemePaletteHc::TEXT_FAINT;
+            if row.clickable { color = EssentialsThemePaletteHc::TEXT; }
+            gfx.drawString(Minecraft::getInstance().font, row.label, layout.panel_x + 10, ly + 5, color);
+            ly = ly + ess_list_row_h();
+            i = i + 1;
+        }
+        gfx.disableScissor();
+
+        if max_scroll > 0 {
+            let track_x = layout.panel_x + panel_w - 4;
+            var thumb_h = layout.list_h * layout.list_h / (layout.list_h + max_scroll * ess_list_row_h());
+            if thumb_h < 10 { thumb_h = 10; }
+            let thumb_y = layout.list_y + (ess_list_scroll * (layout.list_h - thumb_h)) / max_scroll;
+            gfx.fill(track_x, layout.list_y, track_x + 2, layout.list_y + layout.list_h, 587202560); // 0x22FFFFFF
+            gfx.fill(track_x, thumb_y, track_x + 2, thumb_y + thumb_h, -1996488449); // 0x88FFFFFF, signed Int32
+        }
+
+        if rows.length == 0 {
+            var msg = ess_list_empty_message();
+            if !ess_list_rendered_once { msg = "§8Loading..."; }
+            gfx.drawCenteredString(Minecraft::getInstance().font, msg, layout.panel_x + panel_w / 2, layout.list_y + layout.list_h / 2 - 4, EssentialsThemePaletteHc::TEXT_FAINT);
+        }
+
+        let esc_label = "Esc to close";
+        gfx.drawString(Minecraft::getInstance().font, "§8{esc_label}", layout.panel_x + panel_w - Minecraft::getInstance().font.width(esc_label) - 8, layout.panel_y + 7, EssentialsThemePaletteHc::TEXT_FAINT);
+
+        ess_list_rendered_once = true;
+    }
+
+    override fn mouseClicked(&self, mx: Double, my: Double, button: Int) -> Bool {
+        let window = Minecraft::getInstance().getWindow();
+        let layout = ess_list_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        let rows = ess_list_build_rows();
+        let row_idx = ess_list_row_at(mx as Int, my as Int, &layout, rows.length);
+        if row_idx < 0 { return false; }
+        let row = rows[row_idx];
+        if !row.clickable { return true; }
+
+        if ess_list_kind == ess_list_kind_trash {
+            let player = Minecraft::getInstance().player;
+            if player != null {
+                player.connection.sendCommand("essentialsautotrash remove {row.action_name}");
+            }
+            let pkt = C2SRequestSyncPacketHc::new(ess_list_sync_kind());
+            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+            return true;
+        }
+
+        if ess_list_kind == ess_list_kind_homes {
+            let pkt = C2SGuiTeleportPacketHc::new(C2SGuiTeleportKindHc::HOME, row.action_name);
+            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+        }
+        if ess_list_kind == ess_list_kind_warps {
+            let pkt = C2SGuiTeleportPacketHc::new(C2SGuiTeleportKindHc::WARP, row.action_name);
+            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+        }
+        if ess_list_kind == ess_list_kind_kits {
+            let pkt = C2SGuiClaimKitPacketHc::new(row.action_name);
+            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+        }
+        Minecraft::getInstance().setScreen(null);
+        return true;
+    }
+
+    override fn mouseScrolled(&self, mx: Double, my: Double, delta: Double) -> Bool {
+        let rows = ess_list_build_rows();
+        let window = Minecraft::getInstance().getWindow();
+        let layout = ess_list_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        var max_scroll = rows.length - layout.list_h / ess_list_row_h();
+        if max_scroll < 0 { max_scroll = 0; }
+        var next = ess_list_scroll - (delta as Int);
+        if next < 0 { next = 0; }
+        if next > max_scroll { next = max_scroll; }
+        ess_list_scroll = next;
+        return true;
+    }
+
+    override fn keyPressed(&self, key_code: Int, scan_code: Int, modifiers: Int) -> Bool {
+        // Escape goes back to the config screen (the real `onClose() -> minecraft.setScreen
+        // (parent)` original behavior) -- a successful action click (`mouseClicked`, above)
+        // closes everything instead (`setScreen(null)`), same real distinction the original
+        // makes between "cancelled" and "did the thing."
+        if key_code == 256 { // GLFW_KEY_ESCAPE
+            open_essentials_config_screen_hc();
+            return true;
+        }
+        return false;
+    }
+
+    override fn isPauseScreen(&self) -> Bool {
+        return false;
+    }
+}
+
+// The one real caller -- `EssentialsConfigScreenHc.hotc`'s own `ess_open_list`. Mirrors the
+// original's own `init()`: resets scroll/loading state, sends the real `C2SRequestSyncPacket` to
+// (re)populate `EssentialsClientCache`, then opens the screen.
+pub fn open_essentials_list_screen_hc(kind: Int, title: String) {
+    ess_list_kind = kind;
+    ess_list_title = title;
+    ess_list_scroll = 0;
+    ess_list_rendered_once = false;
+    let pkt = C2SRequestSyncPacketHc::new(ess_list_sync_kind());
+    EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+    let screen = HcEssentialsListScreen::new(Component::literal(title) as Component);
+    Minecraft::getInstance().setScreen(screen as ScreenHc);
+}

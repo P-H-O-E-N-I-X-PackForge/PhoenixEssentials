@@ -1,0 +1,238 @@
+// --- Real, pixel-faithful port of `EssentialsConfigScreen.java` ---
+//
+// Calls the REAL `EssentialsUIKit`/`EssentialsThemePalette`/`PhoenixTheme` Java classes directly
+// (`essentials_bridge.hc`) instead of reimplementing their chrome-drawing/color logic -- the output
+// is pixel- and color-identical to the original by construction (same real method calls, same real
+// static color fields), not by hand-copying numbers into HC and hoping they stay in sync. Every
+// pixel offset/constant below (`ROW_H`, `PANEL_W`, `PANEL_H`, the `+12`/`+28`/`+10`/`+4` spacing) is
+// copied directly from the real Java file, not re-derived.
+//
+// `ess_compute_layout` -- the original caches `panelX`/`panelY`/every row's own Y into real
+// instance fields, set once in `init()` and read back from both `render()` and `mouseClicked()`.
+// An `extends`-struct has zero fields of its own (`gui.hc`'s own header) -- there's nowhere to
+// cache them. Recomputed instead, fresh, by both `render` and `mouseClicked` -- a pure function of
+// the current screen size (+ two real `font.width(...)` calls), so both call sites always agree,
+// same "recompute every call" convention `ui_render.hc`'s own `HcUiScreen` already established for
+// the exact same zero-fields reason.
+//
+// Real, disclosed scope cut for this pass: `EssentialsListScreen` itself is NOT ported yet -- the
+// four nav buttons below open the REAL, UNCHANGED Java `EssentialsListScreen`
+// (`essentials_bridge.hc`'s own `EssentialsListScreenHc`), exactly like the original Java config
+// screen already does. A later pass can port that screen too and swap this binding for a real HC
+// `extends ScreenHc` struct instead.
+
+fn ess_row_h() -> Int { return 18; }
+fn ess_panel_w() -> Int { return 260; }
+fn ess_panel_h() -> Int { return 238; }
+
+struct EssLayout {
+    panel_x: Int,
+    panel_y: Int,
+    row_w: Int,
+    theme_row_y: Int,
+    theme_links_y: Int,
+    edit_x: Int,
+    edit_w: Int,
+    wiki_x: Int,
+    wiki_w: Int,
+    afk_row_y: Int,
+    homes_y: Int,
+    warps_y: Int,
+    kits_y: Int,
+    trash_y: Int,
+}
+
+// `Minecraft::getInstance().font` is called FRESH right here, not threaded in as a shared param --
+// a plain public-field read (`minecraft_client.hc`'s own `font: FontHc;`), cheap enough to call as
+// many times as needed. Real, disclosed reason this matters: an extern-class-typed LOCAL reused as
+// a BY-VALUE argument across several calls genuinely move-checks here (confirmed directly --
+// `gfx.drawString(font, ...)` called more than once from one shared `let font = ...;` local is a
+// real "use of moved value 'font'" error) -- fetching a fresh value at each use site sidesteps it
+// entirely, with no real cost (no allocation, the same single field read `ui_render.hc`'s own
+// `FontMeasurer { font: Minecraft::getInstance().font }` already calls once per render pass).
+fn ess_compute_layout(screen_w: Int, screen_h: Int) -> EssLayout {
+    let panel_w = ess_panel_w();
+    let panel_h = ess_panel_h();
+    let panel_x = (screen_w - panel_w) / 2;
+    let panel_y = (screen_h - panel_h) / 2;
+    let row_w = panel_w - 24;
+    let row_h = ess_row_h();
+
+    var ty = panel_y + 28;
+    let theme_row_y = ty;
+    ty = ty + row_h;
+    let theme_links_y = ty;
+    let edit_x = panel_x + 12;
+    let edit_w = Minecraft::getInstance().font.width("✎ Edit colors...");
+    let wiki_x = edit_x + edit_w + 14;
+    let wiki_w = Minecraft::getInstance().font.width("📖 Wiki");
+    ty = ty + row_h;
+    let afk_row_y = ty;
+    ty = ty + row_h + 10;
+    let homes_y = ty;
+    ty = ty + row_h + 4;
+    let warps_y = ty;
+    ty = ty + row_h + 4;
+    let kits_y = ty;
+    ty = ty + row_h + 4;
+    let trash_y = ty;
+
+    return EssLayout {
+        panel_x: panel_x, panel_y: panel_y, row_w: row_w,
+        theme_row_y: theme_row_y, theme_links_y: theme_links_y,
+        edit_x: edit_x, edit_w: edit_w, wiki_x: wiki_x, wiki_w: wiki_w,
+        afk_row_y: afk_row_y, homes_y: homes_y, warps_y: warps_y, kits_y: kits_y, trash_y: trash_y,
+    };
+}
+
+fn ess_hov(mx: Int, my: Int, x: Int, y: Int, w: Int) -> Bool {
+    return mx >= x && mx < x + w && my >= y && my < y + ess_row_h();
+}
+
+fn ess_draw_menu_button(gfx: &GuiGraphicsHc, x: Int, y: Int, w: Int, label: String, mx: Int, my: Int) {
+    let hov = ess_hov(mx, my, x, y, w);
+    var fill_color = EssentialsThemePaletteHc::HEADER;
+    if hov { fill_color = 872363007; } // 0x33FFFFFF
+    gfx.fill(x, y, x + w, y + ess_row_h(), fill_color);
+    var border_color = EssentialsThemePaletteHc::BORDER;
+    if hov { border_color = EssentialsThemePaletteHc::ACCENT; }
+    EssentialsUIKitHc::drawBorder(gfx, x, y, w, ess_row_h(), border_color);
+    var prefix = "§7";
+    if hov { prefix = "§f"; }
+    gfx.drawCenteredString(Minecraft::getInstance().font, "{prefix}{label}", x + w / 2, y + 5, EssentialsThemePaletteHc::TEXT);
+}
+
+fn ess_open_wiki(parent: ScreenHc) {
+    let t = PhoenixThemeHc::current();
+    let theme = WikiThemeHc::new(t.bg.getColor(), t.panel.getColor(), t.header.getColor(), t.border.getColor(),
+        t.accent.getColor(), t.text.getColor(), t.textDim.getColor(), t.textFaint.getColor(),
+        t.done.getColor(), t.activeColor.getColor());
+    PhoenixWikiAPIHc::open(parent, "phoenix_essentials", "wiki", theme);
+}
+
+// Now opens the REAL HC port (`EssentialsListScreenPort.hotc`), not the unchanged Java
+// `EssentialsListScreenHc` binding -- that binding stays declared in `essentials_bridge.hc` (a
+// later rollback point if the port ever needs bypassing), just unused by this call site now.
+// `parent` is unused -- the ported list screen's own `onClose`-equivalent (its `keyPressed`
+// override) always returns to THIS config screen via `setScreen(null)` (this screen is the only
+// thing ever still "open" underneath, same single-active-screen assumption every other screen in
+// this library already relies on), not a stored parent reference (an `extends`-struct still has
+// zero fields to keep one in).
+fn ess_open_list(parent: ScreenHc, kind: Int, title: String) {
+    open_essentials_list_screen_hc(kind, title);
+}
+
+struct HcEssentialsConfigScreen extends ScreenHc {}
+
+impl HcEssentialsConfigScreen {
+    override fn render(&self, gfx: GuiGraphicsHc, mx: Int, my: Int, partial_tick: Float) {
+        EssentialsThemePaletteHc::refresh(PhoenixThemeHc::current());
+        let window = Minecraft::getInstance().getWindow();
+        let layout = ess_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        let panel_w = ess_panel_w();
+        let panel_h = ess_panel_h();
+
+        EssentialsUIKitHc::drawModalChrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
+            layout.panel_x, layout.panel_y, panel_w, panel_h, 20, "§fPhoenix Essentials");
+        let esc_label = "Esc to close";
+        gfx.drawString(Minecraft::getInstance().font, "§8{esc_label}", layout.panel_x + panel_w - Minecraft::getInstance().font.width(esc_label) - 8, layout.panel_y + 7, EssentialsThemePaletteHc::TEXT_FAINT);
+
+        let x = layout.panel_x + 12;
+
+        let theme_hov = ess_hov(mx, my, x, layout.theme_row_y, layout.row_w);
+        if theme_hov {
+            gfx.fill(x - 2, layout.theme_row_y, x + layout.row_w, layout.theme_row_y + ess_row_h(), 587202560); // 0x22FFFFFF
+        }
+        gfx.drawString(Minecraft::getInstance().font, "§7Theme: §f{PhoenixThemeHc::getActiveName()} §8(click to cycle)", x, layout.theme_row_y + 5, EssentialsThemePaletteHc::TEXT);
+
+        let edit_hov = ess_hov(mx, my, layout.edit_x, layout.theme_links_y, layout.edit_w);
+        var edit_label = "§8✎ Edit colors...";
+        if edit_hov { edit_label = "§b✎ Edit colors..."; }
+        gfx.drawString(Minecraft::getInstance().font, edit_label, layout.edit_x, layout.theme_links_y + 5, EssentialsThemePaletteHc::TEXT_DIM);
+
+        let wiki_hov = ess_hov(mx, my, layout.wiki_x, layout.theme_links_y, layout.wiki_w);
+        var wiki_label = "§8📖 Wiki";
+        if wiki_hov { wiki_label = "§b📖 Wiki"; }
+        gfx.drawString(Minecraft::getInstance().font, wiki_label, layout.wiki_x, layout.theme_links_y + 5, EssentialsThemePaletteHc::TEXT_DIM);
+
+        let afk_hov = ess_hov(mx, my, x, layout.afk_row_y, layout.row_w);
+        if afk_hov {
+            gfx.fill(x - 2, layout.afk_row_y, x + layout.row_w, layout.afk_row_y + ess_row_h(), 587202560); // 0x22FFFFFF
+        }
+        var mark = "§8[ ]";
+        if EssentialsSettingsHc::get().isShowAfkOverlay() { mark = "§a[x]"; }
+        gfx.drawString(Minecraft::getInstance().font, "{mark} §7Show AFK overlay indicator", x, layout.afk_row_y + 5, EssentialsThemePaletteHc::TEXT);
+
+        ess_draw_menu_button(&gfx, x, layout.homes_y, layout.row_w, "Homes", mx, my);
+        ess_draw_menu_button(&gfx, x, layout.warps_y, layout.row_w, "Warps", mx, my);
+        ess_draw_menu_button(&gfx, x, layout.kits_y, layout.row_w, "Kits", mx, my);
+        ess_draw_menu_button(&gfx, x, layout.trash_y, layout.row_w, "Auto-Trash", mx, my);
+    }
+
+    override fn mouseClicked(&self, mx: Double, my: Double, button: Int) -> Bool {
+        let window = Minecraft::getInstance().getWindow();
+        let layout = ess_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        let x = layout.panel_x + 12;
+        let ix = mx as Int;
+        let iy = my as Int;
+
+        if ess_hov(ix, iy, x, layout.theme_row_y, layout.row_w) {
+            EssentialsHcBridgeHc::cycleTheme();
+            return true;
+        }
+        if ess_hov(ix, iy, layout.edit_x, layout.theme_links_y, layout.edit_w) {
+            let editor = PhoenixThemeEditorScreenHc::new(self as ScreenHc, "Phoenix Essentials");
+            Minecraft::getInstance().setScreen(editor as ScreenHc);
+            return true;
+        }
+        if ess_hov(ix, iy, layout.wiki_x, layout.theme_links_y, layout.wiki_w) {
+            ess_open_wiki(self as ScreenHc);
+            return true;
+        }
+        if ess_hov(ix, iy, x, layout.afk_row_y, layout.row_w) {
+            let s = EssentialsSettingsHc::get();
+            s.setShowAfkOverlay(!s.isShowAfkOverlay());
+            s.save();
+            return true;
+        }
+        if ess_hov(ix, iy, x, layout.homes_y, layout.row_w) {
+            ess_open_list(self as ScreenHc, ess_list_kind_homes, "Homes");
+            return true;
+        }
+        if ess_hov(ix, iy, x, layout.warps_y, layout.row_w) {
+            ess_open_list(self as ScreenHc, ess_list_kind_warps, "Warps");
+            return true;
+        }
+        if ess_hov(ix, iy, x, layout.kits_y, layout.row_w) {
+            ess_open_list(self as ScreenHc, ess_list_kind_kits, "Kits");
+            return true;
+        }
+        if ess_hov(ix, iy, x, layout.trash_y, layout.row_w) {
+            ess_open_list(self as ScreenHc, ess_list_kind_trash, "Auto-Trash");
+            return true;
+        }
+        return false;
+    }
+
+    override fn keyPressed(&self, key_code: Int, scan_code: Int, modifiers: Int) -> Bool {
+        // `256` == GLFW_KEY_ESCAPE -- same real value `ui_render.hc`'s own `ui_key_escape` already
+        // documents; this screen doesn't share that file's own `HcUiScreen`, so it needs its own.
+        if key_code == 256 {
+            Minecraft::getInstance().setScreen(null);
+            return true;
+        }
+        return false;
+    }
+
+    override fn isPauseScreen(&self) -> Bool {
+        return false;
+    }
+}
+
+// The one real caller -- opens this screen client-side, same `parent: null` the real
+// `EssentialsInputHandler`'s own `new EssentialsConfigScreen(null)` call already uses (this screen
+// is always the ROOT of its own little screen stack, reached straight from a keybind).
+pub fn open_essentials_config_screen_hc() {
+    let screen = HcEssentialsConfigScreen::new(Component::literal("Phoenix Essentials") as Component);
+    Minecraft::getInstance().setScreen(screen as ScreenHc);
+}

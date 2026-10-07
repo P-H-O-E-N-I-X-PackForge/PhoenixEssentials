@@ -1,0 +1,54 @@
+// --- Real port of MessageCommand.java's own /msg + /reply round trip ---
+//
+// Same "call the real Java directly" approach every other ported command in this project uses --
+// `EssentialsHcServerBridgeHc::sendDirectMessage`/`getLastMessagedName` (`EssentialsBridge.hotc`)
+// consolidate the real ignoring-check, the two `sendSystemMessage` calls, and the UUID-keyed "last
+// messaged" bookkeeping into two real calls, rather than binding `java.util.UUID`/`Map`
+// individually for this one real caller.
+//
+// `hc`-prefixed command literals (`/hcmsg`/`/hcr`, not `/msg`/`/tell`/`/r`/`/reply`) -- same
+// side-by-side-pilot reasoning every other ported command file in this project already gives; the
+// real aliases (`MessageCommand.java`) stay registered and untouched. Only one alias each ported
+// here (not all four) -- a real, disclosed scope cut, easy to extend later the same way.
+
+fn hc_send_message(source: CommandSourceStackHc, target_name: String, message: String) -> Int {
+    let sender = source.getPlayer();
+    if sender == null { return 0; }
+    let target = source.getServer().getPlayerList().getPlayerByName(target_name);
+    if target == null {
+        source.sendFailure(Component::literal("Player \"{target_name}\" isn't online.") as Component);
+        return 0;
+    }
+    let error = EssentialsHcServerBridgeHc::sendDirectMessage(sender, target, message);
+    if error != null {
+        source.sendFailure(Component::literal(error) as Component);
+        return 0;
+    }
+    return 1;
+}
+
+fn hc_reply_message(source: CommandSourceStackHc, message: String) -> Int {
+    let sender = source.getPlayer();
+    if sender == null { return 0; }
+    let target_name = EssentialsHcServerBridgeHc::getLastMessagedName(source.getServer(), sender);
+    if target_name == null {
+        source.sendFailure(Component::literal("You have no one to reply to.") as Component);
+        return 0;
+    }
+    return hc_send_message(source, target_name, message);
+}
+
+pub fn register_real_message_commands(dispatcher: CommandDispatcherSrc) {
+    let message_arg = CommandsHc::argument("message", StringArgumentTypeSrc::greedyString() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_send_message(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), StringArgumentTypeSrc::getString(ctx, "message"));
+    });
+    let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).then(message_arg);
+    let msg_builder = CommandsHc::literal("hcmsg").then(player_arg);
+    dispatcher.register(msg_builder as LiteralArgumentBuilderSrc);
+
+    let reply_message_arg = CommandsHc::argument("message", StringArgumentTypeSrc::greedyString() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_reply_message(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "message"));
+    });
+    let reply_builder = CommandsHc::literal("hcr").then(reply_message_arg);
+    dispatcher.register(reply_builder as LiteralArgumentBuilderSrc);
+}

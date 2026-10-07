@@ -1,0 +1,62 @@
+// --- Real port of TpForceCommand.java ---
+//
+// Same "call the real Java directly" approach every other ported command uses -- the real
+// `TeleportExecutor.forceTeleport` (instant: no warmup, no cooldown, still records `/back`) is
+// bound directly. `hc`-prefixed literals (`/hctpforce <player> <target>`, `/hctphere <player>`),
+// same side-by-side-pilot reasoning; the real `/tpforce`/`/tphere` stay registered and untouched.
+// Same disclosed scope cut as the other op-ish ports: no permission gate here.
+
+fn hc_tpforce(source: CommandSourceStackHc, player_name: String, target_name: String) -> Int {
+    let players = source.getServer().getPlayerList();
+    let player = players.getPlayerByName(player_name);
+    if player == null {
+        source.sendFailure(Component::literal("Player \"{player_name}\" isn't online.") as Component);
+        return 0;
+    }
+    let target = players.getPlayerByName(target_name);
+    if target == null {
+        source.sendFailure(Component::literal("Player \"{target_name}\" isn't online.") as Component);
+        return 0;
+    }
+    let target_login = target.getGameProfile().getName();
+    let player_login = player.getGameProfile().getName();
+    player.sendSystemMessage(Component::literal("You were teleported to {target_login}.") as Component);
+    TeleportExecutorHc::forceTeleport(player, NamedLocationHc::of(target), "tpforce", target_login);
+    source.sendSuccess(|| { return Component::literal("Teleported {player_login} to {target_login}.") as JObjectCmd; }, true);
+    return 1;
+}
+
+fn hc_tphere(source: CommandSourceStackHc, player_name: String) -> Int {
+    let executor = source.getPlayer();
+    if executor == null { return 0; }
+    let player = source.getServer().getPlayerList().getPlayerByName(player_name);
+    if player == null {
+        source.sendFailure(Component::literal("Player \"{player_name}\" isn't online.") as Component);
+        return 0;
+    }
+    if player == executor {
+        source.sendFailure(Component::literal("You're already here.") as Component);
+        return 0;
+    }
+    let executor_login = executor.getGameProfile().getName();
+    let player_login = player.getGameProfile().getName();
+    player.sendSystemMessage(Component::literal("You were teleported to {executor_login}.") as Component);
+    TeleportExecutorHc::forceTeleport(player, NamedLocationHc::of(executor), "tpforce", executor_login);
+    source.sendSuccess(|| { return Component::literal("Teleported {player_login} to you.") as JObjectCmd; }, false);
+    return 1;
+}
+
+pub fn register_real_tpforce_commands(dispatcher: CommandDispatcherSrc) {
+    let target_arg = CommandsHc::argument("target", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_tpforce(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), StringArgumentTypeSrc::getString(ctx, "target"));
+    });
+    let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).then(target_arg);
+    let tpforce_builder = CommandsHc::literal("hctpforce").then(player_arg);
+    dispatcher.register(tpforce_builder as LiteralArgumentBuilderSrc);
+
+    let here_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return hc_tphere(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"));
+    });
+    let tphere_builder = CommandsHc::literal("hctphere").then(here_arg);
+    dispatcher.register(tphere_builder as LiteralArgumentBuilderSrc);
+}
