@@ -1,0 +1,261 @@
+// --- HC port of TeleportExecutor.java (warmup / cooldown / cancel state machine) ---
+//
+// The Java class stays as a thin FACADE (every existing caller -- the Java commands, the shims, the
+// public `EssentialsAPI.teleport`, other mods -- keeps calling `TeleportExecutor.request(...)`), and
+// in takeover mode its `request`/`cancel`/`forceTeleport` delegate here and its two event handlers
+// early-return. Same behavior, restated:
+//   * `te_request`   -- feature gate, one-pending-per-player, cooldown (with the bypass permission),
+//                       the cancellable `TeleportEvent.Pre`, then either teleport now or start a warmup;
+//   * server tick    -- finish warmups whose time has come, cancel ones where the player moved;
+//   * living hurt    -- cancel a pending warmup when the player takes damage (config);
+//   * `te_execute_now` -- level lookup + `/back` bookkeeping + the real cross-dimension teleport
+//                       (Java shim), record the cooldown stamp, tell the player, post `TeleportEvent.Post`.
+// State is two HC arrays (pending warmups, last-use stamps) instead of two `ConcurrentHashMap`s; all of
+// it is only touched from the server thread (commands, the tick handler and the hurt handler all run
+// there), so no locking is needed. `TeleportEvent.Pre`/`Post` are still posted on the Forge bus (via
+// the Java shim), so other mods that subscribe to them see no difference.
+
+struct TpPending {
+    uuid: String,
+    target: NamedLocationHc?,
+    ready_at: Long,
+    sx: Double,
+    sy: Double,
+    sz: Double,
+    dim: String,
+    category: String,
+    label: String,
+    detail: String,
+}
+
+struct TpUse {
+    uuid: String,
+    category: String,
+    at: Long,
+}
+
+fn te_blank_pending() -> TpPending {
+    return TpPending { uuid: "", target: null, ready_at: 0L, sx: 0.0, sy: 0.0, sz: 0.0, dim: "", category: "", label: "", detail: "" };
+}
+
+static te_pending: [TpPending] = [TpPending { uuid: "", target: null, ready_at: 0L, sx: 0.0, sy: 0.0, sz: 0.0, dim: "", category: "", label: "", detail: "" }; 0];
+static te_last_use: [TpUse] = [TpUse { uuid: "", category: "", at: 0L }; 0];
+
+fn te_find_pending(uuid: String) -> Int {
+    var i = 0;
+    while i < te_pending.length {
+        if te_pending[i].uuid == uuid { return i; }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn te_make_pending(uuid: String, target: NamedLocationHc?, ready_at: Long, sx: Double, sy: Double, sz: Double, dim: String, category: String, label: String, detail: String) -> TpPending {
+    return TpPending { uuid: uuid, target: target, ready_at: ready_at, sx: sx, sy: sy, sz: sz, dim: dim, category: category, label: label, detail: detail };
+}
+
+fn te_append_pending(entry: TpPending) {
+    var out = [te_blank_pending(); te_pending.length + 1];
+    var i = 0;
+    while i < te_pending.length {
+        out[i] = te_pending[i];
+        i = i + 1;
+    }
+    out[te_pending.length] = entry;
+    te_pending = out;
+}
+
+fn te_remove_pending_at(idx: Int) {
+    var out = [te_blank_pending(); te_pending.length - 1];
+    var w = 0;
+    var i = 0;
+    while i < te_pending.length {
+        if i != idx {
+            out[w] = te_pending[i];
+            w = w + 1;
+        }
+        i = i + 1;
+    }
+    te_pending = out;
+}
+
+fn te_last_use_at(uuid: String, category: String) -> Long {
+    var i = 0;
+    while i < te_last_use.length {
+        if te_last_use[i].uuid == uuid && te_last_use[i].category == category { return te_last_use[i].at; }
+        i = i + 1;
+    }
+    return 0L;
+}
+
+fn te_record_use(uuid: String, category: String, at: Long) {
+    var i = 0;
+    while i < te_last_use.length {
+        if te_last_use[i].uuid == uuid && te_last_use[i].category == category {
+            te_last_use[i] = TpUse { uuid: uuid, category: category, at: at };
+            return;
+        }
+        i = i + 1;
+    }
+    var out = [TpUse { uuid: "", category: "", at: 0L }; te_last_use.length + 1];
+    var j = 0;
+    while j < te_last_use.length {
+        out[j] = te_last_use[j];
+        j = j + 1;
+    }
+    out[te_last_use.length] = TpUse { uuid: uuid, category: category, at: at };
+    te_last_use = out;
+}
+
+fn te_cooldown_remaining_ms(uuid: String, category: String, cooldown_seconds: Int) -> Long {
+    if cooldown_seconds <= 0 { return 0L; }
+    let last = te_last_use_at(uuid, category);
+    let remaining = (cooldown_seconds as Long) * 1000L - (EssentialsHcServerBridgeHc::nowMs() - last);
+    if remaining < 0L { return 0L; }
+    return remaining;
+}
+
+fn te_execute_now(player: ServerPlayer, target: NamedLocationHc, category: String, label: String, detail: String) {
+    let error = EssentialsHcServerBridgeHc::teleportPlayerTo(&player, &target);
+    if error != null {
+        player.sendSystemMessage(Component::literal("§c{error}") as Component);
+        return;
+    }
+    te_record_use(player.getStringUUID(), category, EssentialsHcServerBridgeHc::nowMs());
+    var suffix = "";
+    if detail.length() > 0 { suffix = " §7({detail})"; }
+    player.sendSystemMessage(Component::literal("§aTeleported to §f{label}§a.{suffix}") as Component);
+    EssentialsHcServerBridgeHc::postPostTeleport(&player, category, label);
+}
+
+// `detail` may be `null` from Java callers (the 4/5-arg overloads pass none).
+pub fn te_request(player: ServerPlayer, target: NamedLocationHc, category: String, label: String, detail: String?, bypass: Bool, cooldown_seconds: Int) {
+    if !EssentialsHcModeHc::featureEnabled(&player, "teleport") { return; }
+    let uuid = player.getStringUUID();
+    if te_find_pending(uuid) >= 0 {
+        player.sendSystemMessage(Component::literal("§cYou already have a teleport pending - moving will cancel it.") as Component);
+        return;
+    }
+    var can_bypass = bypass;
+    if !can_bypass { can_bypass = EssentialsHcServerBridgeHc::canBypassCooldown(&player); }
+    if !can_bypass {
+        let remaining = te_cooldown_remaining_ms(uuid, category, cooldown_seconds);
+        if remaining > 0L {
+            let seconds = (remaining + 999L) / 1000L;
+            player.sendSystemMessage(Component::literal("§cYou must wait {seconds}s before doing that again.") as Component);
+            return;
+        }
+    }
+    if EssentialsHcServerBridgeHc::postPreTeleport(&player, category, label, &target) { return; }
+
+    var detail_text = "";
+    if detail != null { detail_text = detail; }
+    var warmup = 0;
+    if !bypass { warmup = EssentialsHcServerBridgeHc::warmupSeconds(); }
+    if warmup <= 0 {
+        te_execute_now(player, target, category, label, detail_text);
+        return;
+    }
+    te_append_pending(te_make_pending(uuid, target,
+        EssentialsHcServerBridgeHc::nowMs() + (warmup as Long) * 1000L,
+        player.getX(), player.getY(), player.getZ(),
+        EssentialsHcServerBridgeHc::dimensionOf(&player),
+        category, label, detail_text));
+    player.sendSystemMessage(Component::literal("§7Teleporting to §f{label} §7in {warmup}s - don't move!") as Component);
+}
+
+pub fn te_cancel(player: ServerPlayer) {
+    let idx = te_find_pending(player.getStringUUID());
+    if idx >= 0 { te_remove_pending_at(idx); }
+}
+
+pub fn te_force_teleport(player: ServerPlayer, target: NamedLocationHc, category: String, label: String) {
+    if !EssentialsHcModeHc::featureEnabled(&player, "teleport") { return; }
+    te_execute_now(player, target, category, label, "");
+}
+
+// --- events ---
+
+extern class ServerTickEventHc = "net.minecraftforge.event.TickEvent$ServerTickEvent" {
+    phase: TickPhaseHc;
+}
+
+extern class LivingHurtEventHc = "net.minecraftforge.event.entity.living.LivingHurtEvent" {
+    fn getEntity(&self) -> LivingEntity;
+}
+
+fn te_on_server_tick(e: JObjectEvent) {
+    let ev = e as ServerTickEventHc;
+    if ev.phase != TickPhaseHc::END { return; }
+    if te_pending.length == 0 { return; }
+    let now = EssentialsHcServerBridgeHc::nowMs();
+
+    var keep = [te_blank_pending(); te_pending.length];
+    var kept = 0;
+    var ready = [te_blank_pending(); te_pending.length];
+    var ready_n = 0;
+    var i = 0;
+    while i < te_pending.length {
+        let entry = te_pending[i];
+        let player = EssentialsHcServerBridgeHc::playerByUuid(entry.uuid);
+        if player != null {
+            if EssentialsHcServerBridgeHc::cancelOnMove() && EssentialsHcServerBridgeHc::hasMoved(&player, entry.sx, entry.sy, entry.sz, entry.dim) {
+                player.sendSystemMessage(Component::literal("§cTeleport to §f{entry.label} §ccancelled - you moved.") as Component);
+            } else {
+                if now >= entry.ready_at {
+                    ready[ready_n] = entry;
+                    ready_n = ready_n + 1;
+                } else {
+                    keep[kept] = entry;
+                    kept = kept + 1;
+                }
+            }
+        }
+        i = i + 1;
+    }
+
+    // Publish the surviving list BEFORE executing, so a `TeleportEvent` subscriber that calls back into
+    // `request` sees the post-tick state.
+    var trimmed = [te_blank_pending(); kept];
+    var k = 0;
+    while k < kept {
+        trimmed[k] = keep[k];
+        k = k + 1;
+    }
+    te_pending = trimmed;
+
+    var r = 0;
+    while r < ready_n {
+        let entry = ready[r];
+        let player = EssentialsHcServerBridgeHc::playerByUuid(entry.uuid);
+        let target = entry.target;
+        if player != null {
+            if target != null {
+                te_execute_now(player, target, entry.category, entry.label, entry.detail);
+            }
+        }
+        r = r + 1;
+    }
+}
+
+fn te_on_living_hurt(e: JObjectEvent) {
+    if !EssentialsHcServerBridgeHc::cancelOnDamage() { return; }
+    let who = (e as LivingHurtEventHc).getEntity();
+    if !(who is ServerPlayer) { return; }
+    let player = who as ServerPlayer;
+    let idx = te_find_pending(player.getStringUUID());
+    if idx < 0 { return; }
+    let label = te_pending[idx].label;
+    te_remove_pending_at(idx);
+    player.sendSystemMessage(Component::literal("§cTeleport to §f{label} §ccancelled - you took damage.") as Component);
+}
+
+pub fn register_teleport_events() {
+    let bus = MinecraftForgeHc::EVENT_BUS;
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.TickEvent$ServerTickEvent") as JClassNet,
+        |e| { te_on_server_tick(e); });
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.entity.living.LivingHurtEvent") as JClassNet,
+        |e| { te_on_living_hurt(e); });
+}

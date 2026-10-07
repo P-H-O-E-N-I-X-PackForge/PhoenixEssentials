@@ -62,7 +62,10 @@ public class PhoenixEssentials {
             LOGGER.info("[Phoenix Essentials] Bootstrapping server essentials...");
             EssentialsNetwork.init();
             hcCompileMerged1.setup_hc_networking();
-            if (EssentialsHcMode.takeover()) hcCompileMerged1.register_player_events();
+            if (EssentialsHcMode.takeover()) {
+                hcCompileMerged1.register_player_events();
+                hcCompileMerged1.register_teleport_events();
+            }
         });
     }
 

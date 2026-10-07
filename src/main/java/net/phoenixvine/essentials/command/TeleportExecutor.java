@@ -54,6 +54,12 @@ public final class TeleportExecutor {
     public static void request(ServerPlayer player, NamedLocation target, String category, String destinationLabel,
                                String successDetail, boolean bypassWarmupAndCooldown, int cooldownSeconds) {
 
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.te_request(player, target, category, destinationLabel,
+                    successDetail, bypassWarmupAndCooldown ? 1 : 0, cooldownSeconds);
+            return;
+        }
+
         if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_TELEPORT, player.level().dimension().location())) {
             return;
         }
@@ -95,10 +101,18 @@ public final class TeleportExecutor {
     }
 
     public static void cancel(ServerPlayer player) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.te_cancel(player);
+            return;
+        }
         PENDING.remove(player.getUUID());
     }
 
     public static void forceTeleport(ServerPlayer player, NamedLocation target, String category, String destinationLabel) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.te_force_teleport(player, target, category, destinationLabel);
+            return;
+        }
         if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_TELEPORT, player.level().dimension().location())) {
             return;
         }
@@ -135,6 +149,7 @@ public final class TeleportExecutor {
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return;
         if (event.phase != TickEvent.Phase.END) return;
         if (PENDING.isEmpty()) return;
 
@@ -167,6 +182,7 @@ public final class TeleportExecutor {
 
     @SubscribeEvent
     public static void onDamage(LivingHurtEvent event) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return;
         if (!EssentialsServerConfig.CANCEL_ON_DAMAGE.get()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         Pending removed = PENDING.remove(player.getUUID());

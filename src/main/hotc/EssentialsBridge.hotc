@@ -199,6 +199,20 @@ extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.Essentials
     // HC network layer helpers -- see `EssentialsNetworkPackets.hotc`.
     static fn kitSyncCsv(player: ServerPlayer) -> String;
     static fn homesPerPlayer() -> Int;
+    // TeleportExecutor helpers -- see `EssentialsTeleportExecutor.hotc`.
+    static fn nowMs() -> Long;
+    static fn dimensionOf(player: &ServerPlayer) -> String;
+    static fn canBypassCooldown(player: &ServerPlayer) -> Bool;
+    static fn warmupSeconds() -> Int;
+    static fn cancelOnMove() -> Bool;
+    static fn cancelOnDamage() -> Bool;
+    static fn postPreTeleport(player: &ServerPlayer, category: String, label: String, target: &NamedLocationHc) -> Bool;
+    static fn postPostTeleport(player: &ServerPlayer, category: String, label: String);
+    // Real, nullable -- `null` on success, else the message to show.
+    static fn teleportPlayerTo(player: &ServerPlayer, target: &NamedLocationHc) -> String?;
+    static fn hasMoved(player: &ServerPlayer, sx: Double, sy: Double, sz: Double, start_dim: String) -> Bool;
+    // Real, nullable -- `null` if that player is offline.
+    static fn playerByUuid(uuid: String) -> ServerPlayer;
     // Event-handler helpers -- see `EssentialsPlayerEvents.hotc`.
     static fn copyPlayerData(original: Player, entity: Player);
     static fn recordSeen(player: ServerPlayer);

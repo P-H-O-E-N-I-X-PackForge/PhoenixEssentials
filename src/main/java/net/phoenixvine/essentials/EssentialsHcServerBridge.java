@@ -295,6 +295,68 @@ public final class EssentialsHcServerBridge {
         return EssentialsServerConfig.HOMES_PER_PLAYER.get();
     }
 
+    // --- TeleportExecutor helpers (EssentialsTeleportExecutor.hotc) ---
+    // The teleport state machine itself (pending list, cooldowns, the tick/damage handlers) is HC; these
+    // are the pieces that need Set/UUID/ResourceKey/event-class bindings HC doesn't have.
+
+    public static long nowMs() {
+        return System.currentTimeMillis();
+    }
+
+    public static String dimensionOf(ServerPlayer player) {
+        return player.level().dimension().location().toString();
+    }
+
+    // TeleportExecutor's `canBypassCooldown` permission half.
+    public static boolean canBypassCooldown(ServerPlayer player) {
+        return net.phoenixvine.essentials.config.EssentialsPermissions.BYPASS_COOLDOWN != null
+                && net.phoenixvine.essentials.config.EssentialsPermissions.check(player.createCommandSourceStack(),
+                        net.phoenixvine.essentials.config.EssentialsPermissions.BYPASS_COOLDOWN);
+    }
+
+    public static int warmupSeconds() { return EssentialsServerConfig.TELEPORT_WARMUP_SECONDS.get(); }
+    public static boolean cancelOnMove() { return EssentialsServerConfig.CANCEL_ON_MOVE.get(); }
+    public static boolean cancelOnDamage() { return EssentialsServerConfig.CANCEL_ON_DAMAGE.get(); }
+
+    // Same API event as always -- other mods subscribe to TeleportEvent.Pre/Post. Pre returns true if cancelled.
+    public static boolean postPreTeleport(ServerPlayer player, String category, String label, NamedLocation target) {
+        net.phoenixvine.essentials.api.event.TeleportEvent.Pre pre =
+                new net.phoenixvine.essentials.api.event.TeleportEvent.Pre(player, category, label, target);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(pre);
+        return pre.isCanceled();
+    }
+
+    public static void postPostTeleport(ServerPlayer player, String category, String label) {
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new net.phoenixvine.essentials.api.event.TeleportEvent.Post(player, category, label));
+    }
+
+    // Direct copy of executeNow's level lookup + `/back` bookkeeping + the real cross-dimension
+    // teleportTo. Returns null on success, else the message to show.
+    public static String teleportPlayerTo(ServerPlayer player, NamedLocation target) {
+        ServerLevel targetLevel = player.getServer().getLevel(target.dimension);
+        if (targetLevel == null) return "That destination's dimension is no longer loaded.";
+        player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                .ifPresent(data -> data.setBack(NamedLocation.of(player)));
+        player.teleportTo(targetLevel, target.x, target.y, target.z, java.util.Set.of(), target.yaw, target.pitch);
+        return null;
+    }
+
+    // `hasMoved` -- different dimension, or more than 0.1 blocks from where the warmup started.
+    public static boolean hasMoved(ServerPlayer player, double sx, double sy, double sz, String startDim) {
+        if (!dimensionOf(player).equals(startDim)) return true;
+        double dx = player.getX() - sx;
+        double dy = player.getY() - sy;
+        double dz = player.getZ() - sz;
+        return (dx * dx + dy * dy + dz * dz) > 0.01;
+    }
+
+    // The tick handler only has the stored UUID string.
+    public static ServerPlayer playerByUuid(String uuid) {
+        net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        return server == null ? null : server.getPlayerList().getPlayer(UUID.fromString(uuid));
+    }
+
     public static String dimensionLabel(ServerLevel level) {
         return level.dimension().location().toString();
     }
