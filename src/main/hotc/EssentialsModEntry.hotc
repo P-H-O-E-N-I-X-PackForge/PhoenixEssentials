@@ -1,0 +1,160 @@
+// --- HC port of the PhoenixEssentials mod entry's body ---
+//
+// Forge needs the `@Mod` class itself to be Java, so `PhoenixEssentials.java` stays a few lines: its
+// constructor calls `mod_construct()` here (plus the client-only `DistExecutor` hop, which must stay Java
+// so the client proxy class is never loaded on a server). Everything the constructor and its
+// `@SubscribeEvent` methods used to do is here:
+//   * mod bus   -- common setup (network + the HC event listeners, on the main thread via
+//                  `enqueueWork`), capability registration, the server-config (re)load hooks for the
+//                  override file;
+//   * Forge bus -- `ServerStartingEvent` (load the warp/kit/spawn registries) and
+//                  `RegisterCommandsEvent` (register the Java commands + the HC ones);
+//   * `ModLoadingContext.registerConfig(SERVER, SPEC)`.
+// The listeners were `this::` method references / `@SubscribeEvent` methods before; they are plain
+// `addListener(priority, receiveCanceled, eventClass, consumer)` registrations now, made at the same
+// moment (mod construction).
+// `-Dphoenix_essentials.use_java=true` still flips the *behavior* (commands, events, screens) exactly as
+// before; the entry plumbing itself is the same in both modes.
+
+extern class MeModBusContext = "net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext" {
+    static fn get() -> MeModBusContext;
+    fn getModEventBus(&self) -> IEventBusHc;
+}
+
+extern class MeLoadingContext = "net.minecraftforge.fml.ModLoadingContext" {
+    static fn get() -> MeLoadingContext;
+    fn registerConfig(&self, kind: MeConfigType, spec: OvIConfigSpec);
+}
+
+extern class MeConfigType = "net.minecraftforge.fml.config.ModConfig$Type" {
+    static SERVER: MeConfigType;
+}
+
+extern class MeCommonSetupEvent = "net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent" {
+    fn enqueueWork(&self, work: &dyn JRunnableNet) -> JCompletableFutureVoidNet;
+}
+
+extern class MeCapabilityEvent = "net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent" {}
+
+// Java classes the entry still drives.
+extern class MeNetwork = "net.phoenixvine.essentials.network.EssentialsNetwork" {
+    static fn init();
+}
+extern class MeCapabilityProvider = "net.phoenixvine.essentials.capability.EssentialsCapabilityProvider" {
+    static fn register(ev: MeCapabilityEvent);
+}
+extern class MeCommands = "net.phoenixvine.essentials.command.EssentialsCommands" {
+    static fn registerAll(dispatcher: CommandDispatcherSrc);
+}
+extern class MeWarpRegistry = "net.phoenixvine.essentials.data.WarpRegistry" {
+    static fn load();
+}
+extern class MeKitRegistry = "net.phoenixvine.essentials.data.KitRegistry" {
+    static fn load();
+}
+extern class MeSpawnRegistry = "net.phoenixvine.essentials.data.SpawnRegistry" {
+    static fn load();
+}
+extern class MeJavaOverrides = "net.phoenixvine.essentials.config.EssentialsConfigOverrides" {
+    static fn applyJava(ev: OvModConfigEvent);
+}
+extern class MeMode = "net.phoenixvine.essentials.EssentialsHcMode" {
+    static fn takeover() -> Bool;
+}
+extern class MeLog = "net.phoenixvine.essentials.EssentialsHcData" {
+    static fn logInfo(msg: String);
+}
+
+fn me_common_setup(e: JObjectEvent) {
+    (e as MeCommonSetupEvent).enqueueWork(|| {
+        MeLog::logInfo("[Phoenix Essentials] Bootstrapping server essentials...");
+        MeNetwork::init();
+        setup_hc_networking();
+        if MeMode::takeover() {
+            register_player_events();
+            register_teleport_events();
+            register_autotrash_events();
+        }
+    });
+}
+
+fn me_on_server_starting(e: JObjectEvent) {
+    MeWarpRegistry::load();
+    MeKitRegistry::load();
+    MeSpawnRegistry::load();
+}
+
+fn me_dispatcher(ev: &RegisterCommandsEventHc) -> CommandDispatcherSrc {
+    return ev.getDispatcher();
+}
+
+fn me_on_register_commands(e: JObjectEvent) {
+    let ev = e as RegisterCommandsEventHc;
+    MeCommands::registerAll(me_dispatcher(&ev));
+    // By default the HC ports own the real command names and are registered by `registerAll`. With
+    // -Dphoenix_essentials.use_java=true the original Java commands are used instead and the HC versions
+    // come up here as `hc`-prefixed twins (/hchome, /hcwarp, ...) for side-by-side comparison.
+    if !MeMode::takeover() {
+        register_real_home_commands(me_dispatcher(&ev));
+        register_real_warp_commands(me_dispatcher(&ev));
+        register_real_kit_commands(me_dispatcher(&ev));
+        register_real_back_command(me_dispatcher(&ev));
+        register_real_spawn_commands(me_dispatcher(&ev));
+        register_real_nick_command(me_dispatcher(&ev));
+        register_real_playtime_command(me_dispatcher(&ev));
+        register_real_message_commands(me_dispatcher(&ev));
+        register_real_ignore_commands(me_dispatcher(&ev));
+        register_real_heal_feed_commands(me_dispatcher(&ev));
+        register_real_god_fly_commands(me_dispatcher(&ev));
+        register_real_gamemode_commands(me_dispatcher(&ev));
+        register_real_top_command(me_dispatcher(&ev));
+        register_real_seen_command(me_dispatcher(&ev));
+        register_real_afk_command(me_dispatcher(&ev));
+        register_real_tpa_commands(me_dispatcher(&ev));
+        register_real_tpforce_commands(me_dispatcher(&ev));
+        register_real_tpx_command(me_dispatcher(&ev));
+        register_real_rtp_command(me_dispatcher(&ev));
+        register_real_playerinfo_command(me_dispatcher(&ev));
+        register_real_trash_commands(me_dispatcher(&ev));
+        register_real_invsee_command(me_dispatcher(&ev));
+    }
+}
+
+fn me_on_capabilities(e: JObjectEvent) {
+    MeCapabilityProvider::register(e as MeCapabilityEvent);
+}
+
+fn me_on_config_event(e: JObjectEvent) {
+    if MeMode::takeover() {
+        ovr_apply(e as OvModConfigEvent);
+    } else {
+        MeJavaOverrides::applyJava(e as OvModConfigEvent);
+    }
+}
+
+// Called from the `PhoenixEssentials` constructor.
+pub fn mod_construct() {
+    let mod_bus = MeModBusContext::get().getModEventBus();
+    mod_bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent") as JClassNet,
+        |e| { me_common_setup(e); });
+    mod_bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent") as JClassNet,
+        |e| { me_on_capabilities(e); });
+    mod_bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.fml.event.config.ModConfigEvent$Loading") as JClassNet,
+        |e| { me_on_config_event(e); });
+    mod_bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.fml.event.config.ModConfigEvent$Reloading") as JClassNet,
+        |e| { me_on_config_event(e); });
+
+    let forge_bus = MinecraftForgeHc::EVENT_BUS;
+    forge_bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.server.ServerStartingEvent") as JClassNet,
+        |e| { me_on_server_starting(e); });
+    forge_bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.RegisterCommandsEvent") as JClassNet,
+        |e| { me_on_register_commands(e); });
+
+    MeLoadingContext::get().registerConfig(MeConfigType::SERVER, OvServerConfig::SPEC as OvIConfigSpec);
+}

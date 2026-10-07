@@ -47,11 +47,12 @@ public final class EssentialsConfigOverrides {
         apply(event);
     }
 
+    /** The original Java implementation, driven by the HC mod entry when {@code use_java=true}. */
+    public static void applyJava(ModConfigEvent event) {
+        apply(event);
+    }
+
     private static void apply(ModConfigEvent event) {
-        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
-            net.phoenixvine.essentials.hc.hcCompileMerged1.ovr_apply(event);
-            return;
-        }
         if (event.getConfig().getSpec() != EssentialsServerConfig.SPEC) {
             return;
         }

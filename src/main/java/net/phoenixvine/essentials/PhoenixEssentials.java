@@ -2,28 +2,10 @@ package net.phoenixvine.essentials;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent;
-import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.client.EssentialsClientProxy;
-import net.phoenixvine.essentials.command.EssentialsCommands;
 import net.phoenixvine.essentials.hc.hcCompileMerged1;
-import net.phoenixvine.essentials.config.EssentialsConfigOverrides;
-import net.phoenixvine.essentials.config.EssentialsServerConfig;
-import net.phoenixvine.essentials.data.KitRegistry;
-import net.phoenixvine.essentials.data.SpawnRegistry;
-import net.phoenixvine.essentials.data.WarpRegistry;
-import net.phoenixvine.essentials.network.EssentialsNetwork;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -36,71 +18,12 @@ public class PhoenixEssentials {
     public static final Logger LOGGER = LogManager.getLogger();
 
     public PhoenixEssentials() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        // Everything the constructor and the old @SubscribeEvent methods did (mod/Forge-bus listeners, the
+        // server-config registration) lives in the Hot Chocolate port: src/main/hotc/EssentialsModEntry.hotc.
+        hcCompileMerged1.mod_construct();
 
-        modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(EssentialsCapabilityProvider::register);
-        modEventBus.addListener(EssentialsConfigOverrides::onLoading);
-        modEventBus.addListener(EssentialsConfigOverrides::onReloading);
-
-        MinecraftForge.EVENT_BUS.register(this);
-
+        // Client-only: must stay Java so the client proxy class is never loaded on a dedicated server.
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> EssentialsClientProxy::registerConfigScreen);
-
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, EssentialsServerConfig.SPEC);
-    }
-
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            LOGGER.info("[Phoenix Essentials] Bootstrapping server essentials...");
-            EssentialsNetwork.init();
-            hcCompileMerged1.setup_hc_networking();
-            if (EssentialsHcMode.takeover()) {
-                hcCompileMerged1.register_player_events();
-                hcCompileMerged1.register_teleport_events();
-                hcCompileMerged1.register_autotrash_events();
-            }
-        });
-    }
-
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-        WarpRegistry.load();
-        KitRegistry.load();
-        SpawnRegistry.load();
-    }
-
-    @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
-        EssentialsCommands.registerAll(event.getDispatcher());
-        // By default the Hot Chocolate ports own the real command names and are registered by
-        // EssentialsCommands.registerAll. With -Dphoenix_essentials.use_java=true the original Java
-        // commands are used instead and the HC versions come up here as `hc`-prefixed twins
-        // (/hchome, /hcwarp, ...) for side-by-side comparison.
-        if (!EssentialsHcMode.takeover()) {
-            hcCompileMerged1.register_real_home_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_warp_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_kit_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_back_command(event.getDispatcher());
-            hcCompileMerged1.register_real_spawn_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_nick_command(event.getDispatcher());
-            hcCompileMerged1.register_real_playtime_command(event.getDispatcher());
-            hcCompileMerged1.register_real_message_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_ignore_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_heal_feed_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_god_fly_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_gamemode_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_top_command(event.getDispatcher());
-            hcCompileMerged1.register_real_seen_command(event.getDispatcher());
-            hcCompileMerged1.register_real_afk_command(event.getDispatcher());
-            hcCompileMerged1.register_real_tpa_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_tpforce_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_tpx_command(event.getDispatcher());
-            hcCompileMerged1.register_real_rtp_command(event.getDispatcher());
-            hcCompileMerged1.register_real_playerinfo_command(event.getDispatcher());
-            hcCompileMerged1.register_real_trash_commands(event.getDispatcher());
-            hcCompileMerged1.register_real_invsee_command(event.getDispatcher());
-        }
     }
 
     public static ResourceLocation id(String path) {
