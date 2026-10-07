@@ -269,6 +269,32 @@ public final class EssentialsHcServerBridge {
         return EssentialsServerConfig.BACK_AFTER_DEATH.get();
     }
 
+    // Direct copy of C2SRequestSyncPacket's KITS branch: every kit's name + this player's remaining
+    // cooldown seconds, sorted by name ignoring case, as "name:secs,name:secs" (kit names are
+    // single words, so neither ':' nor ',' appears in one). Used by the HC sync layer.
+    public static String kitSyncCsv(ServerPlayer player) {
+        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        List<String[]> entries = new ArrayList<>();
+        for (KitDefinition kit : KitRegistry.getAll().values()) {
+            long lastClaimedMs = data == null ? 0 : data.getKitLastClaimedMs(kit.name);
+            long remainingMs = kit.cooldownSeconds * 1000L - (System.currentTimeMillis() - lastClaimedMs);
+            int remainingSeconds = lastClaimedMs <= 0 || remainingMs <= 0 ? 0 : (int) ((remainingMs + 999) / 1000);
+            entries.add(new String[] { kit.name, Integer.toString(remainingSeconds) });
+        }
+        entries.sort((a, b) -> a[0].compareToIgnoreCase(b[0]));
+        StringBuilder sb = new StringBuilder();
+        for (String[] e : entries) {
+            if (sb.length() > 0) sb.append(',');
+            sb.append(e[0]).append(':').append(e[1]);
+        }
+        return sb.toString();
+    }
+
+    // `HOMES_PER_PLAYER` for the homes sync (the original sends the config value, not the override).
+    public static int homesPerPlayer() {
+        return EssentialsServerConfig.HOMES_PER_PLAYER.get();
+    }
+
     public static String dimensionLabel(ServerLevel level) {
         return level.dimension().location().toString();
     }

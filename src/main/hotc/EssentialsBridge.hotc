@@ -101,72 +101,8 @@ extern class WikiThemeHc = "net.phoenixvine.wiki.client.screen.WikiTheme" {
     fn new(bg: Int, panel: Int, header: Int, border: Int, accent: Int, text: Int, textDim: Int, textFaint: Int, done: Int, activeColor: Int) -> Self;
 }
 
-// Real nested-enum binding, same "`$`-qualified binary name, static field per constant" pattern
-// `networking.hc`'s own `PacketDistributorHc::PLAYER` already established for a plain Java enum.
-extern class C2SRequestSyncKindHc = "net.phoenixvine.essentials.network.packet.C2SRequestSyncPacket$Kind" {
-    static HOMES: C2SRequestSyncKindHc;
-    static WARPS: C2SRequestSyncKindHc;
-    static KITS: C2SRequestSyncKindHc;
-    static TRASH: C2SRequestSyncKindHc;
-}
-
-extern class C2SRequestSyncPacketHc = "net.phoenixvine.essentials.network.packet.C2SRequestSyncPacket" {
-    fn new(kind: C2SRequestSyncKindHc) -> Self;
-}
-
-// The real mod's own shared channel -- see this file's own header for why this port reuses it
-// instead of standing up a second one. `EssentialsNetwork.init()` (real Java, unchanged) already
-// populates this before any screen can open, same as the original `EssentialsConfigScreen`/
-// `EssentialsListScreen` already assume.
-extern class EssentialsNetworkHc = "net.phoenixvine.essentials.network.EssentialsNetwork" {
-    static CHANNEL: SimpleChannel;
-}
-
-// The real, UNCHANGED `EssentialsListScreen` -- this pass ports `EssentialsConfigScreen` only (see
-// `README.md` in this directory); its own four nav buttons open this REAL Java screen exactly as
-// the original Java config screen does, rather than re-deriving a second, not-yet-pixel-matched HC
-// version of the list screen. A later pass can port this one too and swap this binding for a real
-// HC `extends ScreenHc` struct instead.
-extern class EssentialsListScreenHc = "net.phoenixvine.essentials.client.EssentialsListScreen" {
-    fn new(parent: ScreenHc, kind: C2SRequestSyncKindHc, title: String) -> Self;
-}
-
-// --- Real bridge bindings, part 2: the list screen's own real data/network surface ---
-//
-// `EssentialsClientCache` -- the real client-side cache `EssentialsListScreen.java` itself reads
-// from (`getHomes`/`getWarps`/`getKits`/`getAutoTrash`), populated by the real
-// `S2CHomesSyncPacket`/`S2CWarpsSyncPacket`/`S2CKitsSyncPacket`/`S2CAutoTrashSyncPacket` handlers
-// (unchanged Java -- this port reads the cache the same way the original screen already does, it
-// doesn't re-implement the sync packets themselves).
-extern class EssentialsClientCacheHc = "net.phoenixvine.essentials.client.EssentialsClientCache" {
-    static fn getHomes() -> JListHc;
-    static fn getHomesCap() -> Int;
-    static fn getWarps() -> JListHc;
-    static fn getKits() -> JListHc;
-    static fn getAutoTrash() -> JListHc;
-}
-
-// The real nested record `EssentialsClientCache.KitEntry(String name, int cooldownRemainingSeconds)`
-// -- a real Java record's own auto-generated accessors (`name()`/`cooldownRemainingSeconds()`),
-// same binding shape as any other extern method.
-extern class EssentialsKitEntryHc = "net.phoenixvine.essentials.client.EssentialsClientCache$KitEntry" {
-    fn name(&self) -> String;
-    fn cooldownRemainingSeconds(&self) -> Int;
-}
-
-extern class C2SGuiTeleportKindHc = "net.phoenixvine.essentials.network.packet.C2SGuiTeleportPacket$Kind" {
-    static HOME: C2SGuiTeleportKindHc;
-    static WARP: C2SGuiTeleportKindHc;
-    static BACK: C2SGuiTeleportKindHc;
-}
-
-extern class C2SGuiTeleportPacketHc = "net.phoenixvine.essentials.network.packet.C2SGuiTeleportPacket" {
-    fn new(kind: C2SGuiTeleportKindHc, name: String) -> Self;
-}
-
-extern class C2SGuiClaimKitPacketHc = "net.phoenixvine.essentials.network.packet.C2SGuiClaimKitPacket" {
-    fn new(name: String) -> Self;
-}
+// (The Java `EssentialsNetwork`/`EssentialsClientCache`/packet and `EssentialsListScreen` bindings that
+// used to live here are gone: every HC screen now talks to `EssentialsNetworkPackets.hotc` instead.)
 
 // --- Real bridge bindings, part 3: real per-player home persistence + real teleport ---
 //
@@ -260,6 +196,9 @@ extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.Essentials
     // Real, nullable -- `null` if the target has no essentials data.
     static fn playerInfo(target: ServerPlayer) -> String?;
     static fn openTrash(player: ServerPlayer);
+    // HC network layer helpers -- see `EssentialsNetworkPackets.hotc`.
+    static fn kitSyncCsv(player: ServerPlayer) -> String;
+    static fn homesPerPlayer() -> Int;
     // Event-handler helpers -- see `EssentialsPlayerEvents.hotc`.
     static fn copyPlayerData(original: Player, entity: Player);
     static fn recordSeen(player: ServerPlayer);

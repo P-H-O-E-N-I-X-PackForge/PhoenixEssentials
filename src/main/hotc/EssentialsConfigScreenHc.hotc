@@ -15,11 +15,8 @@
 // same "recompute every call" convention `ui_render.hc`'s own `HcUiScreen` already established for
 // the exact same zero-fields reason.
 //
-// Real, disclosed scope cut for this pass: `EssentialsListScreen` itself is NOT ported yet -- the
-// four nav buttons below open the REAL, UNCHANGED Java `EssentialsListScreen`
-// (`essentials_bridge.hc`'s own `EssentialsListScreenHc`), exactly like the original Java config
-// screen already does. A later pass can port that screen too and swap this binding for a real HC
-// `extends ScreenHc` struct instead.
+// The four nav buttons open the HC port of `EssentialsListScreen` (`EssentialsListScreenPort.hotc`),
+// which in turn talks to the HC network layer (`EssentialsNetworkPackets.hotc`).
 
 fn ess_row_h() -> Int { return 18; }
 fn ess_panel_w() -> Int { return 260; }
@@ -110,14 +107,8 @@ fn ess_open_wiki(parent: ScreenHc) {
     PhoenixWikiAPIHc::open(parent, "phoenix_essentials", "wiki", theme);
 }
 
-// Now opens the REAL HC port (`EssentialsListScreenPort.hotc`), not the unchanged Java
-// `EssentialsListScreenHc` binding -- that binding stays declared in `essentials_bridge.hc` (a
-// later rollback point if the port ever needs bypassing), just unused by this call site now.
-// `parent` is unused -- the ported list screen's own `onClose`-equivalent (its `keyPressed`
-// override) always returns to THIS config screen via `setScreen(null)` (this screen is the only
-// thing ever still "open" underneath, same single-active-screen assumption every other screen in
-// this library already relies on), not a stored parent reference (an `extends`-struct still has
-// zero fields to keep one in).
+// `parent` is unused -- the list screen's Escape handler reopens THIS config screen directly (the only
+// way to reach it), since an `extends`-struct has no field to keep a parent reference in.
 fn ess_open_list(parent: ScreenHc, kind: Int, title: String) {
     open_essentials_list_screen_hc(kind, title);
 }

@@ -5,9 +5,8 @@
 // this is the missing half, written in HC:
 //   * server: `/hcafk2` (`EssentialsAfkCommand.hotc`) calls `send_afk_state` after flipping the
 //     real `PlayerEssentialsData.afk` flag;
-//   * network: a tiny S2C `AfkSyncPacket` on its OWN channel (the real `EssentialsNetwork.CHANNEL`
-//     registers its ids from Java, so this doesn't touch it) -- same shape as hotc-mc's
-//     `UiDataPacket`, including the `enqueueWork` hop onto the main thread;
+//   * network: a tiny S2C `AfkSyncPacket` on the shared HC channel (`EssentialsNetworkPackets.hotc`,
+//     id 0) -- same shape as hotc-mc's `UiDataPacket`, including the `enqueueWork` hop;
 //   * client: `EssentialsHcAfkOverlay` (Java: the `RegisterGuiOverlaysEvent` hook + the synced
 //     flag/timer) calls `render_afk_overlay` every frame; this draws the badge in the real
 //     `EssentialsThemePalette` colors, only when the setting is on AND the flag is set.
@@ -32,29 +31,14 @@ impl AfkSyncPacket {
     }
 }
 
-// `hotc-mc`'s own `GanacheNetHc::unwrapSupplier` binds a Ganache-only shim class -- this project's
-// equivalent lives in `EssentialsHcServerBridge` (second alias to the same class `EssentialsBridge`
-// already binds, just exposing the one extra method).
-extern class EssentialsNetUnwrapHc = "net.phoenixvine.essentials.EssentialsHcServerBridge" {
-    static fn unwrapSupplier(o: PhoenixObject4Net) -> PhoenixObject4Net;
-}
-
 extern class EssentialsHcAfkOverlayHc = "net.phoenixvine.essentials.client.EssentialsHcAfkOverlay" {
     static fn setActive(afk: Bool);
     static fn isActive() -> Bool;
     static fn label() -> String;
 }
 
-pub static ess_afk_channel: SimpleChannel? = null;
-
-// Same nullable-static assignment trick `ui_render.hc`'s own `set_ui_channel` documents: a plain
-// `SimpleChannel` can't be assigned straight into a `SimpleChannel?` static, but passing it
-// through a `SimpleChannel?`-typed parameter is accepted.
-fn set_afk_channel(channel: SimpleChannel?) {
-    ess_afk_channel = channel;
-}
-
-fn register_afk_packet(channel: &SimpleChannel, id: Int) {
+// Registered by `setup_hc_networking` (`EssentialsNetworkPackets.hotc`), id 0 on the shared HC channel.
+pub fn register_afk_packet(channel: &SimpleChannel, id: Int) {
     let cls = class("AfkSyncPacket") as JClassNet;
     channel.registerMessage(
         id,
@@ -69,21 +53,9 @@ fn register_afk_packet(channel: &SimpleChannel, id: Int) {
     );
 }
 
-// Called once from `PhoenixEssentials.commonSetup` (both sides need the channel registered).
-pub fn setup_afk_networking() {
-    let channel = NetworkRegistry::newSimpleChannel(
-        ResourceLocation::new("phoenix_essentials", "afk_hc"),
-        || { return "1" as PhoenixObject4Net; },
-        |v| { return true; },
-        |v| { return true; }
-    );
-    register_afk_packet(channel, 0);
-    set_afk_channel(channel);
-}
-
 // Server -> exactly one player (`PacketDistributor.PLAYER`), same targeting `send_ui_data` uses.
 pub fn send_afk_state(player: ServerPlayer, afk: Bool) {
-    let chan = ess_afk_channel;
+    let chan = ess_hc_channel;
     if chan == null { return; }
     var flag = 0;
     if afk { flag = 1; }

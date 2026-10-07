@@ -1,0 +1,352 @@
+// --- HC port of EssentialsNetwork + the seven sync/action packets + EssentialsClientCache ---
+//
+// One channel (`phoenix_essentials:main_hc`), eight packets, in the same order/direction as the
+// original's `EssentialsNetwork.init()` (plus the HC-only `AfkSyncPacket`, `EssentialsAfkOverlay.
+// hotc`). Deliberately a SEPARATE channel from the Java one: both stay registered, so the original
+// Java screens (the H fallback in takeover mode, everything in `use_java` mode) keep their own
+// untouched channel + `EssentialsClientCache`, while every HC screen talks only to this layer.
+//
+// Same logic as the Java packets, restated in HC:
+//   C2S  RequestSync(kind)       -> server replies with the matching S2C list
+//   C2S  GuiTeleport(kind, name) -> HOME/WARP/BACK through the real `TeleportExecutor`
+//   C2S  GuiClaimKit(name)       -> feature check, cooldown, grant, `recordKitClaimed`
+//   S2C  Homes/Warps/Kits/AutoTrash sync -> fill the client cache below
+// Lists travel as comma-joined strings (home/warp/kit names and item ids never contain `,`; a kit
+// entry is `name:seconds`) rather than a count + repeated fields -- simpler HC structs, and wire
+// compatibility with the Java layer isn't needed since both ends are this mod.
+//
+// `kind` ints mirror `EssentialsListScreenPort.hotc`'s `ess_list_kind_*` and the original enums'
+// ordinals: sync HOMES=0/WARPS=1/KITS=2/TRASH=3; teleport HOME=0/WARP=1/BACK=2.
+//
+// Every handler runs through `enqueueWork` (network thread otherwise -- see hotc-mc's README).
+
+// --- client cache (replaces `EssentialsClientCache`) ---
+
+static ess_cache_homes: [String] = [""; 0];
+static ess_cache_homes_cap: Int = 0;
+static ess_cache_warps: [String] = [""; 0];
+static ess_cache_kit_names: [String] = [""; 0];
+static ess_cache_kit_secs: [Int] = [0; 0];
+static ess_cache_trash: [String] = [""; 0];
+
+fn ess_split_csv(csv: String) -> [String] {
+    if csv.length() > 0 { return csv.split(","); }
+    return [""; 0];
+}
+
+fn ess_cache_set_homes(csv: String, cap: Int) {
+    let names = ess_split_csv(csv);
+    ess_cache_homes_cap = cap;
+    ess_cache_homes = names;
+}
+
+fn ess_cache_set_warps(csv: String) {
+    let names = ess_split_csv(csv);
+    ess_cache_warps = names;
+}
+
+fn ess_cache_set_trash(csv: String) {
+    let ids = ess_split_csv(csv);
+    ess_cache_trash = ids;
+}
+
+// "name:secs,name:secs" -> two parallel arrays.
+fn ess_cache_set_kits(csv: String) {
+    let pairs = ess_split_csv(csv);
+    var names = [""; pairs.length];
+    var secs = [0; pairs.length];
+    var i = 0;
+    while i < pairs.length {
+        let parts = pairs[i].split(":");
+        names[i] = parts[0];
+        secs[i] = JIntNet::parseInt(parts[1]);
+        i = i + 1;
+    }
+    ess_cache_kit_secs = secs;
+    ess_cache_kit_names = names;
+}
+
+extern class JIntNet = "java.lang.Integer" {
+    static fn parseInt(s: String) -> Int;
+}
+
+// --- packets ---
+
+struct RequestSyncPacket { kind: Int }
+struct GuiTeleportPacket { kind: Int, name: String }
+struct GuiClaimKitPacket { name: String }
+struct HomesSyncPacket { csv: String, cap: Int }
+struct WarpsSyncPacket { csv: String }
+struct KitsSyncPacket { csv: String }
+struct AutoTrashSyncPacket { csv: String }
+
+impl RequestSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeVarInt(self.kind); }
+    static fn decode(buf: FriendlyByteBuf) -> RequestSyncPacket { return RequestSyncPacket { kind: buf.readVarInt() }; }
+    fn on_received(&self, sender: ServerPlayer) { ess_handle_request_sync(sender, self.kind); }
+}
+
+impl GuiTeleportPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeVarInt(self.kind).writeUtf(self.name); }
+    static fn decode(buf: FriendlyByteBuf) -> GuiTeleportPacket {
+        let kind = buf.readVarInt();
+        let name = buf.readUtf();
+        return GuiTeleportPacket { kind: kind, name: name };
+    }
+    fn on_received(&self, sender: ServerPlayer) { ess_handle_gui_teleport(sender, self.kind, self.name); }
+}
+
+impl GuiClaimKitPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.name); }
+    static fn decode(buf: FriendlyByteBuf) -> GuiClaimKitPacket { return GuiClaimKitPacket { name: buf.readUtf() }; }
+    fn on_received(&self, sender: ServerPlayer) { ess_handle_claim_kit(sender, self.name); }
+}
+
+impl HomesSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.csv).writeVarInt(self.cap); }
+    static fn decode(buf: FriendlyByteBuf) -> HomesSyncPacket {
+        let csv = buf.readUtf();
+        let cap = buf.readVarInt();
+        return HomesSyncPacket { csv: csv, cap: cap };
+    }
+    fn on_received(&self) { ess_cache_set_homes(self.csv, self.cap); }
+}
+
+impl WarpsSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.csv); }
+    static fn decode(buf: FriendlyByteBuf) -> WarpsSyncPacket { return WarpsSyncPacket { csv: buf.readUtf() }; }
+    fn on_received(&self) { ess_cache_set_warps(self.csv); }
+}
+
+impl KitsSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.csv); }
+    static fn decode(buf: FriendlyByteBuf) -> KitsSyncPacket { return KitsSyncPacket { csv: buf.readUtf() }; }
+    fn on_received(&self) { ess_cache_set_kits(self.csv); }
+}
+
+impl AutoTrashSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.csv); }
+    static fn decode(buf: FriendlyByteBuf) -> AutoTrashSyncPacket { return AutoTrashSyncPacket { csv: buf.readUtf() }; }
+    fn on_received(&self) { ess_cache_set_trash(self.csv); }
+}
+
+// --- server-side handlers (the bodies of the Java packets' `handle`) ---
+
+fn ess_send_to_player(player: ServerPlayer, msg: PhoenixObject4Net) {
+    let chan = ess_hc_channel;
+    if chan == null { return; }
+    let target = PacketDistributorHc::PLAYER.with(|| { return player as PhoenixObject4Net; });
+    chan.send(target, msg);
+}
+
+fn ess_player_data_of(player: &ServerPlayer) -> EssentialsPlayerDataHc {
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data_obj = opt.orElse(null);
+    if data_obj == null { return null; }
+    return data_obj as EssentialsPlayerDataHc;
+}
+
+fn ess_handle_request_sync(player: ServerPlayer, kind: Int) {
+    if kind == 0 {
+        var csv = "";
+        let data = ess_player_data_of(&player);
+        if data != null { csv = EssentialsHcServerBridgeHc::homeNamesCsv(&data); }
+        ess_send_to_player(player, HomesSyncPacket { csv: csv, cap: EssentialsHcServerBridgeHc::homesPerPlayer() } as PhoenixObject4Net);
+        return;
+    }
+    if kind == 1 {
+        ess_send_to_player(player, WarpsSyncPacket { csv: EssentialsHcServerBridgeHc::warpNamesCsv() } as PhoenixObject4Net);
+        return;
+    }
+    if kind == 2 {
+        ess_send_to_player(player, KitsSyncPacket { csv: EssentialsHcServerBridgeHc::kitSyncCsv(player) } as PhoenixObject4Net);
+        return;
+    }
+    var ids = "";
+    let data = ess_player_data_of(&player);
+    if data != null { ids = EssentialsHcServerBridgeHc::autoTrashCsv(&data); }
+    ess_send_to_player(player, AutoTrashSyncPacket { csv: ids } as PhoenixObject4Net);
+}
+
+fn ess_handle_gui_teleport(player: ServerPlayer, kind: Int, name: String) {
+    let data = ess_player_data_of(&player);
+    if kind == 0 {
+        if data == null { return; }
+        let home = data.getHome(name);
+        if home == null { return; }
+        TeleportExecutorHc::request(player, home, "home", "home \"{name}\"");
+        return;
+    }
+    if kind == 1 {
+        let warp = WarpRegistryHc::get(name);
+        if warp == null { return; }
+        TeleportExecutorHc::request(player, warp, "warp", "warp \"{name}\"");
+        return;
+    }
+    if data == null { return; }
+    let back = data.getBack();
+    if back == null {
+        player.sendSystemMessage(Component::literal("You have nowhere to go back to.") as Component);
+        return;
+    }
+    TeleportExecutorHc::request(player, back, "back", "your previous location");
+}
+
+fn ess_handle_claim_kit(player: ServerPlayer, name: String) {
+    if !EssentialsHcModeHc::featureEnabled(&player, "kits") {
+        player.sendSystemMessage(Component::literal("Kits aren't available here right now.") as Component);
+        return;
+    }
+    if !EssentialsHcServerBridgeHc::kitExists(name) { return; }
+    let data = ess_player_data_of(&player);
+    if data == null { return; }
+    let remaining = EssentialsHcServerBridgeHc::kitCooldownRemainingSeconds(&data, name);
+    if remaining > 0 {
+        player.sendSystemMessage(Component::literal("You can claim \"{name}\" again in {remaining}s.") as Component);
+        return;
+    }
+    EssentialsHcServerBridgeHc::claimKit(player, &data, name);
+    player.sendSystemMessage(Component::literal("Claimed kit \"{name}\".") as Component);
+}
+
+// --- registration ---
+
+pub static ess_hc_channel: SimpleChannel? = null;
+
+fn set_hc_channel(channel: SimpleChannel?) {
+    ess_hc_channel = channel;
+}
+
+extern class EssentialsNetUnwrapHc = "net.phoenixvine.essentials.EssentialsHcServerBridge" {
+    static fn unwrapSupplier(o: PhoenixObject4Net) -> PhoenixObject4Net;
+}
+
+fn ess_dir_server() -> JOptionalNet { return JOptionalNet::of(NetworkDirectionHc::PLAY_TO_SERVER as PhoenixObject4Net); }
+fn ess_dir_client() -> JOptionalNet { return JOptionalNet::of(NetworkDirectionHc::PLAY_TO_CLIENT as PhoenixObject4Net); }
+
+// C2S: the handler's `on_received` needs the real sender.
+fn ess_reg_c2s_request(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("RequestSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as RequestSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return RequestSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let sender = real_ctx.getSender();
+            let packet = pkt as RequestSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(sender); });
+        },
+        ess_dir_server());
+}
+
+fn ess_reg_c2s_teleport(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("GuiTeleportPacket") as JClassNet,
+        |pkt, buf| { (pkt as GuiTeleportPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return GuiTeleportPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let sender = real_ctx.getSender();
+            let packet = pkt as GuiTeleportPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(sender); });
+        },
+        ess_dir_server());
+}
+
+fn ess_reg_c2s_claim(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("GuiClaimKitPacket") as JClassNet,
+        |pkt, buf| { (pkt as GuiClaimKitPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return GuiClaimKitPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let sender = real_ctx.getSender();
+            let packet = pkt as GuiClaimKitPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(sender); });
+        },
+        ess_dir_server());
+}
+
+fn ess_reg_s2c_homes(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("HomesSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as HomesSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return HomesSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as HomesSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        },
+        ess_dir_client());
+}
+
+fn ess_reg_s2c_warps(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("WarpsSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as WarpsSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return WarpsSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as WarpsSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        },
+        ess_dir_client());
+}
+
+fn ess_reg_s2c_kits(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("KitsSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as KitsSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return KitsSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as KitsSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        },
+        ess_dir_client());
+}
+
+fn ess_reg_s2c_trash(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("AutoTrashSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as AutoTrashSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return AutoTrashSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as AutoTrashSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        },
+        ess_dir_client());
+}
+
+// Called once from `PhoenixEssentials.commonSetup` (both sides need the channel registered, in the
+// same order). Id 0 is the AFK overlay's packet (`EssentialsAfkOverlay.hotc`).
+pub fn setup_hc_networking() {
+    let channel = NetworkRegistry::newSimpleChannel(
+        ResourceLocation::new("phoenix_essentials", "main_hc"),
+        || { return "1" as PhoenixObject4Net; },
+        |v| { return true; },
+        |v| { return true; }
+    );
+    register_afk_packet(channel, 0);
+    ess_reg_c2s_request(channel, 1);
+    ess_reg_c2s_teleport(channel, 2);
+    ess_reg_c2s_claim(channel, 3);
+    ess_reg_s2c_homes(channel, 4);
+    ess_reg_s2c_warps(channel, 5);
+    ess_reg_s2c_kits(channel, 6);
+    ess_reg_s2c_trash(channel, 7);
+    set_hc_channel(channel);
+}
+
+// Client -> server, used by `EssentialsListScreenPort.hotc`.
+pub fn ess_send_request_sync(kind: Int) {
+    let chan = ess_hc_channel;
+    if chan == null { return; }
+    chan.sendToServer(RequestSyncPacket { kind: kind } as PhoenixObject4Net);
+}
+
+pub fn ess_send_gui_teleport(kind: Int, name: String) {
+    let chan = ess_hc_channel;
+    if chan == null { return; }
+    chan.sendToServer(GuiTeleportPacket { kind: kind, name: name } as PhoenixObject4Net);
+}
+
+pub fn ess_send_claim_kit(name: String) {
+    let chan = ess_hc_channel;
+    if chan == null { return; }
+    chan.sendToServer(GuiClaimKitPacket { name: name } as PhoenixObject4Net);
+}

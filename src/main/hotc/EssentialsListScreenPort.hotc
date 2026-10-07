@@ -3,27 +3,20 @@
 // Same "call the real Java chrome/theme code directly" approach `EssentialsConfigScreenHc.hotc`
 // already established -- `EssentialsUIKitHc::drawModalChrome`/`drawBorder` and
 // `EssentialsThemePaletteHc`'s own real static color fields are called/read directly, so the
-// output is pixel/color-identical to the original by construction. Reuses the REAL, UNCHANGED
-// `EssentialsClientCache` (populated by the real S2C sync packets), the real
-// `C2SRequestSyncPacket`/`C2SGuiTeleportPacket`/`C2SGuiClaimKitPacket`, and the real shared
-// `EssentialsNetwork.CHANNEL` -- this port's own client-side screen is new, but the whole
-// client<->server data/network path underneath it is completely unchanged Java.
+// output is pixel/color-identical to the original by construction. The data/network path is HC now
+// too (`EssentialsNetworkPackets.hotc`): requests/teleports/kit claims go out on the HC channel and
+// the lists come back into HC-side cache statics this screen reads -- nothing here touches the
+// Java `EssentialsNetwork`/`EssentialsClientCache` any more.
 //
 // Real, disclosed simplifications versus the original (both cosmetic, not behavioral):
 // 1. The original caches its own built row list and only rebuilds when the underlying cache
-//    object's REFERENCE changes (`lastBuiltSource != source`), plus throttles a Kits rebuild to
-//    once per 500ms (cooldown countdown text). HC has no cheap reference-identity comparison for
-//    extern-class values and no `System.currentTimeMillis()` binding yet -- this port just
-//    rebuilds the row list fresh every `render()` call instead. More recomputation per frame (a
-//    few `JListHc::get`/struct-literal calls, no allocDition-heavy), no observable behavior
-//    difference.
-// 2. The original shows "Loading..." instead of "No X set" until the FIRST real sync reply
-//    changes the cache (`hasSynced`, same reference-identity trick). This port approximates it
-//    with a plain "has this screen rendered more than once yet" flag -- the FIRST frame (before
-//    the reply can possibly have arrived) shows "Loading...", every frame after shows the real
-//    empty-state message. Not byte-for-byte identical to the original's own trigger condition,
-//    but the same real UX (a "loading" flash that resolves almost immediately), and no real
-//    caller should notice the difference in practice.
+//    object's REFERENCE changes, plus throttles a Kits rebuild to once per 500ms. This port just
+//    rebuilds the row list fresh every `render()` call instead -- a few array reads and struct
+//    literals per frame, no observable behavior difference.
+// 2. The original shows "Loading..." until the FIRST real sync reply changes the cache
+//    (`hasSynced`). This port approximates it with a plain "has this screen rendered more than
+//    once yet" flag -- the first frame shows "Loading...", every frame after shows the real
+//    empty-state message.
 
 struct EssListRow {
     label: String,
@@ -35,7 +28,7 @@ fn ess_list_row_h() -> Int { return 18; }
 fn ess_list_panel_w() -> Int { return 260; }
 fn ess_list_panel_h() -> Int { return 220; }
 
-static ess_list_kind: Int = 0; // mirrors ui_essentials_kind_* below, NOT C2SRequestSyncKindHc itself (see header)
+static ess_list_kind: Int = 0; // 0=homes 1=warps 2=kits 3=trash -- same values the HC sync packets use
 static ess_list_title: String = "";
 static ess_list_rendered_once: Bool = false;
 
@@ -43,18 +36,6 @@ pub static ess_list_kind_homes: Int = 0;
 pub static ess_list_kind_warps: Int = 1;
 pub static ess_list_kind_kits: Int = 2;
 pub static ess_list_kind_trash: Int = 3;
-
-// A plain `Int` tag, not `C2SRequestSyncKindHc` itself -- this static needs to survive being read
-// back on every `render`/`mouseClicked` call without re-touching the real enum type each time;
-// `ess_list_sync_kind()`/`ess_list_teleport_kind()` below convert back to the two DIFFERENT real
-// Java enums (`C2SRequestSyncPacket$Kind` to re-request a sync, `C2SGuiTeleportPacket$Kind` to
-// send a teleport) only at the one real call site each actually needs it.
-fn ess_list_sync_kind() -> C2SRequestSyncKindHc {
-    if ess_list_kind == ess_list_kind_homes { return C2SRequestSyncKindHc::HOMES; }
-    if ess_list_kind == ess_list_kind_warps { return C2SRequestSyncKindHc::WARPS; }
-    if ess_list_kind == ess_list_kind_kits { return C2SRequestSyncKindHc::KITS; }
-    return C2SRequestSyncKindHc::TRASH;
-}
 
 fn ess_list_empty_message() -> String {
     if ess_list_kind == ess_list_kind_homes { return "§8No homes set"; }
@@ -77,47 +58,42 @@ fn ess_list_display_name_of(id: String) -> String {
 }
 
 fn ess_list_build_rows() -> [EssListRow] {
+    // Reads the HC-side cache (`EssentialsNetworkPackets.hotc`) -- indexed directly, not aliased
+    // into a local, so repeated per-frame reads never move the static.
     if ess_list_kind == ess_list_kind_homes {
-        let names = EssentialsClientCacheHc::getHomes();
-        var out = [EssListRow { label: "", action_name: "", clickable: false }; names.size()];
+        var out = [EssListRow { label: "", action_name: "", clickable: false }; ess_cache_homes.length];
         var i = 0;
-        while i < names.size() {
-            let name = names.get(i) as String;
-            out[i] = EssListRow { label: "§7{name}", action_name: name, clickable: true };
+        while i < ess_cache_homes.length {
+            out[i] = EssListRow { label: "§7{ess_cache_homes[i]}", action_name: ess_cache_homes[i], clickable: true };
             i = i + 1;
         }
         return out;
     }
     if ess_list_kind == ess_list_kind_warps {
-        let names = EssentialsClientCacheHc::getWarps();
-        var out = [EssListRow { label: "", action_name: "", clickable: false }; names.size()];
+        var out = [EssListRow { label: "", action_name: "", clickable: false }; ess_cache_warps.length];
         var i = 0;
-        while i < names.size() {
-            let name = names.get(i) as String;
-            out[i] = EssListRow { label: "§7{name}", action_name: name, clickable: true };
+        while i < ess_cache_warps.length {
+            out[i] = EssListRow { label: "§7{ess_cache_warps[i]}", action_name: ess_cache_warps[i], clickable: true };
             i = i + 1;
         }
         return out;
     }
     if ess_list_kind == ess_list_kind_kits {
-        let entries = EssentialsClientCacheHc::getKits();
-        var out = [EssListRow { label: "", action_name: "", clickable: false }; entries.size()];
+        var out = [EssListRow { label: "", action_name: "", clickable: false }; ess_cache_kit_names.length];
         var i = 0;
-        while i < entries.size() {
-            let entry = entries.get(i) as EssentialsKitEntryHc;
-            let ready = entry.cooldownRemainingSeconds() <= 0;
-            var label = "§7{entry.name()} §8({entry.cooldownRemainingSeconds()}s)";
-            if ready { label = "§a{entry.name()}"; }
-            out[i] = EssListRow { label: label, action_name: entry.name(), clickable: ready };
+        while i < ess_cache_kit_names.length {
+            let ready = ess_cache_kit_secs[i] <= 0;
+            var label = "§7{ess_cache_kit_names[i]} §8({ess_cache_kit_secs[i]}s)";
+            if ready { label = "§a{ess_cache_kit_names[i]}"; }
+            out[i] = EssListRow { label: label, action_name: ess_cache_kit_names[i], clickable: ready };
             i = i + 1;
         }
         return out;
     }
-    let ids = EssentialsClientCacheHc::getAutoTrash();
-    var out = [EssListRow { label: "", action_name: "", clickable: false }; ids.size()];
+    var out = [EssListRow { label: "", action_name: "", clickable: false }; ess_cache_trash.length];
     var i = 0;
-    while i < ids.size() {
-        let id = ids.get(i) as String;
+    while i < ess_cache_trash.length {
+        let id = ess_cache_trash[i];
         out[i] = EssListRow { label: "§7{ess_list_display_name_of(id)} §8(click to remove)", action_name: id, clickable: true };
         i = i + 1;
     }
@@ -226,22 +202,18 @@ impl HcEssentialsListScreen {
             if player != null {
                 player.connection.sendCommand("essentialsautotrash remove {row.action_name}");
             }
-            let pkt = C2SRequestSyncPacketHc::new(ess_list_sync_kind());
-            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+            ess_send_request_sync(ess_list_kind);
             return true;
         }
 
         if ess_list_kind == ess_list_kind_homes {
-            let pkt = C2SGuiTeleportPacketHc::new(C2SGuiTeleportKindHc::HOME, row.action_name);
-            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+            ess_send_gui_teleport(0, row.action_name);
         }
         if ess_list_kind == ess_list_kind_warps {
-            let pkt = C2SGuiTeleportPacketHc::new(C2SGuiTeleportKindHc::WARP, row.action_name);
-            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+            ess_send_gui_teleport(1, row.action_name);
         }
         if ess_list_kind == ess_list_kind_kits {
-            let pkt = C2SGuiClaimKitPacketHc::new(row.action_name);
-            EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+            ess_send_claim_kit(row.action_name);
         }
         Minecraft::getInstance().setScreen(null);
         return true;
@@ -278,15 +250,14 @@ impl HcEssentialsListScreen {
 }
 
 // The one real caller -- `EssentialsConfigScreenHc.hotc`'s own `ess_open_list`. Mirrors the
-// original's own `init()`: resets scroll/loading state, sends the real `C2SRequestSyncPacket` to
+// original's own `init()`: resets scroll/loading state, sends a `RequestSyncPacket` to
 // (re)populate `EssentialsClientCache`, then opens the screen.
 pub fn open_essentials_list_screen_hc(kind: Int, title: String) {
     ess_list_kind = kind;
     ess_list_title = title;
     ess_list_scroll = 0;
     ess_list_rendered_once = false;
-    let pkt = C2SRequestSyncPacketHc::new(ess_list_sync_kind());
-    EssentialsNetworkHc::CHANNEL.sendToServer(pkt as PhoenixObject4Net);
+    ess_send_request_sync(kind);
     let screen = HcEssentialsListScreen::new(Component::literal(title) as Component);
     Minecraft::getInstance().setScreen(screen as ScreenHc);
 }

@@ -46,6 +46,7 @@ config button and the suite-bar button.
 | `EssentialsListScreenPort.hotc` | `EssentialsListScreen` (homes / warps / kits / auto-trash) |
 | `EssentialsHome/Warp/Kit/BackSpawn/Nick/Playtime/Message/Ignore/HealFeed/GodFly/Gamemode/Top/Seen/Afk/Tpa/TpForce/Tpx/Rtp/PlayerInfo/Trash/InvseeCommand(s).hotc` | the matching `*Command.java` |
 | `EssentialsCommandSupport.hotc` | `ess_literal` (real-or-twin name + permission gate), op-level gate |
+| `EssentialsNetworkPackets.hotc` | `EssentialsNetwork` + the 7 sync/action packets + `EssentialsClientCache`, on its own `main_hc` channel (the Java channel stays registered for the H fallback / rollback) |
 | `EssentialsPlayerEvents.hotc` | `EssentialsPlayerEvents` -- playtime, clone, last-seen, death spot (first HC event handlers, via hotc-mc `ForgeEvents.hotc`) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
@@ -60,7 +61,7 @@ config button and the suite-bar button.
   drops you into the void) and scans for floor in ceilinged dimensions like the Nether.
 * `/hcplayerinfo` is plain text (no section-sign colors).
 * `/sethomelimit`, auto-AFK detection, `EssentialsAutoTrashEvents`, `TeleportExecutor`, the
-  sync packets/`EssentialsNetwork`, the data registries and the remaining systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
+  data registries and the remaining systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
   sync the flag to the client) and doesn't resync on login.
 
 ## HC gotchas found while porting
