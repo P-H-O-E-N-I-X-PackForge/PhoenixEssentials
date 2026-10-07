@@ -1,12 +1,4 @@
-// --- Real port of InvseeCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses. The snapshot-and-
-// write-back inventory viewer needs a container-close EVENT HANDLER, and hotc-mc has no event-
-// subscription binding -- so the open + write-back pair is a direct Java copy
-// (`EssentialsHcInvsee`, with its own session map so `/hcinvsee` and the real `/invsee` can't
-// cross-wire) and HC just resolves the target and calls `open`. `hc`-prefixed literal, same
-// side-by-side-pilot reasoning; the real `/invsee` stays registered. Needs two online players to
-// exercise fully.
+
 
 fn hc_invsee(source: CommandSourceStackHc, target_name: String) -> Int {
     let viewer = source.getPlayer();

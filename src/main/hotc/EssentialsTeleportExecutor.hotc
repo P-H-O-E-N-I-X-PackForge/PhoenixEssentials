@@ -1,19 +1,4 @@
-// --- HC port of TeleportExecutor.java (warmup / cooldown / cancel state machine) ---
-//
-// The Java class stays as a thin FACADE (every existing caller -- the Java commands, the shims, the
-// public `EssentialsAPI.teleport`, other mods -- keeps calling `TeleportExecutor.request(...)`), and
-// in takeover mode its `request`/`cancel`/`forceTeleport` delegate here and its two event handlers
-// early-return. Same behavior, restated:
-//   * `te_request`   -- feature gate, one-pending-per-player, cooldown (with the bypass permission),
-//                       the cancellable `TeleportEvent.Pre`, then either teleport now or start a warmup;
-//   * server tick    -- finish warmups whose time has come, cancel ones where the player moved;
-//   * living hurt    -- cancel a pending warmup when the player takes damage (config);
-//   * `te_execute_now` -- level lookup + `/back` bookkeeping + the real cross-dimension teleport
-//                       (Java shim), record the cooldown stamp, tell the player, post `TeleportEvent.Post`.
-// State is two HC arrays (pending warmups, last-use stamps) instead of two `ConcurrentHashMap`s; all of
-// it is only touched from the server thread (commands, the tick handler and the hurt handler all run
-// there), so no locking is needed. `TeleportEvent.Pre`/`Post` are still posted on the Forge bus (via
-// the Java shim), so other mods that subscribe to them see no difference.
+
 
 struct TpPending {
     uuid: String,
@@ -128,7 +113,6 @@ fn te_execute_now(player: ServerPlayer, target: NamedLocationHc, category: Strin
     EssentialsHcServerBridgeHc::postPostTeleport(&player, category, label);
 }
 
-// `detail` may be `null` from Java callers (the 4/5-arg overloads pass none).
 pub fn te_request(player: ServerPlayer, target: NamedLocationHc, category: String, label: String, detail: String?, bypass: Bool, cooldown_seconds: Int) {
     if !EssentialsHcModeHc::featureEnabled(&player, "teleport") { return; }
     let uuid = player.getStringUUID();
@@ -174,8 +158,6 @@ pub fn te_force_teleport(player: ServerPlayer, target: NamedLocationHc, category
     te_execute_now(player, target, category, label, "");
 }
 
-// --- events ---
-
 extern class ServerTickEventHc = "net.minecraftforge.event.TickEvent$ServerTickEvent" {
     phase: TickPhaseHc;
 }
@@ -214,8 +196,6 @@ fn te_on_server_tick(e: JObjectEvent) {
         i = i + 1;
     }
 
-    // Publish the surviving list BEFORE executing, so a `TeleportEvent` subscriber that calls back into
-    // `request` sees the post-tick state.
     var trimmed = [te_blank_pending(); kept];
     var k = 0;
     while k < kept {

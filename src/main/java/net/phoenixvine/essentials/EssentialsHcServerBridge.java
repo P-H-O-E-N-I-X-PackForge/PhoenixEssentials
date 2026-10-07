@@ -451,6 +451,10 @@ public final class EssentialsHcServerBridge {
         return null;
     }
 
+    public static int setTeamHomeLimit(net.minecraft.commands.CommandSourceStack source, String anchorName, int count) {
+        return net.phoenixvine.essentials.command.HomeCommand.setTeamHomeLimitHc(source, anchorName, count);
+    }
+
     public static void claimKit(ServerPlayer player, PlayerEssentialsData data, String name) {
         KitDefinition kit = KitRegistry.get(name);
         if (kit == null) return;

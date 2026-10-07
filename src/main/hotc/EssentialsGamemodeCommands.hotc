@@ -1,20 +1,4 @@
-// --- Real port of GamemodeShortcutCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command in this project uses --
-// `ServerPlayer.setGameMode` and the real `GameType` enum constants (`context.hc`'s own new
-// `GameTypeHc`), nothing reimplemented. The four shortcuts (`gmc`/`gms`/`gma`/`gmsp`) share one
-// implementation, same as the original's own loop.
-//
-// The mode is carried as a plain `Int` code (0=survival .. 3=spectator) and turned back into the
-// real `GameTypeHc` constant fresh at each use (`hc_game_type`), rather than captured as an
-// extern-class value in two separate lambdas (the no-target and `<player>` forms) -- sidesteps any
-// "use of moved value" question entirely, same reasoning `EssentialsConfigScreenHc.hotc` already
-// gives for re-fetching `Minecraft::getInstance().font` instead of sharing one local.
-//
-// `hc`-prefixed literals (`/hcgmc`/`/hcgms`/`/hcgma`/`/hcgmsp`) -- same side-by-side-pilot
-// reasoning every other ported command file already gives; the real shortcuts stay registered and
-// untouched. Same disclosed scope cut as the heal/feed/god/fly ports: the original's `<player>`
-// form also requires op level 2, not ported here.
+
 
 fn hc_game_type(code: Int) -> GameTypeHc {
     if code == 0 { return GameTypeHc::SURVIVAL; }

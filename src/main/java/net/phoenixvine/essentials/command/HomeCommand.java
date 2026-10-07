@@ -107,6 +107,10 @@ public final class HomeCommand {
         return 1;
     }
 
+    public static int setTeamHomeLimitHc(CommandSourceStack source, String anchorName, int count) {
+        return setTeamHomeLimit(source, anchorName, count);
+    }
+
     private static int setTeamHomeLimit(CommandSourceStack source, String anchorName, int count) {
         ServerPlayer anchor = source.getServer().getPlayerList().getPlayerByName(anchorName);
         if (anchor == null) {

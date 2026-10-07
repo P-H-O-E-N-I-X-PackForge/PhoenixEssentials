@@ -1,19 +1,4 @@
-// --- Real, capability + registry backed port of KitCommand.java's own two commands ---
-//
-// Same "call the real Java directly" approach every other ported command/screen this project uses
-// -- `EssentialsHcServerBridgeHc::claimKit`/`kitCooldownRemainingSeconds` (`EssentialsBridge.hotc`)
-// consolidate `KitCommand.java`'s own item-granting loop and cooldown math into two real calls
-// rather than binding `java.util.List<KitItemEntry>` iteration, `KitDefinition`'s own fields,
-// `Inventory.add`, and `System.currentTimeMillis()` individually for this one real caller.
-//
-// `hc`-prefixed command literals (`/hckit`, not `/kit`) -- same side-by-side-pilot reasoning every
-// other ported command file in this project already gives; the real `/kit`/`/kits`
-// (`KitCommand.java`) stay registered and untouched.
-//
-// Real, disclosed scope cut: `EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_KITS, ...)`
-// (a per-dimension feature toggle the original checks first) is not ported -- a real, separate
-// binding surface (`EssentialsAPI`) not touched this pass; this port's own `/hckit` is always
-// enabled, everywhere.
+
 
 fn hc_claim_kit(source: CommandSourceStackHc, name: String) -> Int {
     let player = source.getPlayer();
@@ -48,7 +33,6 @@ fn hc_list_kits(source: CommandSourceStackHc) -> Int {
     return 1;
 }
 
-// Real tab-complete -- every configured kit's own name (server-wide, same shape as warps' own).
 fn hc_suggest_kit_names(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
     let csv = EssentialsHcServerBridgeHc::kitNamesCsv();
     return ess_suggest_from_csv(builder, csv).buildFuture();

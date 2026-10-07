@@ -1,13 +1,4 @@
-// --- Shared command plumbing for the Hot Chocolate takeover ---
-//
-// Every ported command is built through `ess_literal` so ONE place decides (a) the literal -- the
-// real name (`home`) when the HC ports own the real commands (the default), or the `hc` twin
-// (`hchome`) when launched with `-Dphoenix_essentials.use_java=true` -- and (b) the permission
-// gate. `allowed` is the exact same `EssentialsPermissions.check(source, NODE)` the Java commands
-// apply in their `.requires(...)`, looked up by the node's field name ("HOME", "GOD", ...), so
-// taking over a name does not silently open it to everyone. An empty node means no gate (the real
-// trash commands have none). `EssentialsHcMode.featureEnabled` is the per-dimension
-// `EssentialsAPI.isFeatureEnabled` toggle ("social" / "kits") the Java commands check first.
+
 
 extern class EssentialsHcModeHc = "net.phoenixvine.essentials.EssentialsHcMode" {
     static fn takeover() -> Bool;
@@ -21,7 +12,6 @@ fn ess_literal(real_name: String, twin_name: String, node: String) -> ArgumentBu
         .requires(|src| { return EssentialsHcModeHc::allowed(src as CommandSourceStackHc, node); });
 }
 
-// The original's `<player>` argument forms additionally require op level 2.
 fn ess_op_required(source: JObjectCmd) -> Bool {
     return (source as CommandSourceStackHc).hasPermission(2);
 }

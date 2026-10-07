@@ -1,15 +1,4 @@
-// --- Real port of GodFlyCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command in this project uses --
-// reads and writes the real `Abilities.invulnerable`/`mayfly`/`flying` public fields directly
-// (`context.hc`'s own new `AbilitiesHc`), then `onUpdateAbilities()` to push the change to the
-// client, exactly like the original.
-//
-// `hc`-prefixed command literals (`/hcgod`/`/hcfly`) -- same side-by-side-pilot reasoning every
-// other ported command file in this project already gives; the real `/god`/`/fly`
-// (`GodFlyCommand.java`) stay registered and untouched. Same disclosed scope cut as
-// `EssentialsHealFeedCommands.hotc`: the original's own `<player>` argument also requires op level
-// 2, not ported here.
+
 
 fn hc_god_resolve(source: &CommandSourceStackHc, target_name: String) -> ServerPlayer {
     let target = source.getServer().getPlayerList().getPlayerByName(target_name);

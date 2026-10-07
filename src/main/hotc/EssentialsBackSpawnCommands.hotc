@@ -1,16 +1,4 @@
-// --- Real port of BackCommand.java + SpawnCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command in this project uses.
-// `/hcback` reads the real per-player `getBack()` (set automatically as a side effect of
-// `TeleportExecutor`'s own `executeNow`, on every successful home/warp/spawn teleport this port or
-// the original Java commands trigger -- shared state, not reimplemented). `/hcspawn`/`/hcsetspawn`
-// read/write the real server-wide `SpawnRegistry`.
-//
-// `hc`-prefixed command literals -- same side-by-side-pilot reasoning every other ported command
-// file in this project already gives; the real `/back`/`/spawn`/`/setspawn` stay registered and
-// untouched. Same disclosed cooldown-pool simplification `EssentialsWarpCommands.hotc`'s own
-// header already discloses (the simpler 4-arg `TeleportExecutorHc::request` overload, not the
-// original's own cooldown-config-reading 6-arg one).
+
 
 fn hc_teleport_back(source: CommandSourceStackHc) -> Int {
     let player = source.getPlayer();
@@ -43,7 +31,6 @@ fn hc_set_spawn(source: CommandSourceStackHc) -> Int {
     return 1;
 }
 
-// Split in two because the real mod gates them separately (`ENABLE_BACK` vs `ENABLE_SPAWN`).
 pub fn register_real_back_command(dispatcher: CommandDispatcherSrc) {
     let back_builder = ess_literal("back", "hcback", "BACK").executes(|ctx| {
         return hc_teleport_back(ctx.getSource() as CommandSourceStackHc);
@@ -52,9 +39,7 @@ pub fn register_real_back_command(dispatcher: CommandDispatcherSrc) {
 }
 
 pub fn register_real_spawn_commands(dispatcher: CommandDispatcherSrc) {
-    // `hcspawn2`, not `hcspawn` -- hotc-mc's own `command_example.hc` (vendored into this same
-    // merged compile) already declares a `register_hcspawn` with that literal; nothing currently
-    // calls it from this project, but the name is avoided here to not create a latent collision.
+
     let spawn_builder = ess_literal("spawn", "hcspawn2", "SPAWN").executes(|ctx| {
         return hc_teleport_spawn(ctx.getSource() as CommandSourceStackHc);
     });

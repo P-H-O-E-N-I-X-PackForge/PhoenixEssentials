@@ -15,7 +15,6 @@ public final class EssentialsCommands {
     // port (src/main/hotc) owns the real command names; launch with
     // `-Dphoenix_essentials.use_java=true` to register the original Java classes instead (the HC
     // versions then come up as `hc`-prefixed twins -- see PhoenixEssentials#onRegisterCommands).
-    // `/sethomelimit` has no HC port yet and always stays Java.
     public static void registerAll(CommandDispatcher<CommandSourceStack> dispatcher) {
 
         boolean configLoaded = EssentialsServerConfig.SPEC.isLoaded();
@@ -24,7 +23,7 @@ public final class EssentialsCommands {
         if (!configLoaded || EssentialsServerConfig.ENABLE_HOME.get()) {
             if (hc) {
                 hcCompileMerged1.register_real_home_commands(dispatcher);
-                HomeCommand.registerLimit(dispatcher);
+                hcCompileMerged1.register_real_sethomelimit_command(dispatcher);
             } else {
                 HomeCommand.register(dispatcher);
             }

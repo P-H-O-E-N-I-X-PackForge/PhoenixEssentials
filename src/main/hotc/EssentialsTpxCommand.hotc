@@ -1,12 +1,4 @@
-// --- Real port of TpxCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses -- the real
-// `DimensionArgument` (already bound in `command.hc`) parses the dimension, a Java shim
-// (`EssentialsHcServerBridge::tpxLocation`, a direct copy of the original's own target math: same
-// X/Z, surface Y in the target dimension) builds the destination, and the real `TeleportExecutor`
-// does the warmup/cooldown/teleport. `hc`-prefixed literal, same side-by-side-pilot reasoning; the
-// real `/tpx` stays registered and untouched. Same disclosed cooldown-pool simplification as
-// `EssentialsWarpCommands.hotc` (4-arg overload, not the original's `TPX_COOLDOWN_SECONDS`).
+
 
 fn hc_tpx(source: CommandSourceStackHc, target_level: ServerLevel) -> Int {
     let player = source.getPlayer();

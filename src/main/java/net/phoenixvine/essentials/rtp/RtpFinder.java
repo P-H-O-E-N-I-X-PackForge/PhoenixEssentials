@@ -3,7 +3,6 @@ package net.phoenixvine.essentials.rtp;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.phoenixvine.essentials.compat.ClaimProtectionCompat;
@@ -50,9 +49,7 @@ public final class RtpFinder {
             if (groundState.isAir() || isUnsafeGround(level, ground)) continue;
 
             if (!level.getBlockState(head1).isAir() || !level.getBlockState(head2).isAir()) continue;
-            if (level.getFluidState(head1).is(FluidTags.WATER) || level.getFluidState(head1).is(FluidTags.LAVA)) {
-                continue;
-            }
+            if (!level.getFluidState(head1).isEmpty() || !level.getFluidState(head2).isEmpty()) continue;
 
             return head1.immutable();
         }
@@ -61,7 +58,8 @@ public final class RtpFinder {
 
     private static boolean isUnsafeGround(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        return level.getFluidState(pos).is(FluidTags.LAVA) ||
+
+        return !level.getFluidState(pos).isEmpty() ||
                 state.is(net.minecraft.world.level.block.Blocks.FIRE) ||
                 state.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK) ||
                 state.is(net.minecraft.world.level.block.Blocks.CACTUS);

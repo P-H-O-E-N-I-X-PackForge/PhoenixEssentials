@@ -29,6 +29,13 @@ public class EssentialsListScreen extends Screen {
     private int panelX, panelY, listY, listH;
     private final List<int[]> rowRects = new ArrayList<>();
     private List<Row> rows = List.of();
+    private int scrollOffset = 0;
+
+    private Object lastBuiltSource;
+    private long lastKitsBuildMs = -1;
+
+    private Object initialSyncSnapshot;
+    private boolean hasSynced = false;
 
     public EssentialsListScreen(Screen parent, C2SRequestSyncPacket.Kind kind, String title) {
         super(Component.literal(title));
@@ -43,7 +50,26 @@ public class EssentialsListScreen extends Screen {
         listY = panelY + 26;
         listH = PANEL_H - 34;
 
+        initialSyncSnapshot = currentSyncSource();
         EssentialsNetwork.CHANNEL.sendToServer(new C2SRequestSyncPacket(kind));
+    }
+
+    private Object currentSyncSource() {
+        return switch (kind) {
+            case HOMES -> EssentialsClientCache.getHomes();
+            case WARPS -> EssentialsClientCache.getWarps();
+            case KITS -> EssentialsClientCache.getKits();
+            case TRASH -> EssentialsClientCache.getAutoTrash();
+        };
+    }
+
+    private String emptyMessage() {
+        return switch (kind) {
+            case HOMES -> "§8No homes set";
+            case WARPS -> "§8No warps available";
+            case KITS -> "§8No kits available";
+            case TRASH -> "§8No items set to auto-trash";
+        };
     }
 
     @Override
@@ -53,23 +79,36 @@ public class EssentialsListScreen extends Screen {
         EssentialsUIKit.drawModalChrome(g, font, width, height, panelX, panelY, PANEL_W, PANEL_H, 20,
                 "§f" + getTitle().getString());
 
-        rows = buildRows();
+        rows = buildRowsIfNeeded();
+        int maxScroll = Math.max(0, rows.size() - listH / ROW_H);
+        scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
+
         rowRects.clear();
         int ly = listY;
         g.enableScissor(panelX + 6, listY, panelX + PANEL_W - 6, listY + listH);
-        for (Row row : rows) {
+        for (int i = scrollOffset; i < rows.size() && ly + ROW_H <= listY + listH; i++) {
+            Row row = rows.get(i);
             boolean hov = row.clickable() && mx >= panelX + 6 && mx < panelX + PANEL_W - 6 &&
                     my >= ly && my < ly + ROW_H;
             if (hov) g.fill(panelX + 6, ly, panelX + PANEL_W - 6, ly + ROW_H, 0x22FFFFFF);
             int color = row.clickable() ? EssentialsThemePalette.TEXT : EssentialsThemePalette.TEXT_FAINT;
             g.drawString(font, row.label(), panelX + 10, ly + 5, color, false);
-            rowRects.add(new int[] { panelX + 6, ly, PANEL_W - 12, ROW_H });
+            rowRects.add(new int[] { panelX + 6, ly, PANEL_W - 12, ROW_H, i });
             ly += ROW_H;
         }
         g.disableScissor();
 
+        if (maxScroll > 0) {
+            int trackX = panelX + PANEL_W - 4;
+            int thumbH = Math.max(10, listH * listH / (listH + maxScroll * ROW_H));
+            int thumbY = listY + (int) ((long) scrollOffset * (listH - thumbH) / maxScroll);
+            g.fill(trackX, listY, trackX + 2, listY + listH, 0x22FFFFFF);
+            g.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, 0x88FFFFFF);
+        }
+
         if (rows.isEmpty()) {
-            g.drawCenteredString(font, "§8Loading...", panelX + PANEL_W / 2, listY + listH / 2 - 4,
+            String msg = hasSynced ? emptyMessage() : "§8Loading...";
+            g.drawCenteredString(font, msg, panelX + PANEL_W / 2, listY + listH / 2 - 4,
                     EssentialsThemePalette.TEXT_FAINT);
         }
 
@@ -77,6 +116,26 @@ public class EssentialsListScreen extends Screen {
                 panelY + 7, EssentialsThemePalette.TEXT_FAINT, false);
 
         super.render(g, mx, my, partial);
+    }
+
+    private List<Row> buildRowsIfNeeded() {
+        Object source = currentSyncSource();
+        if (!hasSynced && source != initialSyncSnapshot) hasSynced = true;
+
+        if (kind == C2SRequestSyncPacket.Kind.KITS) {
+            long now = System.currentTimeMillis();
+            if (lastKitsBuildMs < 0 || now - lastKitsBuildMs >= 500) {
+                rows = buildRows();
+                lastKitsBuildMs = now;
+            }
+            return rows;
+        }
+
+        if (source != lastBuiltSource) {
+            rows = buildRows();
+            lastBuiltSource = source;
+        }
+        return rows;
     }
 
     private List<Row> buildRows() {
@@ -122,10 +181,9 @@ public class EssentialsListScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        for (int i = 0; i < rowRects.size(); i++) {
-            int[] r = rowRects.get(i);
+        for (int[] r : rowRects) {
             if (mx >= r[0] && mx < r[0] + r[2] && my >= r[1] && my < r[1] + r[3]) {
-                Row row = rows.get(i);
+                Row row = rows.get(r[4]);
                 if (!row.clickable()) return true;
 
                 if (kind == C2SRequestSyncPacket.Kind.TRASH) {
@@ -152,6 +210,13 @@ public class EssentialsListScreen extends Screen {
             }
         }
         return super.mouseClicked(mx, my, btn);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mx, double my, double delta) {
+        int maxScroll = Math.max(0, rows.size() - listH / ROW_H);
+        scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - (int) delta));
+        return true;
     }
 
     @Override

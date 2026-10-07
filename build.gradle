@@ -32,6 +32,17 @@ repositories {
     flatDir {
         dir 'libs'
     }
+    maven {
+        name = "Repsy"
+        url = uri("https://repo.repsy.io/mvn/user75142941/phoenixsuite")
+    }
+    maven {
+        // Curse Forge File
+        url "https://cursemaven.com/"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
 }
 
 version = mod_version
@@ -100,17 +111,17 @@ dependencies {
 
     modRuntimeOnly("dev.architectury:architectury-forge:${architectury_version}")
 
-    modCompileOnly('local:phoenix_guilds:0.1.0')
-    modRuntimeOnly('local:phoenix_guilds:0.1.0')
+    modCompileOnly('net.phoenixvine.guilds:phoenix_guilds:1.6.3')
+    modRuntimeOnly('net.phoenixvine.guilds:phoenix_guilds:1.6.3')
 
     modCompileOnly("dev.ftb.mods:ftb-chunks-forge:${ftbchunks_version}")
     modRuntimeOnly("dev.ftb.mods:ftb-chunks-forge:${ftbchunks_version}")
 
-    modCompileOnly('local:phoenix_domains:0.1.0')
-    modRuntimeOnly('local:phoenix_domains:0.1.0')
+    modCompileOnly('net.phoenixvine.domains:phoenix_domains:2.4')
+    modRuntimeOnly('net.phoenixvine.domains:phoenix_domains:2.4')
 
 
-    jarJar(modImplementation("local:phoenix_wiki:0.1.0"))
+   modImplementation("net.phoenixvine.wiki:phoenix_wiki:0.4.8")
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -150,4 +161,22 @@ tasks.named('jar', Jar).configure { finalizedBy 'reobfJar' }
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
     options.release.set(17)
+}
+publishing {
+    publications {
+        create('mavenJava', MavenPublication) {
+            artifactId = base.archivesName.get()
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            name = "Repsy"
+            url = uri("https://repo.repsy.io/mvn/user75142941/phoenixsuite")
+            credentials {
+                username = project.findProperty("repsyUsername") ?: System.getenv("REPSY_USERNAME")
+                password = project.findProperty("repsyPassword") ?: System.getenv("REPSY_PASSWORD")
+            }
+        }
+    }
 }

@@ -16,7 +16,8 @@ public final class TeamCompat {
 
     public static Optional<String> getTeamId(ServerPlayer player) {
         if (ModList.get().isLoaded("phoenix_guilds")) {
-            Optional<Guild> guild = GuildManager.get(Objects.requireNonNull(player.getServer()).overworld()).getGuildFor(player.getUUID());
+            Optional<Guild> guild = GuildManager.get(
+                    Objects.requireNonNull(player.getServer()).overworld()).getGuildFor(player.getUUID());
             if (guild.isPresent()) return Optional.of("guild:" + guild.get().getId());
         }
 

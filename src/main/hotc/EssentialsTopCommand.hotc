@@ -1,12 +1,4 @@
-// --- Real port of TopCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses --
-// `EssentialsHcServerBridgeHc::topLocation` is a direct copy of the original's own surface-height
-// computation (heightmap lookup + `NamedLocation` construction), and the teleport itself goes
-// through the real `TeleportExecutor` (warmup/cooldown/cancel logic), same as every other
-// teleporting command in this project. `hc`-prefixed literal, same side-by-side-pilot reasoning;
-// the real `/top` stays registered and untouched. Same disclosed cooldown-pool simplification as
-// `EssentialsWarpCommands.hotc` (4-arg overload, not the original's `TOP_COOLDOWN_SECONDS`).
+
 
 fn hc_top(source: CommandSourceStackHc) -> Int {
     let player = source.getPlayer();

@@ -1,0 +1,57 @@
+
+
+fn hc_set_home_limit(source: CommandSourceStackHc, target_name: String, count: Int) -> Int {
+    let target = source.getServer().getPlayerList().getPlayerByName(target_name);
+    if target == null {
+        source.sendFailure(Component::literal("§cPlayer \"{target_name}\" isn't online.") as Component);
+        return 0;
+    }
+    let data = shl_player_data(&target);
+    if data == null {
+        source.sendFailure(Component::literal("§cCouldn't access essentials data for \"{target_name}\".") as Component);
+        return 0;
+    }
+    data.setHomeLimitOverride(count);
+    let name = target.getGameProfile().getName();
+    if count < 0 {
+        let default_limit = EssentialsServerConfigHc::HOMES_PER_PLAYER.get() as Int;
+        source.sendSuccess(|| { return Component::literal("§aCleared §f{name}§a's home-limit override - they now use the server default of §f{default_limit}§a.") as JObjectCmd; }, true);
+    } else {
+        source.sendSuccess(|| { return Component::literal("§a{name}§a's home limit is now §f{count}§a.") as JObjectCmd; }, true);
+    }
+    return 1;
+}
+
+fn shl_player_data(player: &ServerPlayer) -> EssentialsPlayerDataHc {
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data = opt.orElse(null);
+    if data == null { return null; }
+    return data as EssentialsPlayerDataHc;
+}
+
+pub fn register_real_sethomelimit_command(dispatcher: CommandDispatcherSrc) {
+    let count_arg = CommandsHc::argument("count", IntegerArgumentTypeSrc::integer(-1, 256) as ArgumentTypeSrc)
+        .executes(|ctx| {
+            return hc_set_home_limit(ctx.getSource() as CommandSourceStackHc,
+                StringArgumentTypeSrc::getString(ctx, "player"),
+                IntegerArgumentTypeSrc::getInteger(ctx, "count"));
+        });
+    let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .then(count_arg);
+
+    let team_count_arg = CommandsHc::argument("count", IntegerArgumentTypeSrc::integer(-1, 256) as ArgumentTypeSrc)
+        .executes(|ctx| {
+            let source = ctx.getSource() as CommandSourceStackHc;
+            return EssentialsHcServerBridgeHc::setTeamHomeLimit(&source,
+                StringArgumentTypeSrc::getString(ctx, "player"),
+                IntegerArgumentTypeSrc::getInteger(ctx, "count"));
+        });
+    let team_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .then(team_count_arg);
+    let team_literal = CommandsHc::literal("team").then(team_player_arg);
+
+    let builder = ess_literal("sethomelimit", "hcsethomelimit", "SETHOMELIMIT")
+        .then(player_arg)
+        .then(team_literal);
+    dispatcher.register(builder as LiteralArgumentBuilderSrc);
+}

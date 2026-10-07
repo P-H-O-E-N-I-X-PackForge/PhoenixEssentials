@@ -1,17 +1,4 @@
-// --- AFK overlay: a HUD badge, new in the HC port (the original has only the SETTING) ---
-//
-// PhoenixEssentials already ships the "Show AFK overlay indicator" toggle (config screen +
-// `EssentialsSettings`) but nothing in the Java mod reads it -- there is no overlay to port, so
-// this is the missing half, written in HC:
-//   * server: `/hcafk2` (`EssentialsAfkCommand.hotc`) calls `send_afk_state` after flipping the
-//     real `PlayerEssentialsData.afk` flag;
-//   * network: a tiny S2C `AfkSyncPacket` on the shared HC channel (`EssentialsNetworkPackets.hotc`,
-//     id 0) -- same shape as hotc-mc's `UiDataPacket`, including the `enqueueWork` hop;
-//   * client: `EssentialsHcAfkOverlay` (Java: the `RegisterGuiOverlaysEvent` hook + the synced
-//     flag/timer) calls `render_afk_overlay` every frame; this draws the badge in the real
-//     `EssentialsThemePalette` colors, only when the setting is on AND the flag is set.
-// Disclosed scope: only `/hcafk2` syncs the flag (the real `/afk` and any auto-AFK are Java and
-// don't send it); no resync on login/respawn.
+
 
 struct AfkSyncPacket {
     afk: Int,
@@ -37,7 +24,6 @@ extern class EssentialsHcAfkOverlayHc = "net.phoenixvine.essentials.client.Essen
     static fn label() -> String;
 }
 
-// Registered by `setup_hc_networking` (`EssentialsNetworkPackets.hotc`), id 0 on the shared HC channel.
 pub fn register_afk_packet(channel: &SimpleChannel, id: Int) {
     let cls = class("AfkSyncPacket") as JClassNet;
     channel.registerMessage(
@@ -53,7 +39,6 @@ pub fn register_afk_packet(channel: &SimpleChannel, id: Int) {
     );
 }
 
-// Server -> exactly one player (`PacketDistributor.PLAYER`), same targeting `send_ui_data` uses.
 pub fn send_afk_state(player: ServerPlayer, afk: Bool) {
     let chan = ess_hc_channel;
     if chan == null { return; }
@@ -63,7 +48,6 @@ pub fn send_afk_state(player: ServerPlayer, afk: Bool) {
     chan.send(target, AfkSyncPacket { afk: flag } as PhoenixObject4Net);
 }
 
-// Client, every frame -- registered through `EssentialsHcAfkOverlay.onRegisterOverlays` (Java).
 pub fn render_afk_overlay(gfx: GuiGraphicsHc, screen_w: Int, screen_h: Int) {
     if !EssentialsSettingsHc::get().isShowAfkOverlay() { return; }
     if !EssentialsHcAfkOverlayHc::isActive() { return; }

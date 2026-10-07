@@ -39,7 +39,6 @@ fn hc_list_warps(source: CommandSourceStackHc) -> Int {
     return 1;
 }
 
-
 fn hc_suggest_warp_names(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
     let csv = EssentialsHcServerBridgeHc::warpNamesCsv();
     return ess_suggest_from_csv(builder, csv).buildFuture();

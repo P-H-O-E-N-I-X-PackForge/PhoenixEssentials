@@ -1,11 +1,4 @@
-// --- HC port of EssentialsSettings (client settings file) + EssentialsSuiteBarButton's cycling logic ---
-//
-// `EssentialsSettings.java` / `EssentialsSuiteBarButton.java` stay as FACADES (the config screens,
-// the AFK overlay and the suite-bar registration in `EssentialsClientProxy` keep calling them); in
-// takeover mode they delegate here. Settings are `config/phoenix_essentials_settings.json`
-// (`{ "showAfkOverlay": true }`, the shape Gson wrote) read/written with the same tiny JSON reader as
-// the data registries. The suite-bar part is the pure decision logic (next gamemode / weather
-// state / time-of-day); the Java side still supplies the live `Minecraft` inputs and sends the commands.
+
 
 extern class EssentialsHcDataRootHc = "net.phoenixvine.essentials.EssentialsHcData" {
     static fn readRootFile(name: String) -> String?;
@@ -52,9 +45,6 @@ pub fn dr_settings_save() {
     EssentialsHcDataRootHc::writeRootFile("phoenix_essentials_settings.json", "{lb}\n  {q}showAfkOverlay{q}: {v}\n{rb}");
 }
 
-// ---------- suite bar ----------
-
-// survival -> creative -> adventure -> spectator -> survival
 pub fn sb_next_gamemode(current: String) -> String {
     if current == "survival" { return "creative"; }
     if current == "creative" { return "adventure"; }
@@ -62,8 +52,6 @@ pub fn sb_next_gamemode(current: String) -> String {
     return "survival";
 }
 
-// weather state: 0 clear, 1 rain, 2 thunder. `cur` is -1 until first use; `seed` is the live
-// weather (0/1/2) used to initialise it. Returns the NEW state.
 pub fn sb_next_weather_state(cur: Int, seed: Int) -> Int {
     var s = cur;
     if s == -1 { s = seed; }
@@ -76,7 +64,6 @@ pub fn sb_weather_command(cur: Int) -> String {
     return "weather clear";
 }
 
-// `day_time` is the level's raw day time; `has_level` is 0 with no level loaded.
 pub fn sb_next_time(day_time: Long, has_level: Int) -> String {
     if has_level == 0 { return "day"; }
     let tod = day_time % 24000L;

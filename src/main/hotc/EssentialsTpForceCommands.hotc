@@ -1,10 +1,4 @@
-// --- Real port of TpForceCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses -- the real
-// `TeleportExecutor.forceTeleport` (instant: no warmup, no cooldown, still records `/back`) is
-// bound directly. `hc`-prefixed literals (`/hctpforce <player> <target>`, `/hctphere <player>`),
-// same side-by-side-pilot reasoning; the real `/tpforce`/`/tphere` stay registered and untouched.
-// Same disclosed scope cut as the other op-ish ports: no permission gate here.
+
 
 fn hc_tpforce(source: CommandSourceStackHc, player_name: String, target_name: String) -> Int {
     let players = source.getServer().getPlayerList();

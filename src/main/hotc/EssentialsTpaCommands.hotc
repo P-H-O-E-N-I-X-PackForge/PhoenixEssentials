@@ -1,13 +1,4 @@
-// --- Real port of TpaCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses -- the request/
-// respond/cancel logic (pending-request map, timeout from the real `TPA_TIMEOUT_SECONDS` config,
-// ignore check, teammate bypass, the real `TeleportExecutor` 7-arg overload with the real
-// `TPA_COOLDOWN_SECONDS`) is a direct Java copy in `EssentialsHcServerBridge`, reached through
-// three small calls that each return `String?` (`null` = success, else the error to show).
-// `hc`-prefixed literals (`/hctpa`, `/hctpahere`, `/hctpaccept`, `/hctpdeny`, `/hctpcancel`) with
-// their OWN pending-request map, so these and the real `/tpa*` family can't cross-wire while both
-// are registered. Needs two online players to exercise fully.
+
 
 fn hc_tpa_request(source: CommandSourceStackHc, target_name: String, here: Bool) -> Int {
     let requester = source.getPlayer();

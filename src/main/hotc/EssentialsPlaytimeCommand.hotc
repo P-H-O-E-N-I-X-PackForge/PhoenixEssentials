@@ -1,16 +1,4 @@
-// --- Real port of PlaytimeCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command in this project uses.
-// `/hcplaytime [player]` reads the real `PlayerEssentialsData.getPlaytimeTicks()` (via
-// `EssentialsHcServerBridgeHc::playtimeFormatted`, a direct copy of the original's own `format()`
-// so this port doesn't need a `java.lang.Long` binding for one real caller) for either the command
-// sender or a named online player (`MinecraftServerHc::getPlayerList`/`PlayerListHc::
-// getPlayerByName`, `command.hc`'s own new, previously-disclosed-gap binding -- first real closer
-// of "a real player-by-name lookup, a separate, not-yet-bound surface").
-//
-// `hc`-prefixed command literal -- same side-by-side-pilot reasoning every other ported command
-// file in this project already gives; the real `/playtime` (`PlaytimeCommand.java`) stays
-// registered and untouched.
+
 
 fn hc_playtime_for(source: CommandSourceStackHc, target: ServerPlayer) -> Int {
     let opt = target.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);

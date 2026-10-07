@@ -1,12 +1,4 @@
-// --- Real port of AfkCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses -- toggles the real
-// `PlayerEssentialsData.afk` flag (NBT-persisted, also what the real AFK overlay/detection reads)
-// and broadcasts to everyone via `PlayerList.broadcastSystemMessage`. `hcafk2`, not `hcafk` --
-// kept distinct from any future/vendored `hcafk` literal, same latent-collision avoidance the
-// other `...2` literals in this project explain. The real `/afk` stays registered and untouched.
-// Same disclosed scope cut as the other social commands: `EssentialsAPI.isFeatureEnabled(
-// FEATURE_SOCIAL, ...)` is not ported.
+
 
 fn hc_toggle_afk(source: CommandSourceStackHc) -> Int {
     let player = source.getPlayer();
@@ -23,8 +15,7 @@ fn hc_toggle_afk(source: CommandSourceStackHc) -> Int {
     var suffix = "is no longer AFK.";
     if now_afk { suffix = "is now AFK."; }
     source.getServer().getPlayerList().broadcastSystemMessage(Component::literal("{display_name} {suffix}") as Component, false);
-    // Sync the flag to this player's own client so the HUD badge (`EssentialsAfkOverlay.hotc`) shows.
-    // Last use of `player` -- `send_afk_state` takes it by value (it's captured by a lambda).
+
     send_afk_state(player, now_afk);
     return 1;
 }

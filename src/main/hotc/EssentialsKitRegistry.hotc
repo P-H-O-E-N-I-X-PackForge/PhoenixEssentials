@@ -1,10 +1,4 @@
-// --- HC port of KitRegistry (kits.json) ---
-//
-// Same facade scheme as `EssentialsDataRegistries.hotc` (whose JSON reader/escaper this reuses):
-// `KitRegistry.java` keeps its public API and, in takeover mode, builds/consumes `KitDefinition`
-// POJOs through the small scalar accessors below (HC can't construct the Java POJO / `List`).
-// Same `config/phoenix_essentials/kits.json` shape Gson wrote:
-//   { "<key>": { "name": .., "items": [ { "item": .., "count": .., "nbt": .. } ], "cooldownSeconds": .. } }
+
 
 struct KitRow {
     key: String,
@@ -31,7 +25,6 @@ fn kit_find(key: String) -> Int {
     return -1;
 }
 
-// The `n`-th item row of kit `key`, as an index into `dr_kit_items` (-1 if out of range).
 fn kit_item_index(key: String, n: Int) -> Int {
     var seen = 0;
     var i = 0;
@@ -103,7 +96,7 @@ pub fn dr_kit_load() {
         let cell = cells[i];
         let cut = cell.entry.indexOf(sep);
         if cut < 0 {
-            // kit-level scalar: entry is the kit key
+            
             var k = -1;
             var q = 0;
             while q < nk {
@@ -118,7 +111,7 @@ pub fn dr_kit_load() {
             if cell.name == "name" { kits[k] = KitRow { key: kits[k].key, name: cell.value, cooldown: kits[k].cooldown }; }
             if cell.name == "cooldownSeconds" { kits[k] = KitRow { key: kits[k].key, name: kits[k].name, cooldown: DrInt::parseInt(cell.value, 10) }; }
         } else {
-            // "<key><sep>items<sep><idx>" -> an item field
+            
             if !have_item || cell.entry != cur_item_entry {
                 if have_item {
                     items[ni] = item;
@@ -138,8 +131,7 @@ pub fn dr_kit_load() {
         items[ni] = item;
         ni = ni + 1;
     }
-    // A kit whose only content is its (possibly empty) `items` array has no scalar cells of its own
-    // beyond name/cooldown, so it is already present; make sure item-only keys exist too.
+
     var out_kits = [KitRow { key: "", name: "", cooldown: 0 }; nk];
     var a = 0;
     while a < nk {
@@ -156,7 +148,6 @@ pub fn dr_kit_load() {
     dr_kit_items = out_items;
 }
 
-// Newline-separated kit keys in insertion order ("" when none).
 pub fn dr_kit_names() -> String {
     var out = "";
     var i = 0;
@@ -214,9 +205,8 @@ pub fn dr_kit_item_nbt(key: String, n: Int) -> String {
     return dr_kit_items[i].nbt;
 }
 
-// Replaces/creates kit `key` with no items yet; follow with `dr_kit_put_item` calls, then `dr_kit_save`.
 pub fn dr_kit_put(key: String, name: String, cooldown: Int) {
-    // drop any existing items for this key
+    
     var kept = 0;
     var i = 0;
     while i < dr_kit_items.length {
@@ -266,7 +256,6 @@ pub fn dr_kit_save() {
     kit_save();
 }
 
-// 1 if a kit was removed, else 0.
 pub fn dr_kit_remove(key: String) -> Int {
     let idx = kit_find(key);
     if idx < 0 { return 0; }

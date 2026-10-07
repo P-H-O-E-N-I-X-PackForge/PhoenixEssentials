@@ -1,10 +1,4 @@
-// --- Real port of RtpCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses -- the whole flow
-// (allowed-dimension config check, the real `RtpFinder` safe-spot search, the distance/tries
-// detail, the real 7-arg `TeleportExecutor` with `RTP_COOLDOWN_SECONDS`) is a direct Java copy
-// reached through ONE call returning `String?` (`null` = success, else the error to show).
-// `hc`-prefixed literal, same side-by-side-pilot reasoning; the real `/rtp` stays registered.
+
 
 fn hc_rtp(source: CommandSourceStackHc) -> Int {
     let player = source.getPlayer();

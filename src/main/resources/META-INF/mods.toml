@@ -24,3 +24,9 @@ Phoenix Essentials - themed, configurable server essentials (homes, warps, tpa, 
         versionRange = "[${minecraft_version},)"
         ordering = "NONE"
         side = "BOTH"
+[[dependencies.${mod_id}]]
+modId="phoenix_wiki"
+mandatory=true
+versionRange="[0.4.7,)"
+ordering="NONE"
+side="BOTH"

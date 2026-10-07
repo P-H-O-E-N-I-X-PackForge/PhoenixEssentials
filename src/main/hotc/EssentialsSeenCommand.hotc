@@ -1,11 +1,4 @@
-// --- Real port of SeenCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses --
-// `EssentialsHcServerBridgeHc::seenMessage` is a direct copy of the original's own online/offline
-// lookup (`OfflinePlayerIndex`, the server profile cache) and elapsed-time formatting, returned as
-// one plain string (or `null` for "no record") instead of binding `GameProfileCache`/`Optional`/
-// `UUID`/`OfflinePlayerIndex.Entry`'s public fields individually for one real caller.
-// `hc`-prefixed literal, same side-by-side-pilot reasoning; the real `/seen` stays registered.
+
 
 fn hc_seen(source: CommandSourceStackHc, name: String) -> Int {
     let message = EssentialsHcServerBridgeHc::seenMessage(source.getServer(), name);

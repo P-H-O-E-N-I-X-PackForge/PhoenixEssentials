@@ -1,16 +1,4 @@
-// --- Real port of EssentialsTrashCommand.java + EssentialsAutoTrashCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses.
-//   * `/hctrash` -- `EssentialsHcServerBridge::openTrash`, a direct copy of the original's virtual
-//     9x4 void-container menu (avoids binding SimpleContainer/SimpleMenuProvider/ChestMenu/MenuType
-//     and the menu-factory lambda for one real caller).
-//   * `/hcautotrash` (toggle the held item) and `/hcautotrash remove <item>` -- pure HC against the
-//     real `PlayerEssentialsData.alwaysTrash` set (NBT-persisted, also what the real pickup handler
-//     and the list screen's Auto-Trash page read): `getMainHandItem`, `IForgeRegistry.getKey`,
-//     `ResourceLocationArgument`, `toggleAlwaysTrash`/`removeAlwaysTrash`.
-// `hc`-prefixed literals, same side-by-side-pilot reasoning; the real `/essentialstrash` and
-// `/essentialsautotrash` stay registered and untouched (the ported list screen still sends the real
-// `essentialsautotrash remove ...` command for its click-to-remove rows).
+
 
 fn hc_open_trash(source: CommandSourceStackHc) -> Int {
     let player = source.getPlayer();
@@ -51,9 +39,6 @@ fn hc_remove_autotrash(source: CommandSourceStackHc, id: ResourceLocation) -> In
     return 1;
 }
 
-// Tab-complete for `remove <item>` -- the player's own current auto-trash ids (the original
-// offers none, which made `remove` awkward to use by hand; the list screen's click-to-remove rows
-// are the original's intended path).
 fn hc_suggest_autotrash_ids(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
     let source = ctx.getSource() as CommandSourceStackHc;
     let data = ess_player_data(&source);

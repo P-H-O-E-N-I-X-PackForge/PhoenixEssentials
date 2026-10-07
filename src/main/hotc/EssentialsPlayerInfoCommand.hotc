@@ -1,11 +1,4 @@
-// --- Real port of PlayerInfoCommand.java ---
-//
-// Same "call the real Java directly" approach every other ported command uses -- the report itself
-// (gamemode, health/food, playtime, home count, AFK) is a direct Java copy in
-// `EssentialsHcServerBridge::playerInfo`, returned as one newline-joined string (or `null` if the
-// target has no essentials data). Plain text, no section-sign colors -- the only intentional
-// difference from the original. `hc`-prefixed literal, same side-by-side-pilot reasoning; the real
-// `/playerinfo` stays registered and untouched.
+
 
 fn hc_player_info(source: CommandSourceStackHc, target: ServerPlayer) -> Int {
     let report = EssentialsHcServerBridgeHc::playerInfo(target);

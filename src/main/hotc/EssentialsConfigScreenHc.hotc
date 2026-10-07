@@ -1,22 +1,4 @@
-// --- Real, pixel-faithful port of `EssentialsConfigScreen.java` ---
-//
-// Calls the REAL `EssentialsUIKit`/`EssentialsThemePalette`/`PhoenixTheme` Java classes directly
-// (`essentials_bridge.hc`) instead of reimplementing their chrome-drawing/color logic -- the output
-// is pixel- and color-identical to the original by construction (same real method calls, same real
-// static color fields), not by hand-copying numbers into HC and hoping they stay in sync. Every
-// pixel offset/constant below (`ROW_H`, `PANEL_W`, `PANEL_H`, the `+12`/`+28`/`+10`/`+4` spacing) is
-// copied directly from the real Java file, not re-derived.
-//
-// `ess_compute_layout` -- the original caches `panelX`/`panelY`/every row's own Y into real
-// instance fields, set once in `init()` and read back from both `render()` and `mouseClicked()`.
-// An `extends`-struct has zero fields of its own (`gui.hc`'s own header) -- there's nowhere to
-// cache them. Recomputed instead, fresh, by both `render` and `mouseClicked` -- a pure function of
-// the current screen size (+ two real `font.width(...)` calls), so both call sites always agree,
-// same "recompute every call" convention `ui_render.hc`'s own `HcUiScreen` already established for
-// the exact same zero-fields reason.
-//
-// The four nav buttons open the HC port of `EssentialsListScreen` (`EssentialsListScreenPort.hotc`),
-// which in turn talks to the HC network layer (`EssentialsNetworkPackets.hotc`).
+
 
 fn ess_row_h() -> Int { return 18; }
 fn ess_panel_w() -> Int { return 260; }
@@ -39,14 +21,6 @@ struct EssLayout {
     trash_y: Int,
 }
 
-// `Minecraft::getInstance().font` is called FRESH right here, not threaded in as a shared param --
-// a plain public-field read (`minecraft_client.hc`'s own `font: FontHc;`), cheap enough to call as
-// many times as needed. Real, disclosed reason this matters: an extern-class-typed LOCAL reused as
-// a BY-VALUE argument across several calls genuinely move-checks here (confirmed directly --
-// `gfx.drawString(font, ...)` called more than once from one shared `let font = ...;` local is a
-// real "use of moved value 'font'" error) -- fetching a fresh value at each use site sidesteps it
-// entirely, with no real cost (no allocation, the same single field read `ui_render.hc`'s own
-// `FontMeasurer { font: Minecraft::getInstance().font }` already calls once per render pass).
 fn ess_compute_layout(screen_w: Int, screen_h: Int) -> EssLayout {
     let panel_w = ess_panel_w();
     let panel_h = ess_panel_h();
@@ -89,7 +63,7 @@ fn ess_hov(mx: Int, my: Int, x: Int, y: Int, w: Int) -> Bool {
 fn ess_draw_menu_button(gfx: &GuiGraphicsHc, x: Int, y: Int, w: Int, label: String, mx: Int, my: Int) {
     let hov = ess_hov(mx, my, x, y, w);
     var fill_color = EssentialsThemePaletteHc::HEADER;
-    if hov { fill_color = 872363007; } // 0x33FFFFFF
+    if hov { fill_color = 872363007; } 
     gfx.fill(x, y, x + w, y + ess_row_h(), fill_color);
     var border_color = EssentialsThemePaletteHc::BORDER;
     if hov { border_color = EssentialsThemePaletteHc::ACCENT; }
@@ -107,8 +81,6 @@ fn ess_open_wiki(parent: ScreenHc) {
     PhoenixWikiAPIHc::open(parent, "phoenix_essentials", "wiki", theme);
 }
 
-// `parent` is unused -- the list screen's Escape handler reopens THIS config screen directly (the only
-// way to reach it), since an `extends`-struct has no field to keep a parent reference in.
 fn ess_open_list(parent: ScreenHc, kind: Int, title: String) {
     open_essentials_list_screen_hc(kind, title);
 }
@@ -132,7 +104,7 @@ impl HcEssentialsConfigScreen {
 
         let theme_hov = ess_hov(mx, my, x, layout.theme_row_y, layout.row_w);
         if theme_hov {
-            gfx.fill(x - 2, layout.theme_row_y, x + layout.row_w, layout.theme_row_y + ess_row_h(), 587202560); // 0x22FFFFFF
+            gfx.fill(x - 2, layout.theme_row_y, x + layout.row_w, layout.theme_row_y + ess_row_h(), 587202560); 
         }
         gfx.drawString(Minecraft::getInstance().font, "§7Theme: §f{PhoenixThemeHc::getActiveName()} §8(click to cycle)", x, layout.theme_row_y + 5, EssentialsThemePaletteHc::TEXT);
 
@@ -148,7 +120,7 @@ impl HcEssentialsConfigScreen {
 
         let afk_hov = ess_hov(mx, my, x, layout.afk_row_y, layout.row_w);
         if afk_hov {
-            gfx.fill(x - 2, layout.afk_row_y, x + layout.row_w, layout.afk_row_y + ess_row_h(), 587202560); // 0x22FFFFFF
+            gfx.fill(x - 2, layout.afk_row_y, x + layout.row_w, layout.afk_row_y + ess_row_h(), 587202560); 
         }
         var mark = "§8[ ]";
         if EssentialsSettingsHc::get().isShowAfkOverlay() { mark = "§a[x]"; }
@@ -206,13 +178,12 @@ impl HcEssentialsConfigScreen {
     }
 
     override fn keyPressed(&self, key_code: Int, scan_code: Int, modifiers: Int) -> Bool {
-        // `256` == GLFW_KEY_ESCAPE -- same real value `ui_render.hc`'s own `ui_key_escape` already
-        // documents; this screen doesn't share that file's own `HcUiScreen`, so it needs its own.
+
         if key_code == 256 {
             Minecraft::getInstance().setScreen(null);
             return true;
         }
-        // The original also closes when its own open-key is pressed again.
+        
         if EssentialsHcClientHc::isOpenMenuKey(key_code, scan_code) {
             Minecraft::getInstance().setScreen(null);
             return true;
@@ -225,9 +196,6 @@ impl HcEssentialsConfigScreen {
     }
 }
 
-// The one real caller -- opens this screen client-side, same `parent: null` the real
-// `EssentialsInputHandler`'s own `new EssentialsConfigScreen(null)` call already uses (this screen
-// is always the ROOT of its own little screen stack, reached straight from a keybind).
 pub fn open_essentials_config_screen_hc() {
     let screen = HcEssentialsConfigScreen::new(Component::literal("Phoenix Essentials") as Component);
     Minecraft::getInstance().setScreen(screen as ScreenHc);

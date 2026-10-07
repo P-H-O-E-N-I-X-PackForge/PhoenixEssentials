@@ -1,19 +1,4 @@
-// --- HC port of WarpRegistry / SpawnRegistry / OfflinePlayerIndex (the JSON-backed data stores) ---
-//
-// The Java classes stay as FACADES with their original public API (the Java commands, packets,
-// `EssentialsAPI` and the shims keep calling `WarpRegistry.get(...)` etc.); in takeover mode they
-// delegate to the `dr_*` functions below, so the stores, lookups, ordering and JSON codec are HC.
-// Both implementations read/write the SAME files under `config/phoenix_essentials/`
-// (`warps.json`, `spawn.json`, `player_index.json`) in the same shape Gson wrote, so switching
-// `-Dphoenix_essentials.use_java=true` on and off loses nothing.
-//
-// There's no JSON binding in hotc-mc, so this file has a tiny hand-written reader for the one shape
-// these three files use -- an object whose members are scalars or one-level nested objects of
-// scalars -- flattened into `JsCell { entry, name, value }` rows (a top-level scalar has entry "").
-// Disclosed shim: `EssentialsHcData.java` (config-file text IO + `NamedLocation` construction and
-// field access, since `NamedLocation` carries a `ResourceKey`).
-// NOT ported here: `KitRegistry` (its `KitDefinition`/`KitItemEntry` item+NBT model is used all over
-// the Java side) -- still Java.
+
 
 extern class EssentialsHcDataHc = "net.phoenixvine.essentials.EssentialsHcData" {
     static fn readFile(name: String) -> String?;
@@ -42,8 +27,6 @@ extern class DrDouble = "java.lang.Double" {
 extern class DrFloat = "java.lang.Float" {
     static fn parseFloat(s: String) -> Float;
 }
-
-// ---------- tiny JSON reader / writer helpers ----------
 
 struct JsCell {
     entry: String,
@@ -76,7 +59,6 @@ fn js_skip_ws() {
     }
 }
 
-// Cursor sits on the opening quote; leaves it just past the closing one.
 fn js_read_string() -> String {
     js_i = js_i + 1;
     var out = "";
@@ -113,8 +95,6 @@ fn js_read_string() -> String {
     return out;
 }
 
-// Nested entries get a path: a depth-1 object is just its key (so the warp/index/spawn readers are
-// unchanged); deeper ones join with char 1, and array elements append their index.
 fn js_sep() -> String { return DrChar::toString(1); }
 
 fn js_child_path(entry: String, key: String) -> String {
@@ -123,8 +103,6 @@ fn js_child_path(entry: String, key: String) -> String {
     return "{entry}{sep}{key}";
 }
 
-// Cursor is just past an opening `[`; object elements become entries `path<sep>index`, scalar
-// elements are skipped (no file here uses them).
 fn js_parse_array(path: String) {
     var idx = 0;
     var running = true;
@@ -156,7 +134,6 @@ fn js_parse_array(path: String) {
     }
 }
 
-// Cursor is just past an opening `{`; consumes through the matching `}`.
 fn js_parse_members(entry: String) {
     var running = true;
     while running {
@@ -247,8 +224,6 @@ fn dr_read(file: String) -> String {
     return text;
 }
 
-// ---------- location rows (warps + spawn) ----------
-
 struct LocRow {
     name: String,
     dim: String,
@@ -290,7 +265,6 @@ fn dr_loc_from_row(row: &LocRow) -> NamedLocationHc {
     return EssentialsHcDataHc::makeLocation(row.dim, row.x, row.y, row.z, row.yaw, row.pitch);
 }
 
-// Parses `text` into rows, one per nested entry (or a single "" row for a flat top-level object).
 fn dr_parse_loc_rows(text: String) -> [LocRow] {
     js_parse(text);
     var rows = [dr_blank_loc(""); js_cells.length];
@@ -326,14 +300,11 @@ fn dr_parse_loc_rows(text: String) -> [LocRow] {
     return out;
 }
 
-// One location object's members at `ind` indentation (no braces), Gson pretty-print style.
 fn dr_loc_fields(row: &LocRow, ind: String) -> String {
     let q = js_q();
     let d = js_escape(row.dim);
     return "{ind}{q}dimension{q}: {q}{d}{q},\n{ind}{q}x{q}: {row.x},\n{ind}{q}y{q}: {row.y},\n{ind}{q}z{q}: {row.z},\n{ind}{q}yaw{q}: {row.yaw},\n{ind}{q}pitch{q}: {row.pitch}\n";
 }
-
-// ---------- warps ----------
 
 static dr_warps: [LocRow] = [dr_blank_loc(""); 0];
 
@@ -398,7 +369,6 @@ pub fn dr_warp_set(name: String, loc: NamedLocationHc) {
     dr_warp_save();
 }
 
-// 1 if a warp was removed, else 0.
 pub fn dr_warp_remove(name: String) -> Int {
     let idx = dr_warp_find(name);
     if idx < 0 { return 0; }
@@ -417,7 +387,6 @@ pub fn dr_warp_remove(name: String) -> Int {
     return 1;
 }
 
-// Names in insertion order, newline-separated ("" when empty).
 pub fn dr_warp_names() -> String {
     var out = "";
     var i = 0;
@@ -429,8 +398,6 @@ pub fn dr_warp_names() -> String {
     }
     return out;
 }
-
-// ---------- spawn ----------
 
 static dr_spawn: [LocRow] = [dr_blank_loc(""); 0];
 
@@ -459,8 +426,6 @@ pub fn dr_spawn_set(loc: NamedLocationHc) {
     let body = dr_loc_fields(&row, "  ");
     EssentialsHcDataHc::writeFile("spawn.json", "{lb}\n{body}{rb}");
 }
-
-// ---------- offline player index ----------
 
 struct IdxRow {
     uuid: String,
@@ -545,7 +510,6 @@ fn dr_index_save() {
     EssentialsHcDataHc::writeFile("player_index.json", out);
 }
 
-// Last-seen epoch millis for `uuid`, or -1 when never recorded.
 pub fn dr_idx_seen(uuid: String) -> Long {
     dr_index_ensure();
     let i = dr_index_find(uuid);

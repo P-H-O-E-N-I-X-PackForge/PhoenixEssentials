@@ -1,26 +1,4 @@
-// --- HC port of EssentialsNetwork + the seven sync/action packets + EssentialsClientCache ---
-//
-// One channel (`phoenix_essentials:main_hc`), eight packets, in the same order/direction as the
-// original's `EssentialsNetwork.init()` (plus the HC-only `AfkSyncPacket`, `EssentialsAfkOverlay.
-// hotc`). Deliberately a SEPARATE channel from the Java one: both stay registered, so the original
-// Java screens (the H fallback in takeover mode, everything in `use_java` mode) keep their own
-// untouched channel + `EssentialsClientCache`, while every HC screen talks only to this layer.
-//
-// Same logic as the Java packets, restated in HC:
-//   C2S  RequestSync(kind)       -> server replies with the matching S2C list
-//   C2S  GuiTeleport(kind, name) -> HOME/WARP/BACK through the real `TeleportExecutor`
-//   C2S  GuiClaimKit(name)       -> feature check, cooldown, grant, `recordKitClaimed`
-//   S2C  Homes/Warps/Kits/AutoTrash sync -> fill the client cache below
-// Lists travel as comma-joined strings (home/warp/kit names and item ids never contain `,`; a kit
-// entry is `name:seconds`) rather than a count + repeated fields -- simpler HC structs, and wire
-// compatibility with the Java layer isn't needed since both ends are this mod.
-//
-// `kind` ints mirror `EssentialsListScreenPort.hotc`'s `ess_list_kind_*` and the original enums'
-// ordinals: sync HOMES=0/WARPS=1/KITS=2/TRASH=3; teleport HOME=0/WARP=1/BACK=2.
-//
-// Every handler runs through `enqueueWork` (network thread otherwise -- see hotc-mc's README).
 
-// --- client cache (replaces `EssentialsClientCache`) ---
 
 static ess_cache_homes: [String] = [""; 0];
 static ess_cache_homes_cap: Int = 0;
@@ -50,7 +28,6 @@ fn ess_cache_set_trash(csv: String) {
     ess_cache_trash = ids;
 }
 
-// "name:secs,name:secs" -> two parallel arrays.
 fn ess_cache_set_kits(csv: String) {
     let pairs = ess_split_csv(csv);
     var names = [""; pairs.length];
@@ -69,8 +46,6 @@ fn ess_cache_set_kits(csv: String) {
 extern class JIntNet = "java.lang.Integer" {
     static fn parseInt(s: String) -> Int;
 }
-
-// --- packets ---
 
 struct RequestSyncPacket { kind: Int }
 struct GuiTeleportPacket { kind: Int, name: String }
@@ -129,8 +104,6 @@ impl AutoTrashSyncPacket {
     static fn decode(buf: FriendlyByteBuf) -> AutoTrashSyncPacket { return AutoTrashSyncPacket { csv: buf.readUtf() }; }
     fn on_received(&self) { ess_cache_set_trash(self.csv); }
 }
-
-// --- server-side handlers (the bodies of the Java packets' `handle`) ---
 
 fn ess_send_to_player(player: ServerPlayer, msg: PhoenixObject4Net) {
     let chan = ess_hc_channel;
@@ -209,8 +182,6 @@ fn ess_handle_claim_kit(player: ServerPlayer, name: String) {
     player.sendSystemMessage(Component::literal("Claimed kit \"{name}\".") as Component);
 }
 
-// --- registration ---
-
 pub static ess_hc_channel: SimpleChannel? = null;
 
 fn set_hc_channel(channel: SimpleChannel?) {
@@ -224,7 +195,6 @@ extern class EssentialsNetUnwrapHc = "net.phoenixvine.essentials.EssentialsHcSer
 fn ess_dir_server() -> JOptionalNet { return JOptionalNet::of(NetworkDirectionHc::PLAY_TO_SERVER as PhoenixObject4Net); }
 fn ess_dir_client() -> JOptionalNet { return JOptionalNet::of(NetworkDirectionHc::PLAY_TO_CLIENT as PhoenixObject4Net); }
 
-// C2S: the handler's `on_received` needs the real sender.
 fn ess_reg_c2s_request(channel: &SimpleChannel, id: Int) {
     channel.registerMessage(id, class("RequestSyncPacket") as JClassNet,
         |pkt, buf| { (pkt as RequestSyncPacket).encode(buf as FriendlyByteBuf); },
@@ -312,8 +282,6 @@ fn ess_reg_s2c_trash(channel: &SimpleChannel, id: Int) {
         ess_dir_client());
 }
 
-// Called once from `PhoenixEssentials.commonSetup` (both sides need the channel registered, in the
-// same order). Id 0 is the AFK overlay's packet (`EssentialsAfkOverlay.hotc`).
 pub fn setup_hc_networking() {
     let channel = NetworkRegistry::newSimpleChannel(
         ResourceLocation::new("phoenix_essentials", "main_hc"),
@@ -332,7 +300,6 @@ pub fn setup_hc_networking() {
     set_hc_channel(channel);
 }
 
-// Client -> server, used by `EssentialsListScreenPort.hotc`.
 pub fn ess_send_request_sync(kind: Int) {
     let chan = ess_hc_channel;
     if chan == null { return; }
