@@ -1,0 +1,181 @@
+// --- HC port of EssentialsUIKit (shared drawing helpers for the Essentials screens) ---
+//
+// Same pixels as the Java original: scrim, 1px borders, the modal chrome (panel + header + centered
+// title) and the dropdown / scaled-string helpers. The HC screens call these directly now; the Java
+// `EssentialsUIKit` class stays as a facade for the original Java screens (it delegates here in takeover
+// mode and keeps its original bodies for `use_java=true`).
+// The colors come from `EssentialsThemePaletteHc` (the palette fields stay Java statics -- the Java
+// screens read them directly -- refreshed from the active Phoenix theme by each screen's render).
+// The dropdown takes its row labels as a `[String]` (the Java facade maps its items through the label
+// function first), since a Java `List<T>` / `Function<T,String>` has no HC binding.
+
+extern class UkGfx = "net.minecraft.client.gui.GuiGraphics" {
+    fn fill(&self, x1: Int, y1: Int, x2: Int, y2: Int, color: Int);
+    fn drawString(&self, font: &UkFont, text: String, x: Int, y: Int, color: Int, shadow: Bool) -> Int;
+    fn drawCenteredString(&self, font: &UkFont, text: String, x: Int, y: Int, color: Int);
+    fn flush(&self);
+    fn pose(&self) -> UkPose;
+}
+extern class UkFont = "net.minecraft.client.gui.Font" {
+    lineHeight: Int;
+    fn width(&self, text: String) -> Int;
+}
+extern class UkPose = "com.mojang.blaze3d.vertex.PoseStack" {
+    fn pushPose(&self);
+    fn popPose(&self);
+    fn translate(&self, x: Double, y: Double, z: Double);
+    fn scale(&self, x: Float, y: Float, z: Float);
+}
+extern class UkLong = "java.lang.Long" {
+    static fn parseLong(s: String, radix: Int) -> Long;
+}
+
+fn uk_scrim(g: &UkGfx, width: Int, height: Int) {
+    g.fill(0, 0, width, height, EssentialsThemePaletteHc::BG);
+}
+
+fn uk_border(g: &UkGfx, x: Int, y: Int, w: Int, h: Int, color: Int) {
+    g.fill(x, y, x + w, y + 1, color);
+    g.fill(x, y + h - 1, x + w, y + h, color);
+    g.fill(x, y, x + 1, y + h, color);
+    g.fill(x + w - 1, y, x + w, y + h, color);
+}
+
+pub fn uk_draw_scrim(g: &GuiGraphicsHc, width: Int, height: Int) {
+    let ug = g as UkGfx;
+    uk_scrim(&ug, width, height);
+}
+
+pub fn uk_draw_border(g: &GuiGraphicsHc, x: Int, y: Int, w: Int, h: Int, color: Int) {
+    let ug = g as UkGfx;
+    uk_border(&ug, x, y, w, h, color);
+}
+
+pub fn uk_draw_border_default(g: &GuiGraphicsHc, x: Int, y: Int, w: Int, h: Int) {
+    let ug = g as UkGfx;
+    uk_border(&ug, x, y, w, h, EssentialsThemePaletteHc::BORDER);
+}
+
+pub fn uk_draw_modal_chrome_colored(g: &GuiGraphicsHc, font: FontHc, screen_w: Int, screen_h: Int,
+        panel_x: Int, panel_y: Int, panel_w: Int, panel_h: Int, header_h: Int, title: String,
+        panel_color: Int, header_color: Int, border_color: Int, text_color: Int) {
+    let ug = g as UkGfx;
+    let uf = font as UkFont;
+    ug.flush();
+    uk_scrim(&ug, screen_w, screen_h);
+
+    ug.fill(panel_x, panel_y, panel_x + panel_w, panel_y + panel_h, panel_color);
+    uk_border(&ug, panel_x, panel_y, panel_w, panel_h, border_color);
+
+    ug.fill(panel_x, panel_y, panel_x + panel_w, panel_y + header_h, header_color);
+    ug.fill(panel_x, panel_y + header_h - 1, panel_x + panel_w, panel_y + header_h, border_color);
+    ug.drawCenteredString(&uf, title, panel_x + panel_w / 2, panel_y + (header_h / 2) - (uf.lineHeight / 2), text_color);
+}
+
+pub fn uk_draw_modal_chrome(g: &GuiGraphicsHc, font: FontHc, screen_w: Int, screen_h: Int,
+        panel_x: Int, panel_y: Int, panel_w: Int, panel_h: Int, header_h: Int, title: String) {
+    uk_draw_modal_chrome_colored(g, font, screen_w, screen_h, panel_x, panel_y, panel_w, panel_h, header_h, title,
+        EssentialsThemePaletteHc::PANEL, EssentialsThemePaletteHc::HEADER,
+        EssentialsThemePaletteHc::BORDER, EssentialsThemePaletteHc::TEXT);
+}
+
+// Returns the hovered row index, or -1. Drawn 300 z-levels up so it sits over the screen's widgets.
+pub fn uk_draw_dropdown(g: &GuiGraphicsHc, font: FontHc, labels: [String], selected: Int,
+        x: Int, y: Int, w: Int, row_h: Int, mouse_x: Int, mouse_y: Int) -> Int {
+    let ug = g as UkGfx;
+    let uf = font as UkFont;
+    let drop_h = labels.length * row_h;
+    ug.pose().pushPose();
+    ug.pose().translate(0.0, 0.0, 300.0);
+
+    ug.flush();
+
+    ug.fill(x, y, x + w, y + drop_h, EssentialsThemePaletteHc::PANEL);
+    uk_border(&ug, x, y, w, drop_h, EssentialsThemePaletteHc::BORDER);
+
+    var hovered_row = -1;
+    var i = 0;
+    while i < labels.length {
+        let row_y = y + i * row_h;
+        let hovered = mouse_x >= x && mouse_x <= x + w && mouse_y >= row_y && mouse_y <= row_y + row_h;
+        if hovered {
+            ug.fill(x + 1, row_y, x + w - 1, row_y + row_h, -14803414);
+            hovered_row = i;
+        }
+        var marker = "§8  §7";
+        if i == selected { marker = "§a● §7"; }
+        let label = labels[i];
+        var color = EssentialsThemePaletteHc::TEXT_DIM;
+        if hovered { color = EssentialsThemePaletteHc::TEXT; }
+        ug.drawString(&uf, "{marker}{label}", x + 6, row_y + (row_h - uf.lineHeight) / 2, color, true);
+        i = i + 1;
+    }
+
+    ug.flush();
+    ug.pose().popPose();
+    return hovered_row;
+}
+
+pub fn uk_draw_scaled_string(g: &GuiGraphicsHc, font: FontHc, text: String, x: Float, y: Float, color: Int, scale: Float) {
+    let ug = g as UkGfx;
+    let uf = font as UkFont;
+    if scale == 1.0f {
+        ug.drawString(&uf, text, x as Int, y as Int, color, false);
+        return;
+    }
+    ug.pose().pushPose();
+    ug.pose().translate(x as Double, y as Double, 0.0);
+    ug.pose().scale(scale, scale, 1.0f);
+    ug.drawString(&uf, text, 0, 0, color, false);
+    ug.pose().popPose();
+}
+
+pub fn uk_draw_scaled_centered_string(g: &GuiGraphicsHc, font: FontHc, text: String, center_x: Float, y: Float, color: Int, scale: Float) {
+    let ug = g as UkGfx;
+    let uf = font as UkFont;
+    if scale == 1.0f {
+        ug.drawCenteredString(&uf, text, center_x as Int, y as Int, color);
+        return;
+    }
+    let w = (uf.width(text) as Float) * scale;
+    ug.pose().pushPose();
+    ug.pose().translate((center_x - w / 2.0f) as Double, y as Double, 0.0);
+    ug.pose().scale(scale, scale, 1.0f);
+    ug.drawString(&uf, text, 0, 0, color, false);
+    ug.pose().popPose();
+}
+
+// "#RRGGBB" / "RRGGBB" -> ARGB-style int (the value is truncated to 32 bits like `(int) Long.parseLong`);
+// `fallback` for null / blank / unparsable input.
+pub fn uk_parse_hex_color(value: String?, fallback: Int) -> Int {
+    if value == null { return fallback; }
+    var text = "";
+    text = value;
+    // strip every '#'
+    var cleaned = "";
+    var i = 0;
+    while i < text.length() {
+        let ch = text.substring(i, i + 1);
+        if ch != "#" { cleaned = "{cleaned}{ch}"; }
+        i = i + 1;
+    }
+    if cleaned.trim() == "" { return fallback; }
+    try {
+        return UkLong::parseLong(cleaned, 16) as Int;
+    } catch (e: OvThrowable) {
+        return fallback;
+    }
+}
+
+// "#RRGGBB" (alpha dropped), upper-case hex like `String.format("#%06X", ...)`.
+pub fn uk_format_hex_color(color: Int) -> String {
+    let digits = "0123456789ABCDEF";
+    var out = "";
+    var shift = 20;
+    while shift >= 0 {
+        let nibble = (color >> shift) & 15;
+        out = "{out}{digits.substring(nibble, nibble + 1)}";
+        shift = shift - 4;
+    }
+    return "#{out}";
+}

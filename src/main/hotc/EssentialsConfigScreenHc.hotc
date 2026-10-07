@@ -67,7 +67,7 @@ fn ess_draw_menu_button(gfx: &GuiGraphicsHc, x: Int, y: Int, w: Int, label: Stri
     gfx.fill(x, y, x + w, y + ess_row_h(), fill_color);
     var border_color = EssentialsThemePaletteHc::BORDER;
     if hov { border_color = EssentialsThemePaletteHc::ACCENT; }
-    EssentialsUIKitHc::drawBorder(gfx, x, y, w, ess_row_h(), border_color);
+    uk_draw_border(gfx, x, y, w, ess_row_h(), border_color);
     var prefix = "§7";
     if hov { prefix = "§f"; }
     gfx.drawCenteredString(Minecraft::getInstance().font, "{prefix}{label}", x + w / 2, y + 5, EssentialsThemePaletteHc::TEXT);
@@ -95,7 +95,7 @@ impl HcEssentialsConfigScreen {
         let panel_w = ess_panel_w();
         let panel_h = ess_panel_h();
 
-        EssentialsUIKitHc::drawModalChrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
+        uk_draw_modal_chrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
             layout.panel_x, layout.panel_y, panel_w, panel_h, 20, "§fPhoenix Essentials");
         let esc_label = "Esc to close";
         gfx.drawString(Minecraft::getInstance().font, "§8{esc_label}", layout.panel_x + panel_w - Minecraft::getInstance().font.width(esc_label) - 8, layout.panel_y + 7, EssentialsThemePaletteHc::TEXT_FAINT);

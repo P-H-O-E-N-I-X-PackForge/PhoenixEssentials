@@ -35,12 +35,6 @@ extern class EssentialsHcBridgeHc = "net.phoenixvine.essentials.client.Essential
     static fn cycleTheme();
 }
 
-extern class EssentialsUIKitHc = "net.phoenixvine.essentials.client.EssentialsUIKit" {
-
-    static fn drawModalChrome(g: &GuiGraphicsHc, font: FontHc, screenW: Int, screenH: Int, panelX: Int, panelY: Int, panelW: Int, panelH: Int, headerH: Int, title: String);
-    static fn drawBorder(g: &GuiGraphicsHc, x: Int, y: Int, w: Int, h: Int, color: Int);
-}
-
 extern class EssentialsSettingsHc = "net.phoenixvine.essentials.client.EssentialsSettings" {
     static fn get() -> EssentialsSettingsHc;
     fn isShowAfkOverlay(&self) -> Bool;

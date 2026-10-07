@@ -61,6 +61,6 @@ pub fn render_afk_overlay(gfx: GuiGraphicsHc, screen_w: Int, screen_h: Int) {
     let box_y = 6;
 
     gfx.fill(box_x, box_y, box_x + box_w, box_y + box_h, EssentialsThemePaletteHc::PANEL);
-    EssentialsUIKitHc::drawBorder(&gfx, box_x, box_y, box_w, box_h, EssentialsThemePaletteHc::ACCENT);
+    uk_draw_border(&gfx, box_x, box_y, box_w, box_h, EssentialsThemePaletteHc::ACCENT);
     gfx.drawCenteredString(Minecraft::getInstance().font, text, box_x + box_w / 2, box_y + 4, EssentialsThemePaletteHc::TEXT);
 }

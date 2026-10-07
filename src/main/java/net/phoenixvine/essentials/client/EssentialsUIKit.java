@@ -11,10 +11,12 @@ public final class EssentialsUIKit {
     private EssentialsUIKit() {}
 
     public static void drawScrim(GuiGraphics g, int width, int height) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) { net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_scrim(g, width, height); return; }
         g.fill(0, 0, width, height, EssentialsThemePalette.BG);
     }
 
     public static void drawBorder(GuiGraphics g, int x, int y, int w, int h, int color) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) { net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_border(g, x, y, w, h, color); return; }
         g.fill(x, y, x + w, y + 1, color);
         g.fill(x, y + h - 1, x + w, y + h, color);
         g.fill(x, y, x + 1, y + h, color);
@@ -22,6 +24,7 @@ public final class EssentialsUIKit {
     }
 
     public static void drawBorder(GuiGraphics g, int x, int y, int w, int h) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) { net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_border_default(g, x, y, w, h); return; }
         drawBorder(g, x, y, w, h, EssentialsThemePalette.BORDER);
     }
 
@@ -29,6 +32,11 @@ public final class EssentialsUIKit {
                                        int panelX, int panelY, int panelW, int panelH, int headerH,
                                        String title, int panelColor, int headerColor, int borderColor,
                                        int textColor) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_modal_chrome_colored(g, font, screenW, screenH, panelX, panelY, panelW, panelH, headerH, title,
+                    panelColor, headerColor, borderColor, textColor);
+            return;
+        }
         g.flush();
         drawScrim(g, screenW, screenH);
 
@@ -44,6 +52,10 @@ public final class EssentialsUIKit {
     public static void drawModalChrome(GuiGraphics g, Font font, int screenW, int screenH,
                                        int panelX, int panelY, int panelW, int panelH, int headerH,
                                        String title) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_modal_chrome(g, font, screenW, screenH, panelX, panelY, panelW, panelH, headerH, title);
+            return;
+        }
         drawModalChrome(g, font, screenW, screenH, panelX, panelY, panelW, panelH, headerH, title,
                 EssentialsThemePalette.PANEL, EssentialsThemePalette.HEADER,
                 EssentialsThemePalette.BORDER, EssentialsThemePalette.TEXT);
@@ -52,6 +64,11 @@ public final class EssentialsUIKit {
     public static <T> int drawDropdown(GuiGraphics g, Font font, List<T> items, Function<T, String> labelFn,
                                        int selectedIndex, int x, int y, int w, int rowH,
                                        int mouseX, int mouseY) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            String[] labels = new String[items.size()];
+            for (int i = 0; i < labels.length; i++) labels[i] = labelFn.apply(items.get(i));
+            return net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_dropdown(g, font, labels, selectedIndex, x, y, w, rowH, mouseX, mouseY);
+        }
         int dropH = items.size() * rowH;
         g.pose().pushPose();
         g.pose().translate(0, 0, 300);
@@ -81,6 +98,7 @@ public final class EssentialsUIKit {
 
     public static void drawScaledString(GuiGraphics g, Font font, String text, float x, float y, int color,
                                         float scale) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) { net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_scaled_string(g, font, text, x, y, color, scale); return; }
         if (scale == 1.0f) {
             g.drawString(font, text, (int) x, (int) y, color, false);
             return;
@@ -94,6 +112,7 @@ public final class EssentialsUIKit {
 
     public static void drawScaledCenteredString(GuiGraphics g, Font font, String text, float centerX, float y,
                                                 int color, float scale) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) { net.phoenixvine.essentials.hc.hcCompileMerged1.uk_draw_scaled_centered_string(g, font, text, centerX, y, color, scale); return; }
         if (scale == 1.0f) {
             g.drawCenteredString(font, text, (int) centerX, (int) y, color);
             return;
@@ -107,6 +126,7 @@ public final class EssentialsUIKit {
     }
 
     public static int parseHexColor(String value, int fallback) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.uk_parse_hex_color(value, fallback);
         if (value == null || value.isBlank()) return fallback;
         try {
             return (int) Long.parseLong(value.replace("#", ""), 16);
@@ -116,6 +136,7 @@ public final class EssentialsUIKit {
     }
 
     public static String formatHexColor(int color) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.uk_format_hex_color(color);
         return String.format("#%06X", color & 0x00FFFFFF);
     }
 }

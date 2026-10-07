@@ -115,7 +115,7 @@ impl HcEssentialsListScreen {
         let panel_w = ess_list_panel_w();
         let panel_h = ess_list_panel_h();
 
-        EssentialsUIKitHc::drawModalChrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
+        uk_draw_modal_chrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
             layout.panel_x, layout.panel_y, panel_w, panel_h, 20, "§f{ess_list_title}");
 
         let rows = ess_list_build_rows();
