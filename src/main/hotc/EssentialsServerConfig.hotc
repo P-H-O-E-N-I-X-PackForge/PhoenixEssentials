@@ -1,0 +1,132 @@
+// --- HC port of EssentialsServerConfig (the ForgeConfigSpec) ---
+//
+// Builds the same spec, key for key and in the same order, with the same defaults / ranges / comments, so
+// `serverconfig/phoenix_essentials-server.toml` is identical. `EssentialsServerConfig.java` keeps its
+// public static `SPEC` and the typed value fields (`TELEPORT_WARMUP_SECONDS`, `ENABLE_HOME`, ...) that
+// every Java reader uses, but now fills them from here: `cfg_spec()` builds the spec, and
+// `cfg_value("teleportWarmupSeconds")` hands back each value object (Java casts to `IntValue` /
+// `BooleanValue` / `ConfigValue<List>`). The HC code reads them through the same static fields as before
+// (`EssentialsServerConfigHc::HOMES_PER_PLAYER`).
+
+extern class CfgBuilder = "net.minecraftforge.common.ForgeConfigSpec$Builder" {
+    fn new() -> Self;
+    fn push(&self, path: String) -> CfgBuilder;
+    fn pop(&self) -> CfgBuilder;
+    fn comment(&self, text: String) -> CfgBuilder;
+    fn defineInRange(&self, path: String, def: Int, lo: Int, hi: Int) -> CfgIntValue;
+    fn define(&self, path: String, def: Bool) -> CfgBoolValue;
+    fn defineList(&self, path: String, def: CfgListI, validator: &dyn CfgPredicate) -> CfgConfigValue;
+    fn build(&self) -> CfgSpec;
+}
+
+extern class CfgSpec = "net.minecraftforge.common.ForgeConfigSpec" {}
+extern class CfgIntValue = "net.minecraftforge.common.ForgeConfigSpec$IntValue" {}
+extern class CfgBoolValue = "net.minecraftforge.common.ForgeConfigSpec$BooleanValue" {}
+extern class CfgConfigValue = "net.minecraftforge.common.ForgeConfigSpec$ConfigValue" {}
+extern class CfgObject = "java.lang.Object" {}
+extern class CfgListI = "java.util.List" interface {}
+extern class CfgArrayList = "java.util.ArrayList" {
+    fn new() -> Self;
+}
+extern interface CfgPredicate = "java.util.function.Predicate" {
+    fn test(&self, o: CfgObject) -> Bool;
+}
+
+struct CfgEntry {
+    key: String,
+    value: CfgObject,
+}
+
+static cfg_entries: [CfgEntry] = [CfgEntry { key: "", value: null as CfgObject }; 0];
+
+fn cfg_register(key: String, value: CfgObject) {
+    var out = [CfgEntry { key: "", value: null as CfgObject }; cfg_entries.length + 1];
+    var i = 0;
+    while i < cfg_entries.length {
+        out[i] = cfg_entries[i];
+        i = i + 1;
+    }
+    out[cfg_entries.length] = CfgEntry { key: key, value: value };
+    cfg_entries = out;
+}
+
+fn cfg_int(b: &CfgBuilder, key: String, comment: String, def: Int, lo: Int, hi: Int) {
+    let v = b.comment(comment).defineInRange(key, def, lo, hi);
+    cfg_register(key, v as CfgObject);
+}
+
+fn cfg_bool(b: &CfgBuilder, key: String, comment: String, def: Bool) {
+    let v = b.comment(comment).define(key, def);
+    cfg_register(key, v as CfgObject);
+}
+
+// The value object registered under `key` (the TOML key, e.g. "teleportWarmupSeconds"), or null.
+pub fn cfg_value(key: String) -> CfgObject? {
+    var i = 0;
+    while i < cfg_entries.length {
+        if cfg_entries[i].key == key { return cfg_entries[i].value; }
+        i = i + 1;
+    }
+    return null;
+}
+
+pub fn cfg_spec() -> CfgSpec {
+    let b = CfgBuilder::new();
+
+    b.push("teleport");
+    cfg_int(&b, "teleportWarmupSeconds", "Seconds a player must stand still before a teleport fires. 0 = instant.", 5, 0, 300);
+    cfg_int(&b, "teleportCooldownSeconds", "Default fallback cooldown in seconds for teleports (/home, /spawn, /back). 0 = no cooldown.", 5, 0, 3600);
+    cfg_int(&b, "warpCooldownSeconds", "Cooldown in seconds between /warp uses. 0 = no cooldown.", 5, 0, 3600);
+    cfg_int(&b, "tpxCooldownSeconds", "Cooldown in seconds between /tpx uses. 0 = no cooldown.", 5, 0, 3600);
+    cfg_int(&b, "topCooldownSeconds", "Cooldown in seconds between /top uses. 0 = no cooldown.", 50, 0, 3600);
+    cfg_bool(&b, "cancelOnMove", "If true, moving during the warmup countdown cancels the teleport.", true);
+    cfg_bool(&b, "cancelOnDamage", "If true, taking damage during the warmup countdown cancels the teleport.", true);
+    b.pop();
+
+    b.push("homes");
+    cfg_int(&b, "homesPerPlayer", "Maximum number of named homes a single player may set.", 3, 1, 256);
+    cfg_bool(&b, "backAfterDeath", "If true, /back after dying returns the player to their death location. If false, /back only ever returns to the point before the last teleport, ignoring deaths.", true);
+    b.pop();
+
+    b.push("rtp");
+    cfg_int(&b, "rtpMinRadius", "Minimum distance (blocks) from the origin a /rtp destination may land.", 100, 0, 100000);
+    cfg_int(&b, "rtpMaxRadius", "Maximum distance (blocks) from the origin a /rtp destination may land.", 5000, 1, 1000000);
+    cfg_int(&b, "rtpMaxAttempts", "How many random locations to try before giving up and telling the player to try again.", 20, 1, 200);
+    cfg_int(&b, "rtpCooldownSeconds", "Cooldown in seconds between /rtp uses. 0 = no cooldown.", 60, 0, 86400);
+    let dims = b.comment("Dimension ids /rtp is allowed in (e.g. \"minecraft:overworld\"). Empty list = allowed everywhere.")
+        .defineList("rtpAllowedDimensions", CfgArrayList::new() as CfgListI, |o| { return o is String; });
+    cfg_register("rtpAllowedDimensions", dims as CfgObject);
+    b.pop();
+
+    b.push("tpa");
+    cfg_int(&b, "tpaTimeoutSeconds", "Seconds a /tpa or /tpahere request stays valid before it expires.", 120, 5, 3600);
+    cfg_int(&b, "tpaCooldownSeconds", "Cooldown in seconds between /tpa teleports. 0 = no cooldown.", 5, 0, 3600);
+    cfg_bool(&b, "tpaTeammateBypassDelay", "If true, accepting a /tpa or /tpahere request from a teammate skips the teleport warmup and cooldown.", true);
+    b.pop();
+
+    b.push("enabledCommands");
+    cfg_bool(&b, "enableHome", "If false, disables /home, /sethome, /delhome, /homes entirely.", true);
+    cfg_bool(&b, "enableSpawn", "If false, disables /spawn and /setspawn entirely.", true);
+    cfg_bool(&b, "enableWarp", "If false, disables /warp, /setwarp, /delwarp, /warps entirely.", true);
+    cfg_bool(&b, "enableBack", "If false, disables /back entirely.", true);
+    cfg_bool(&b, "enableRtp", "If false, disables /rtp entirely.", true);
+    cfg_bool(&b, "enableTpa", "If false, disables /tpa, /tpahere, /tpaccept, /tpdeny, /tpcancel entirely.", true);
+    cfg_bool(&b, "enableMsg", "If false, disables /msg, /tell, /r, /reply entirely.", true);
+    cfg_bool(&b, "enableNick", "If false, disables /nick entirely.", true);
+    cfg_bool(&b, "enableIgnore", "If false, disables /ignore and /unignore entirely.", true);
+    cfg_bool(&b, "enableAfk", "If false, disables /afk entirely.", true);
+    cfg_bool(&b, "enablePlayerInfo", "If false, disables /playerinfo entirely.", true);
+    cfg_bool(&b, "enableSeen", "If false, disables /seen entirely.", true);
+    cfg_bool(&b, "enablePlaytime", "If false, disables /playtime entirely.", true);
+    cfg_bool(&b, "enableKit", "If false, disables /kit and /kits entirely.", true);
+    cfg_bool(&b, "enableHealFeed", "If false, disables /heal and /feed entirely.", true);
+    cfg_bool(&b, "enableInvsee", "If false, disables /invsee entirely.", true);
+    cfg_bool(&b, "enableGodFly", "If false, disables /god and /fly entirely.", true);
+    cfg_bool(&b, "enableGamemodeShortcuts", "If false, disables /gmc, /gms, /gma, /gmsp entirely.", true);
+    cfg_bool(&b, "enableTop", "If false, disables /top entirely.", true);
+    cfg_bool(&b, "enableTpx", "If false, disables /tpx entirely.", true);
+    cfg_bool(&b, "enableTpforce", "If false, disables /tpforce and /tphere entirely.", true);
+    b.pop();
+
+    return b.build();
+}

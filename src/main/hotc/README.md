@@ -55,6 +55,7 @@ config button and the suite-bar button.
 | `EssentialsAutoTrash.hotc` | `EssentialsAutoTrashEvents` -- item-pickup cancel + 10-tick inventory sweep for always-trash items (Java handlers early-return in takeover) |
 | `EssentialsTeamCompat.hotc` | `TeamCompat` -- direct calls into the optional Phoenix Guilds / FTB Teams APIs (extern bindings behind `ModList.isLoaded`); `TeamCompat.java` is a facade, original kept as `TeamCompatJava` |
 | `EssentialsPermissions.hotc` | `EssentialsPermissions` -- builds/registers the 34 boolean permission nodes (always, even with `use_java`) and does the by-name gate lookup (`perm_allowed`) that replaced the old reflection; `EssentialsPermissions.java` copies the HC nodes into its static fields |
+| `EssentialsServerConfig.hotc` | `EssentialsServerConfig` -- builds the whole `ForgeConfigSpec` (same keys/defaults/ranges/comments); the Java class exposes `SPEC` + the typed value fields, filled from HC. Not switchable with `use_java` (the spec exists once) |
 | `EssentialsSetHomeLimitCommand.hotc` | `/sethomelimit` incl. the `team` branch (calls `EssentialsTeamCompat.hotc`) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
