@@ -95,7 +95,7 @@ fn te_record_use(uuid: String, category: String, at: Long) {
 fn te_cooldown_remaining_ms(uuid: String, category: String, cooldown_seconds: Int) -> Long {
     if cooldown_seconds <= 0 { return 0L; }
     let last = te_last_use_at(uuid, category);
-    let remaining = (cooldown_seconds as Long) * 1000L - (EssentialsHcServerBridgeHc::nowMs() - last);
+    let remaining = (cooldown_seconds as Long) * 1000L - (sup_now_ms() - last);
     if remaining < 0L { return 0L; }
     return remaining;
 }
@@ -106,11 +106,11 @@ fn te_execute_now(player: ServerPlayer, target: NamedLocationHc, category: Strin
         player.sendSystemMessage(Component::literal("§c{error}") as Component);
         return;
     }
-    te_record_use(player.getStringUUID(), category, EssentialsHcServerBridgeHc::nowMs());
+    te_record_use(player.getStringUUID(), category, sup_now_ms());
     var suffix = "";
     if detail.length() > 0 { suffix = " §7({detail})"; }
     player.sendSystemMessage(Component::literal("§aTeleported to §f{label}§a.{suffix}") as Component);
-    EssentialsHcServerBridgeHc::postPostTeleport(&player, category, label);
+    sup_post_post_teleport(&player, category, label);
 }
 
 pub fn te_request(player: ServerPlayer, target: NamedLocationHc, category: String, label: String, detail: String?, bypass: Bool, cooldown_seconds: Int) {
@@ -121,7 +121,7 @@ pub fn te_request(player: ServerPlayer, target: NamedLocationHc, category: Strin
         return;
     }
     var can_bypass = bypass;
-    if !can_bypass { can_bypass = EssentialsHcServerBridgeHc::canBypassCooldown(&player); }
+    if !can_bypass { can_bypass = sup_can_bypass_cooldown(&player); }
     if !can_bypass {
         let remaining = te_cooldown_remaining_ms(uuid, category, cooldown_seconds);
         if remaining > 0L {
@@ -130,20 +130,20 @@ pub fn te_request(player: ServerPlayer, target: NamedLocationHc, category: Strin
             return;
         }
     }
-    if EssentialsHcServerBridgeHc::postPreTeleport(&player, category, label, &target) { return; }
+    if sup_post_pre_teleport(&player, category, label, &target) { return; }
 
     var detail_text = "";
     if detail != null { detail_text = detail; }
     var warmup = 0;
-    if !bypass { warmup = EssentialsHcServerBridgeHc::warmupSeconds(); }
+    if !bypass { warmup = sup_cfg_int("teleportWarmupSeconds"); }
     if warmup <= 0 {
         te_execute_now(player, target, category, label, detail_text);
         return;
     }
     te_append_pending(te_make_pending(uuid, target,
-        EssentialsHcServerBridgeHc::nowMs() + (warmup as Long) * 1000L,
+        sup_now_ms() + (warmup as Long) * 1000L,
         player.getX(), player.getY(), player.getZ(),
-        EssentialsHcServerBridgeHc::dimensionOf(&player),
+        sup_dimension_of(&player),
         category, label, detail_text));
     player.sendSystemMessage(Component::literal("§7Teleporting to §f{label} §7in {warmup}s - don't move!") as Component);
 }
@@ -170,7 +170,7 @@ fn te_on_server_tick(e: JObjectEvent) {
     let ev = e as ServerTickEventHc;
     if ev.phase != TickPhaseHc::END { return; }
     if te_pending.length == 0 { return; }
-    let now = EssentialsHcServerBridgeHc::nowMs();
+    let now = sup_now_ms();
 
     var keep = [te_blank_pending(); te_pending.length];
     var kept = 0;
@@ -179,9 +179,9 @@ fn te_on_server_tick(e: JObjectEvent) {
     var i = 0;
     while i < te_pending.length {
         let entry = te_pending[i];
-        let player = EssentialsHcServerBridgeHc::playerByUuid(entry.uuid);
+        let player = sup_player_by_uuid(entry.uuid);
         if player != null {
-            if EssentialsHcServerBridgeHc::cancelOnMove() && EssentialsHcServerBridgeHc::hasMoved(&player, entry.sx, entry.sy, entry.sz, entry.dim) {
+            if sup_cfg_bool("cancelOnMove") && sup_has_moved(&player, entry.sx, entry.sy, entry.sz, entry.dim) {
                 player.sendSystemMessage(Component::literal("§cTeleport to §f{entry.label} §ccancelled - you moved.") as Component);
             } else {
                 if now >= entry.ready_at {
@@ -207,7 +207,7 @@ fn te_on_server_tick(e: JObjectEvent) {
     var r = 0;
     while r < ready_n {
         let entry = ready[r];
-        let player = EssentialsHcServerBridgeHc::playerByUuid(entry.uuid);
+        let player = sup_player_by_uuid(entry.uuid);
         let target = entry.target;
         if player != null {
             if target != null {
@@ -219,7 +219,7 @@ fn te_on_server_tick(e: JObjectEvent) {
 }
 
 fn te_on_living_hurt(e: JObjectEvent) {
-    if !EssentialsHcServerBridgeHc::cancelOnDamage() { return; }
+    if !sup_cfg_bool("cancelOnDamage") { return; }
     let who = (e as LivingHurtEventHc).getEntity();
     if !(who is ServerPlayer) { return; }
     let player = who as ServerPlayer;

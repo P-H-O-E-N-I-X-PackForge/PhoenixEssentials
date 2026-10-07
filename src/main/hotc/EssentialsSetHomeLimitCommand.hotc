@@ -63,7 +63,7 @@ fn hc_set_team_home_limit(source: CommandSourceStackHc, anchor_name: String, cou
             piece = rest.substring(0, cut);
             rest = rest.substring(cut + 1, rest.length());
         }
-        let mate = EssentialsHcServerBridgeHc::playerByUuid(piece);
+        let mate = sup_player_by_uuid(piece);
         if mate != null {
             let data = shl_player_data(&mate);
             if data != null {

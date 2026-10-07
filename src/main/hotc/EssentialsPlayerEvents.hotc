@@ -48,17 +48,17 @@ fn ess_on_player_tick(e: JObjectEvent) {
 fn ess_on_player_logged_in(e: JObjectEvent) {
     let who = (e as PlayerLoggedInEventHc).getEntity();
     if !(who is ServerPlayer) { return; }
-    EssentialsHcServerBridgeHc::recordSeen(who as ServerPlayer);
+    sup_record_seen(who as ServerPlayer);
 }
 
 fn ess_on_player_logged_out(e: JObjectEvent) {
     let who = (e as PlayerLoggedOutEventHc).getEntity();
     if !(who is ServerPlayer) { return; }
-    EssentialsHcServerBridgeHc::recordSeen(who as ServerPlayer);
+    sup_record_seen(who as ServerPlayer);
 }
 
 fn ess_on_living_death(e: JObjectEvent) {
-    if !EssentialsHcServerBridgeHc::backAfterDeath() { return; }
+    if !sup_cfg_bool("backAfterDeath") { return; }
     let who = (e as LivingDeathEventHc).getEntity();
     if !(who is ServerPlayer) { return; }
     let player = who as ServerPlayer;

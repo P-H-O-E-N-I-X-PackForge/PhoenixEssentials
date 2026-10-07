@@ -108,12 +108,7 @@ extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.Essentials
     
     static fn homeNamesCsv(data: &EssentialsPlayerDataHc) -> String;
     static fn homeCount(data: &EssentialsPlayerDataHc) -> Int;
-    static fn warpNamesCsv() -> String;
-    static fn kitNamesCsv() -> String;
-    static fn kitExists(name: String) -> Bool;
-    static fn kitCooldownRemainingSeconds(data: &EssentialsPlayerDataHc, name: String) -> Int;
     static fn claimKit(player: ServerPlayer, data: &EssentialsPlayerDataHc, name: String);
-    static fn playtimeFormatted(data: &EssentialsPlayerDataHc) -> String;
     
     static fn seenMessage(server: MinecraftServerHc, name: String) -> String?;
     static fn topLocation(player: ServerPlayer) -> NamedLocationHc;
@@ -126,26 +121,12 @@ extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.Essentials
     static fn playerInfo(target: ServerPlayer) -> String?;
     static fn openTrash(player: ServerPlayer);
     
-    static fn kitSyncCsv(player: ServerPlayer) -> String;
-    static fn homesPerPlayer() -> Int;
     
-    static fn nowMs() -> Long;
-    static fn dimensionOf(player: &ServerPlayer) -> String;
-    static fn canBypassCooldown(player: &ServerPlayer) -> Bool;
-    static fn warmupSeconds() -> Int;
-    static fn cancelOnMove() -> Bool;
-    static fn cancelOnDamage() -> Bool;
-    static fn postPreTeleport(player: &ServerPlayer, category: String, label: String, target: &NamedLocationHc) -> Bool;
-    static fn postPostTeleport(player: &ServerPlayer, category: String, label: String);
     
     static fn teleportPlayerTo(player: &ServerPlayer, target: &NamedLocationHc) -> String?;
-    static fn hasMoved(player: &ServerPlayer, sx: Double, sy: Double, sz: Double, start_dim: String) -> Bool;
     
-    static fn playerByUuid(uuid: String) -> ServerPlayer;
     
     static fn copyPlayerData(original: Player, entity: Player);
-    static fn recordSeen(player: ServerPlayer);
-    static fn backAfterDeath() -> Bool;
     static fn autoTrashCsv(data: &EssentialsPlayerDataHc) -> String;
     
     static fn sendDirectMessage(sender: ServerPlayer, target: ServerPlayer, message: String) -> String?;

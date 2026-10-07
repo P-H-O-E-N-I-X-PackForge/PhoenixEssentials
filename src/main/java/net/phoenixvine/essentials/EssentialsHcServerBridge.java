@@ -72,55 +72,6 @@ public final class EssentialsHcServerBridge {
         return data.getHomes().size();
     }
 
-    // Same real need as `homeNamesCsv` above, for the server-wide (not per-player) `WarpRegistry`.
-    public static String warpNamesCsv() {
-        List<String> names = new ArrayList<>(WarpRegistry.getAll().keySet());
-        names.sort(String::compareTo);
-        return String.join(",", names);
-    }
-
-    // Kit claiming -- consolidates KitCommand.java's own cooldown math + item-granting loop into
-    // one real call each, rather than binding java.util.List<KitItemEntry> iteration,
-    // KitDefinition's own fields, Inventory.add, and System.currentTimeMillis() individually for
-    // a single real caller (same "tiny shim over a real gap" precedent as this class's other
-    // methods). Logic is a direct copy of KitCommand.java's own claim()/cooldown check, not a
-    // reimplementation.
-    public static String kitNamesCsv() {
-        List<String> names = new ArrayList<>(KitRegistry.getAll().keySet());
-        names.sort(String::compareTo);
-        return String.join(",", names);
-    }
-
-    public static boolean kitExists(String name) {
-        return KitRegistry.get(name) != null;
-    }
-
-    public static int kitCooldownRemainingSeconds(PlayerEssentialsData data, String name) {
-        KitDefinition kit = KitRegistry.get(name);
-        if (kit == null) return 0;
-        long lastClaimedMs = data.getKitLastClaimedMs(name);
-        if (lastClaimedMs <= 0) return 0;
-        long remainingMs = kit.cooldownSeconds * 1000L - (System.currentTimeMillis() - lastClaimedMs);
-        if (remainingMs <= 0) return 0;
-        return (int) ((remainingMs + 999) / 1000);
-    }
-
-    // Direct copy of PlaytimeCommand.java's own format() -- avoids needing a java.lang.Long
-    // binding in HC for this one real caller (/hcplaytime).
-    public static String playtimeFormatted(PlayerEssentialsData data) {
-        long ticks = data.getPlaytimeTicks();
-        long totalSeconds = ticks / 20;
-        long hours = totalSeconds / 3600;
-        long minutes = (totalSeconds % 3600) / 60;
-        long seconds = totalSeconds % 60;
-
-        StringBuilder sb = new StringBuilder();
-        if (hours > 0) sb.append(hours).append("h ");
-        if (hours > 0 || minutes > 0) sb.append(minutes).append("m ");
-        sb.append(seconds).append("s");
-        return sb.toString();
-    }
-
     // Real /ignore + /unignore -- consolidates IgnoreCommand.java's own Set<UUID> add/remove into
     // one real call, rather than binding java.util.UUID/Set individually for this one real caller.
     public static void setIgnored(PlayerEssentialsData data, ServerPlayer target, boolean ignore) {
@@ -259,77 +210,9 @@ public final class EssentialsHcServerBridge {
         original.invalidateCaps();
     }
 
-    // The offline index is keyed by UUID, which HC has no binding for.
-    public static void recordSeen(ServerPlayer player) {
-        OfflinePlayerIndex.recordSeen(player.getUUID(), player.getGameProfile().getName());
-    }
-
-    // `BACK_AFTER_DEATH` is a ForgeConfigSpec.BooleanValue.
-    public static boolean backAfterDeath() {
-        return EssentialsServerConfig.BACK_AFTER_DEATH.get();
-    }
-
-    // Direct copy of C2SRequestSyncPacket's KITS branch: every kit's name + this player's remaining
-    // cooldown seconds, sorted by name ignoring case, as "name:secs,name:secs" (kit names are
-    // single words, so neither ':' nor ',' appears in one). Used by the HC sync layer.
-    public static String kitSyncCsv(ServerPlayer player) {
-        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
-        List<String[]> entries = new ArrayList<>();
-        for (KitDefinition kit : KitRegistry.getAll().values()) {
-            long lastClaimedMs = data == null ? 0 : data.getKitLastClaimedMs(kit.name);
-            long remainingMs = kit.cooldownSeconds * 1000L - (System.currentTimeMillis() - lastClaimedMs);
-            int remainingSeconds = lastClaimedMs <= 0 || remainingMs <= 0 ? 0 : (int) ((remainingMs + 999) / 1000);
-            entries.add(new String[] { kit.name, Integer.toString(remainingSeconds) });
-        }
-        entries.sort((a, b) -> a[0].compareToIgnoreCase(b[0]));
-        StringBuilder sb = new StringBuilder();
-        for (String[] e : entries) {
-            if (sb.length() > 0) sb.append(',');
-            sb.append(e[0]).append(':').append(e[1]);
-        }
-        return sb.toString();
-    }
-
-    // `HOMES_PER_PLAYER` for the homes sync (the original sends the config value, not the override).
-    public static int homesPerPlayer() {
-        return EssentialsServerConfig.HOMES_PER_PLAYER.get();
-    }
-
     // --- TeleportExecutor helpers (EssentialsTeleportExecutor.hotc) ---
     // The teleport state machine itself (pending list, cooldowns, the tick/damage handlers) is HC; these
     // are the pieces that need Set/UUID/ResourceKey/event-class bindings HC doesn't have.
-
-    public static long nowMs() {
-        return System.currentTimeMillis();
-    }
-
-    public static String dimensionOf(ServerPlayer player) {
-        return player.level().dimension().location().toString();
-    }
-
-    // TeleportExecutor's `canBypassCooldown` permission half.
-    public static boolean canBypassCooldown(ServerPlayer player) {
-        return net.phoenixvine.essentials.config.EssentialsPermissions.BYPASS_COOLDOWN != null
-                && net.phoenixvine.essentials.config.EssentialsPermissions.check(player.createCommandSourceStack(),
-                        net.phoenixvine.essentials.config.EssentialsPermissions.BYPASS_COOLDOWN);
-    }
-
-    public static int warmupSeconds() { return EssentialsServerConfig.TELEPORT_WARMUP_SECONDS.get(); }
-    public static boolean cancelOnMove() { return EssentialsServerConfig.CANCEL_ON_MOVE.get(); }
-    public static boolean cancelOnDamage() { return EssentialsServerConfig.CANCEL_ON_DAMAGE.get(); }
-
-    // Same API event as always -- other mods subscribe to TeleportEvent.Pre/Post. Pre returns true if cancelled.
-    public static boolean postPreTeleport(ServerPlayer player, String category, String label, NamedLocation target) {
-        net.phoenixvine.essentials.api.event.TeleportEvent.Pre pre =
-                new net.phoenixvine.essentials.api.event.TeleportEvent.Pre(player, category, label, target);
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(pre);
-        return pre.isCanceled();
-    }
-
-    public static void postPostTeleport(ServerPlayer player, String category, String label) {
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
-                new net.phoenixvine.essentials.api.event.TeleportEvent.Post(player, category, label));
-    }
 
     // Direct copy of executeNow's level lookup + `/back` bookkeeping + the real cross-dimension
     // teleportTo. Returns null on success, else the message to show.
@@ -340,21 +223,6 @@ public final class EssentialsHcServerBridge {
                 .ifPresent(data -> data.setBack(NamedLocation.of(player)));
         player.teleportTo(targetLevel, target.x, target.y, target.z, java.util.Set.of(), target.yaw, target.pitch);
         return null;
-    }
-
-    // `hasMoved` -- different dimension, or more than 0.1 blocks from where the warmup started.
-    public static boolean hasMoved(ServerPlayer player, double sx, double sy, double sz, String startDim) {
-        if (!dimensionOf(player).equals(startDim)) return true;
-        double dx = player.getX() - sx;
-        double dy = player.getY() - sy;
-        double dz = player.getZ() - sz;
-        return (dx * dx + dy * dy + dz * dz) > 0.01;
-    }
-
-    // The tick handler only has the stored UUID string.
-    public static ServerPlayer playerByUuid(String uuid) {
-        net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
-        return server == null ? null : server.getPlayerList().getPlayer(UUID.fromString(uuid));
     }
 
     public static String dimensionLabel(ServerLevel level) {
@@ -462,5 +330,18 @@ public final class EssentialsHcServerBridge {
             }
         }
         data.recordKitClaimed(name);
+    }
+
+    // Same format as PlaytimeCommand (the HC `sup_playtime_formatted`); kept private for `playerInfo` only.
+    private static String playtimeFormatted(PlayerEssentialsData data) {
+        long totalSeconds = data.getPlaytimeTicks() / 20;
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        StringBuilder sb = new StringBuilder();
+        if (hours > 0) sb.append(hours).append("h ");
+        if (hours > 0 || minutes > 0) sb.append(minutes).append("m ");
+        sb.append(seconds).append("s");
+        return sb.toString();
     }
 }

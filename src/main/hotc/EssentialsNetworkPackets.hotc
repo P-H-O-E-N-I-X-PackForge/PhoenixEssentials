@@ -124,15 +124,15 @@ fn ess_handle_request_sync(player: ServerPlayer, kind: Int) {
         var csv = "";
         let data = ess_player_data_of(&player);
         if data != null { csv = EssentialsHcServerBridgeHc::homeNamesCsv(&data); }
-        ess_send_to_player(player, HomesSyncPacket { csv: csv, cap: EssentialsHcServerBridgeHc::homesPerPlayer() } as PhoenixObject4Net);
+        ess_send_to_player(player, HomesSyncPacket { csv: csv, cap: sup_cfg_int("homesPerPlayer") } as PhoenixObject4Net);
         return;
     }
     if kind == 1 {
-        ess_send_to_player(player, WarpsSyncPacket { csv: EssentialsHcServerBridgeHc::warpNamesCsv() } as PhoenixObject4Net);
+        ess_send_to_player(player, WarpsSyncPacket { csv: sup_warp_names_csv() } as PhoenixObject4Net);
         return;
     }
     if kind == 2 {
-        ess_send_to_player(player, KitsSyncPacket { csv: EssentialsHcServerBridgeHc::kitSyncCsv(player) } as PhoenixObject4Net);
+        ess_send_to_player(player, KitsSyncPacket { csv: sup_kit_sync_csv(player) } as PhoenixObject4Net);
         return;
     }
     var ids = "";
@@ -170,10 +170,10 @@ fn ess_handle_claim_kit(player: ServerPlayer, name: String) {
         player.sendSystemMessage(Component::literal("Kits aren't available here right now.") as Component);
         return;
     }
-    if !EssentialsHcServerBridgeHc::kitExists(name) { return; }
+    if !sup_kit_exists(name) { return; }
     let data = ess_player_data_of(&player);
     if data == null { return; }
-    let remaining = EssentialsHcServerBridgeHc::kitCooldownRemainingSeconds(&data, name);
+    let remaining = sup_kit_cooldown_remaining(&data, name);
     if remaining > 0 {
         player.sendSystemMessage(Component::literal("You can claim \"{name}\" again in {remaining}s.") as Component);
         return;

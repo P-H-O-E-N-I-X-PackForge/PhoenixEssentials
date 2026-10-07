@@ -32,6 +32,8 @@ fn perm_is_op_default(name: String) -> Bool {
 
 extern class PermStr = "java.lang.String" {
     fn toLowerCase(&self) -> String;
+    fn compareTo(&self, other: String) -> Int;
+    fn compareToIgnoreCase(&self, other: String) -> Int;
 }
 
 // The path is the field name lower-cased ("BYPASS_COOLDOWN" -> "bypass_cooldown").

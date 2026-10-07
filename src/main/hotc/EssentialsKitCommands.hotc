@@ -7,13 +7,13 @@ fn hc_claim_kit(source: CommandSourceStackHc, name: String) -> Int {
         source.sendFailure(Component::literal("Kits aren't available here right now.") as Component);
         return 0;
     }
-    if !EssentialsHcServerBridgeHc::kitExists(name) {
+    if !sup_kit_exists(name) {
         source.sendFailure(Component::literal("No kit named \"{name}\".") as Component);
         return 0;
     }
     let data = ess_player_data(&source);
     if data == null { return 0; }
-    let remaining = EssentialsHcServerBridgeHc::kitCooldownRemainingSeconds(&data, name);
+    let remaining = sup_kit_cooldown_remaining(&data, name);
     if remaining > 0 {
         source.sendFailure(Component::literal("You can claim \"{name}\" again in {remaining}s.") as Component);
         return 0;
@@ -24,7 +24,7 @@ fn hc_claim_kit(source: CommandSourceStackHc, name: String) -> Int {
 }
 
 fn hc_list_kits(source: CommandSourceStackHc) -> Int {
-    let csv = EssentialsHcServerBridgeHc::kitNamesCsv();
+    let csv = sup_kit_names_csv();
     if csv == "" {
         source.sendSuccess(|| { return Component::literal("No kits are configured.") as JObjectCmd; }, false);
     } else {
@@ -34,7 +34,7 @@ fn hc_list_kits(source: CommandSourceStackHc) -> Int {
 }
 
 fn hc_suggest_kit_names(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
-    let csv = EssentialsHcServerBridgeHc::kitNamesCsv();
+    let csv = sup_kit_names_csv();
     return ess_suggest_from_csv(builder, csv).buildFuture();
 }
 

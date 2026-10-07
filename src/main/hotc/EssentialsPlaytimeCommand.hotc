@@ -6,7 +6,7 @@ fn hc_playtime_for(source: CommandSourceStackHc, target: ServerPlayer) -> Int {
     if data_obj == null { return 0; }
     let data = data_obj as EssentialsPlayerDataHc;
     let name = target.getGameProfile().getName();
-    let formatted = EssentialsHcServerBridgeHc::playtimeFormatted(&data);
+    let formatted = sup_playtime_formatted(&data);
     source.sendSuccess(|| { return Component::literal("{name}'s playtime: {formatted}") as JObjectCmd; }, false);
     return 1;
 }

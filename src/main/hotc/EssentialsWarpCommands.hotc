@@ -30,7 +30,7 @@ fn hc_delete_warp(source: CommandSourceStackHc, name: String) -> Int {
 }
 
 fn hc_list_warps(source: CommandSourceStackHc) -> Int {
-    let csv = EssentialsHcServerBridgeHc::warpNamesCsv();
+    let csv = sup_warp_names_csv();
     if csv == "" {
         source.sendSuccess(|| { return Component::literal("No warps have been set.") as JObjectCmd; }, false);
     } else {
@@ -40,7 +40,7 @@ fn hc_list_warps(source: CommandSourceStackHc) -> Int {
 }
 
 fn hc_suggest_warp_names(ctx: CommandContextSrc, builder: SuggestionsBuilderHc) -> JObjectSuggestFuture {
-    let csv = EssentialsHcServerBridgeHc::warpNamesCsv();
+    let csv = sup_warp_names_csv();
     return ess_suggest_from_csv(builder, csv).buildFuture();
 }
 

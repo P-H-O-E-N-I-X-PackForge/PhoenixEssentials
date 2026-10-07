@@ -1,0 +1,279 @@
+// --- Replacements for the `EssentialsHcServerBridge` shims that no longer need Java ---
+//
+// Each function here used to be a Java shim (`EssentialsHcServerBridge.java`) added when HC lacked a
+// binding. With the config spec, the registries and the permission nodes now living in HC, and a few
+// small bindings added below (System / dimension key / UUID / the Forge bus `post`), they are plain HC:
+//   config reads, clock + dimension helpers, "seen" recording, playtime formatting, the kit / warp
+//   name lists and cooldown math, the cooldown-bypass permission, UUID -> player lookup, and posting the
+//   public `TeleportEvent.Pre/Post` API events.
+// What is left in the Java shim is what still needs Java types HC has no binding for (`Map`/`Set`,
+// capability revive, item stacks from NBT, the in-memory tpa table, ...).
+
+extern class SupSystem = "java.lang.System" {
+    static fn currentTimeMillis() -> Long;
+}
+
+// `player.level().dimension().location().toString()`, one alias per hop.
+extern class SupEntity = "net.minecraft.server.level.ServerPlayer" {
+    fn level(&self) -> SupLevel;
+}
+extern class SupLevel = "net.minecraft.world.level.Level" {
+    fn dimension(&self) -> SupDimKey;
+}
+extern class SupDimKey = "net.minecraft.resources.ResourceKey" {
+    fn location(&self) -> ResourceLocation;
+}
+
+extern class SupIntValue = "net.minecraftforge.common.ForgeConfigSpec$IntValue" {
+    fn get(&self) -> CfgObject;
+}
+extern class SupBoolValue = "net.minecraftforge.common.ForgeConfigSpec$BooleanValue" {
+    fn get(&self) -> CfgObject;
+}
+
+extern class SupKitData = "net.phoenixvine.essentials.capability.PlayerEssentialsData" {
+    fn getKitLastClaimedMs(&self, kit: String) -> Long;
+}
+
+extern class SupUuid = "java.util.UUID" {
+    static fn fromString(s: String) -> TcUuid;
+}
+extern class SupHooks = "net.minecraftforge.server.ServerLifecycleHooks" {
+    static fn getCurrentServer() -> MinecraftServerHc;
+}
+extern class SupPlayerList = "net.minecraft.server.players.PlayerList" {
+    fn getPlayer(&self, id: TcUuid) -> ServerPlayer;
+}
+extern class SupServer = "net.minecraft.server.MinecraftServer" {
+    fn getPlayerList(&self) -> SupPlayerList;
+}
+
+// The mod's public `TeleportEvent.Pre/Post` Forge events (other mods subscribe to them).
+extern class SupPermApi = "net.minecraftforge.server.permission.PermissionAPI" {
+    static fn getPermission(player: &ServerPlayer, node: PermissionNodeSrc, contexts: [PermissionDynamicContextSrc]) -> JObjectCmd;
+}
+extern class SupEvent = "net.minecraftforge.eventbus.api.Event" {}
+extern class SupBus = "net.minecraftforge.eventbus.api.IEventBus" interface {
+    fn post(&self, ev: SupEvent) -> Bool;
+}
+extern class SupForge = "net.minecraftforge.common.MinecraftForge" {
+    static EVENT_BUS: SupBus;
+}
+extern class SupPreEvent = "net.phoenixvine.essentials.api.event.TeleportEvent$Pre" {
+    fn new(player: &ServerPlayer, category: String, label: String, target: &NamedLocationHc) -> Self;
+    fn isCanceled(&self) -> Bool;
+}
+extern class SupPostEvent = "net.phoenixvine.essentials.api.event.TeleportEvent$Post" {
+    fn new(player: &ServerPlayer, category: String, label: String) -> Self;
+}
+
+// ---- clock / dimension ----
+
+pub fn sup_now_ms() -> Long {
+    return SupSystem::currentTimeMillis();
+}
+
+pub fn sup_dimension_of(p: &ServerPlayer) -> String {
+    return (p as SupEntity).level().dimension().location().toString();
+}
+
+// Different dimension than the warmup started in, or moved more than 0.1 blocks.
+pub fn sup_has_moved(p: &ServerPlayer, sx: Double, sy: Double, sz: Double, start_dim: String) -> Bool {
+    if sup_dimension_of(p) != start_dim { return true; }
+    let dx = p.getX() - sx;
+    let dy = p.getY() - sy;
+    let dz = p.getZ() - sz;
+    return (dx * dx + dy * dy + dz * dz) > 0.01;
+}
+
+// ---- config reads (the value objects built in EssentialsServerConfig.hotc) ----
+
+pub fn sup_cfg_int(key: String) -> Int {
+    let v = cfg_value(key);
+    if v == null { return 0; }
+    let raw = (v as SupIntValue).get();
+    return (raw as OvNumber).intValue();
+}
+
+pub fn sup_cfg_bool(key: String) -> Bool {
+    let v = cfg_value(key);
+    if v == null { return false; }
+    let raw = (v as SupBoolValue).get();
+    return (raw as JBooleanPerm).booleanValue();
+}
+
+// ---- players ----
+
+pub fn sup_record_seen(p: ServerPlayer) {
+    dr_idx_record(p.getStringUUID(), p.getGameProfile().getName(), sup_now_ms());
+}
+
+pub fn sup_player_by_uuid(s: String) -> ServerPlayer? {
+    let server = SupHooks::getCurrentServer();
+    if server == null { return null; }
+    return (server as SupServer).getPlayerList().getPlayer(SupUuid::fromString(s));
+}
+
+// TeleportExecutor's permission half of `canBypassCooldown`.
+pub fn sup_can_bypass_cooldown(p: &ServerPlayer) -> Bool {
+    let node = perm_node("BYPASS_COOLDOWN");
+    if node == null { return false; }
+    let result = SupPermApi::getPermission(p, node, [null as PermissionDynamicContextSrc; 0]) as JBooleanPerm;
+    return result.booleanValue();
+}
+
+// "1h 2m 3s" style, same rules as PlaytimeCommand.
+pub fn sup_playtime_formatted(data: &EssentialsPlayerDataHc) -> String {
+    let total_seconds = data.getPlaytimeTicks() / 20L;
+    let hours = total_seconds / 3600L;
+    let minutes = (total_seconds % 3600L) / 60L;
+    let seconds = total_seconds % 60L;
+    var out = "";
+    if hours > 0L { out = "{hours}h "; }
+    if hours > 0L || minutes > 0L { out = "{out}{minutes}m "; }
+    return "{out}{seconds}s";
+}
+
+// ---- teleport API events ----
+
+// True if a subscriber cancelled the teleport.
+pub fn sup_post_pre_teleport(p: &ServerPlayer, category: String, label: String, target: &NamedLocationHc) -> Bool {
+    let pre = SupPreEvent::new(p, category, label, target);
+    SupForge::EVENT_BUS.post(pre as SupEvent);
+    return pre.isCanceled();
+}
+
+pub fn sup_post_post_teleport(p: &ServerPlayer, category: String, label: String) {
+    SupForge::EVENT_BUS.post(SupPostEvent::new(p, category, label) as SupEvent);
+}
+
+// ---- sorted name lists (warps / kits) and kit cooldown math ----
+
+// Splits `s` on newlines.
+fn sup_lines(s: String) -> [String] {
+    if s == "" { return [""; 0]; }
+    var count = 1;
+    var scan = s;
+    var more = true;
+    while more {
+        let cut = scan.indexOf("\n");
+        if cut < 0 {
+            more = false;
+        } else {
+            count = count + 1;
+            scan = scan.substring(cut + 1, scan.length());
+        }
+    }
+    var out = [""; count];
+    var rest = s;
+    var i = 0;
+    while i < count {
+        let cut = rest.indexOf("\n");
+        if cut < 0 {
+            out[i] = rest;
+        } else {
+            out[i] = rest.substring(0, cut);
+            rest = rest.substring(cut + 1, rest.length());
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+// Comma-joined, sorted by `String.compareTo` (what `names.sort(String::compareTo)` did).
+fn sup_sorted_csv(newline_names: String) -> String {
+    let names = sup_lines(newline_names);
+    var i = 1;
+    while i < names.length {
+        let cur = names[i];
+        var j = i - 1;
+        while j >= 0 && (names[j] as PermStr).compareTo(cur) > 0 {
+            names[j + 1] = names[j];
+            j = j - 1;
+        }
+        names[j + 1] = cur;
+        i = i + 1;
+    }
+    var out = "";
+    var k = 0;
+    while k < names.length {
+        let n = names[k];
+        if k == 0 { out = n; } else { out = "{out},{n}"; }
+        k = k + 1;
+    }
+    return out;
+}
+
+pub fn sup_warp_names_csv() -> String {
+    return sup_sorted_csv(dr_warp_names());
+}
+
+pub fn sup_kit_names_csv() -> String {
+    return sup_sorted_csv(dr_kit_names());
+}
+
+fn sup_kit_key(name: String) -> String {
+    return (name as PermStr).toLowerCase();
+}
+
+pub fn sup_kit_exists(name: String) -> Bool {
+    return dr_kit_exists(sup_kit_key(name)) == 1;
+}
+
+// Seconds left on `kit` for this player (0 = ready or unknown kit), rounded up.
+fn sup_kit_remaining(data: &EssentialsPlayerDataHc, key: String, display_name: String) -> Int {
+    let last = (data as SupKitData).getKitLastClaimedMs(display_name);
+    if last <= 0L { return 0; }
+    let remaining_ms = (dr_kit_cooldown(key) as Long) * 1000L - (sup_now_ms() - last);
+    if remaining_ms <= 0L { return 0; }
+    return ((remaining_ms + 999L) / 1000L) as Int;
+}
+
+pub fn sup_kit_cooldown_remaining(data: &EssentialsPlayerDataHc, name: String) -> Int {
+    let key = sup_kit_key(name);
+    if dr_kit_exists(key) == 0 { return 0; }
+    // `KitRegistry.get(name)` is by lower-cased key; the claim stamp is stored under the typed `name`.
+    return sup_kit_remaining(data, key, name);
+}
+
+// "name:secs,name:secs" for every kit, sorted by name ignoring case -- the kits sync payload.
+pub fn sup_kit_sync_csv(player: &ServerPlayer) -> String {
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data_obj = opt.orElse(null);
+    let keys = sup_lines(dr_kit_names());
+    var names = [""; keys.length];
+    var secs = [0; keys.length];
+    var i = 0;
+    while i < keys.length {
+        let display = dr_kit_name(keys[i]);
+        names[i] = display;
+        if data_obj != null {
+            secs[i] = sup_kit_remaining(&(data_obj as EssentialsPlayerDataHc), keys[i], display);
+        }
+        i = i + 1;
+    }
+    // stable insertion sort, ignoring case
+    var a = 1;
+    while a < names.length {
+        let cur_name = names[a];
+        let cur_secs = secs[a];
+        var j = a - 1;
+        while j >= 0 && (names[j] as PermStr).compareToIgnoreCase(cur_name) > 0 {
+            names[j + 1] = names[j];
+            secs[j + 1] = secs[j];
+            j = j - 1;
+        }
+        names[j + 1] = cur_name;
+        secs[j + 1] = cur_secs;
+        a = a + 1;
+    }
+    var out = "";
+    var k = 0;
+    while k < names.length {
+        let n = names[k];
+        let s = secs[k];
+        if k == 0 { out = "{n}:{s}"; } else { out = "{out},{n}:{s}"; }
+        k = k + 1;
+    }
+    return out;
+}
