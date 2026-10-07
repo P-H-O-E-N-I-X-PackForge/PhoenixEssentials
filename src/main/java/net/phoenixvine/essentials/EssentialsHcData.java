@@ -43,6 +43,28 @@ public final class EssentialsHcData {
         }
     }
 
+    private static final Path ROOT = Paths.get("config");
+
+    /** File contents directly under {@code config/} (e.g. the client settings file), or null. */
+    public static String readRootFile(String name) {
+        try {
+            Path p = ROOT.resolve(name);
+            return Files.exists(p) ? Files.readString(p) : null;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static void writeRootFile(String name, String content) {
+        try {
+            Files.createDirectories(ROOT);
+            Files.writeString(ROOT.resolve(name), content);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public static NamedLocation makeLocation(String dim, double x, double y, double z, float yaw, float pitch) {
         ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(dim));
         return new NamedLocation(key, x, y, z, yaw, pitch);

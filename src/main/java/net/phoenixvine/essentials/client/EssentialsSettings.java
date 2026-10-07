@@ -22,6 +22,11 @@ public class EssentialsSettings {
     }
 
     public static EssentialsSettings load() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_settings_load();
+            if (INSTANCE == null) INSTANCE = new EssentialsSettings();
+            return INSTANCE;
+        }
         EssentialsSettings result;
         try {
             if (Files.exists(SETTINGS_FILE)) {
@@ -40,6 +45,11 @@ public class EssentialsSettings {
     }
 
     public void save() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_settings_save();
+            INSTANCE = this;
+            return;
+        }
         try {
             Files.createDirectories(SETTINGS_FILE.getParent());
             Files.writeString(SETTINGS_FILE, GSON.toJson(this));
@@ -50,10 +60,15 @@ public class EssentialsSettings {
     }
 
     public boolean isShowAfkOverlay() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.dr_settings_show_afk() != 0;
         return showAfkOverlay;
     }
 
     public void setShowAfkOverlay(boolean v) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_settings_set_show_afk(v ? 1 : 0);
+            return;
+        }
         showAfkOverlay = v;
     }
 }

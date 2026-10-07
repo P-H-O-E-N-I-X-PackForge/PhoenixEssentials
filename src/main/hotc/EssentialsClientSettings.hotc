@@ -1,0 +1,87 @@
+// --- HC port of EssentialsSettings (client settings file) + EssentialsSuiteBarButton's cycling logic ---
+//
+// `EssentialsSettings.java` / `EssentialsSuiteBarButton.java` stay as FACADES (the config screens,
+// the AFK overlay and the suite-bar registration in `EssentialsClientProxy` keep calling them); in
+// takeover mode they delegate here. Settings are `config/phoenix_essentials_settings.json`
+// (`{ "showAfkOverlay": true }`, the shape Gson wrote) read/written with the same tiny JSON reader as
+// the data registries. The suite-bar part is the pure decision logic (next gamemode / weather
+// state / time-of-day); the Java side still supplies the live `Minecraft` inputs and sends the commands.
+
+extern class EssentialsHcDataRootHc = "net.phoenixvine.essentials.EssentialsHcData" {
+    static fn readRootFile(name: String) -> String?;
+    static fn writeRootFile(name: String, content: String);
+}
+
+static cs_show_afk: Bool = true;
+static cs_loaded: Bool = false;
+
+pub fn dr_settings_load() {
+    cs_loaded = true;
+    cs_show_afk = true;
+    let raw = EssentialsHcDataRootHc::readRootFile("phoenix_essentials_settings.json");
+    if raw != null {
+        js_parse(raw);
+        var i = 0;
+        while i < js_cells.length {
+            let cell = js_cells[i];
+            if cell.entry == "" && cell.name == "showAfkOverlay" {
+                cs_show_afk = cell.value == "true";
+            }
+            i = i + 1;
+        }
+    }
+}
+
+pub fn dr_settings_show_afk() -> Int {
+    if !cs_loaded { dr_settings_load(); }
+    if cs_show_afk { return 1; }
+    return 0;
+}
+
+pub fn dr_settings_set_show_afk(v: Int) {
+    if !cs_loaded { dr_settings_load(); }
+    cs_show_afk = v != 0;
+}
+
+pub fn dr_settings_save() {
+    let q = js_q();
+    let lb = js_lb();
+    let rb = js_rb();
+    var v = "false";
+    if cs_show_afk { v = "true"; }
+    EssentialsHcDataRootHc::writeRootFile("phoenix_essentials_settings.json", "{lb}\n  {q}showAfkOverlay{q}: {v}\n{rb}");
+}
+
+// ---------- suite bar ----------
+
+// survival -> creative -> adventure -> spectator -> survival
+pub fn sb_next_gamemode(current: String) -> String {
+    if current == "survival" { return "creative"; }
+    if current == "creative" { return "adventure"; }
+    if current == "adventure" { return "spectator"; }
+    return "survival";
+}
+
+// weather state: 0 clear, 1 rain, 2 thunder. `cur` is -1 until first use; `seed` is the live
+// weather (0/1/2) used to initialise it. Returns the NEW state.
+pub fn sb_next_weather_state(cur: Int, seed: Int) -> Int {
+    var s = cur;
+    if s == -1 { s = seed; }
+    return (s + 1) % 3;
+}
+
+pub fn sb_weather_command(cur: Int) -> String {
+    if cur == 1 { return "weather rain"; }
+    if cur == 2 { return "weather thunder"; }
+    return "weather clear";
+}
+
+// `day_time` is the level's raw day time; `has_level` is 0 with no level loaded.
+pub fn sb_next_time(day_time: Long, has_level: Int) -> String {
+    if has_level == 0 { return "day"; }
+    let tod = day_time % 24000L;
+    if tod < 1000L { return "noon"; }
+    if tod < 6000L { return "night"; }
+    if tod < 13000L { return "midnight"; }
+    return "day";
+}

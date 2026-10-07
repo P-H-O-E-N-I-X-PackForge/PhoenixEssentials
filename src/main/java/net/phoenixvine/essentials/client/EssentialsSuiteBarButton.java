@@ -14,6 +14,7 @@ public final class EssentialsSuiteBarButton {
 
     public static GameType nextGameMode(Minecraft mc) {
         GameType current = mc.gameMode != null ? mc.gameMode.getPlayerMode() : GameType.SURVIVAL;
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return GameType.byName(net.phoenixvine.essentials.hc.hcCompileMerged1.sb_next_gamemode(current.getName()));
         return switch (current) {
             case SURVIVAL -> GameType.CREATIVE;
             case CREATIVE -> GameType.ADVENTURE;
@@ -33,6 +34,12 @@ public final class EssentialsSuiteBarButton {
             else weatherState = 0;
         }
 
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            weatherState = net.phoenixvine.essentials.hc.hcCompileMerged1.sb_next_weather_state(weatherState, 0);
+            mc.player.connection.sendCommand(net.phoenixvine.essentials.hc.hcCompileMerged1.sb_weather_command(weatherState));
+            return;
+        }
+
         weatherState = (weatherState + 1) % 3;
 
         String cmd = switch (weatherState) {
@@ -45,6 +52,7 @@ public final class EssentialsSuiteBarButton {
     }
 
     public static String nextTime(Minecraft mc) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.sb_next_time(mc.level == null ? 0L : mc.level.getDayTime(), mc.level == null ? 0 : 1);
         if (mc.level == null) return "day";
         long tod = mc.level.getDayTime() % 24000L;
         if (tod < 1000L) return "noon";

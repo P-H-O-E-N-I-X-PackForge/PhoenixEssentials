@@ -51,6 +51,7 @@ config button and the suite-bar button.
 | `EssentialsTeleportExecutor.hotc` | `TeleportExecutor` -- warmup/cooldown/cancel-on-move/cancel-on-damage state machine; the Java class is a facade that delegates here in takeover |
 | `EssentialsDataRegistries.hotc` | `WarpRegistry` / `SpawnRegistry` / `OfflinePlayerIndex` -- HC stores + hand-written JSON codec over the same `config/phoenix_essentials/*.json` files (Java classes are facades; shim `EssentialsHcData.java` does file IO + `NamedLocation` access). |
 | `EssentialsKitRegistry.hotc` | `KitRegistry` -- HC kit store + `kits.json` codec (reuses the registries' JSON reader, extended for nested arrays); `KitRegistry.java` builds `KitDefinition` POJOs from scalar accessors |
+| `EssentialsClientSettings.hotc` | `EssentialsSettings` (client settings JSON) + `EssentialsSuiteBarButton`'s gamemode/weather/time cycling logic; the Java classes are facades (`EssentialsKeyBindings` and `EssentialsClientProxy` stay Java) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
 
