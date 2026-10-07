@@ -1,0 +1,107 @@
+// --- HC port of EssentialsAutoTrashEvents ---
+//
+// Two Forge listeners (registered from commonSetup in takeover mode via `register_autotrash_events`;
+// the Java class's `@SubscribeEvent` handlers early-return then):
+//   * pickup  -- an item whose registry id is on the player's always-trash list is cancelled and
+//                discarded instead of entering the inventory;
+//   * sweep   -- every 10 ticks, any such item already in the main inventory (slots 0-35) or the
+//                offhand (slot 40) is removed.
+// The list itself (`PlayerEssentialsData.alwaysTrash`, a `Set<ResourceLocation>`) stays Java; HC asks it
+// `hasAlwaysTrash()` / `isAlwaysTrash(id)`.
+
+extern class AtItemEntityHc = "net.minecraft.world.entity.item.ItemEntity" {
+    fn getItem(&self) -> ItemStack;
+    fn discard(&self);
+}
+
+extern class AtPickupEventHc = "net.minecraftforge.event.entity.player.EntityItemPickupEvent" {
+    fn getEntity(&self) -> Player;
+    fn getItem(&self) -> AtItemEntityHc;
+    fn setCanceled(&self, canceled: Bool);
+}
+
+extern class AtInventoryHc = "net.minecraft.world.entity.player.Inventory" {
+    fn getItem(&self, slot: Int) -> ItemStack;
+    fn setItem(&self, slot: Int, stack: ItemStack);
+    fn setChanged(&self);
+}
+
+extern class AtPlayerHc = "net.minecraft.world.entity.player.Player" {
+    fn getInventory(&self) -> AtInventoryHc;
+    fn getCapability(&self, cap: CapabilityHc) -> LazyOptionalHc;
+}
+
+extern class AtServerPlayerHc = "net.minecraft.server.level.ServerPlayer" {
+    tickCount: Int;
+}
+
+extern class AtItemStackHc = "net.minecraft.world.item.ItemStack" {
+    static EMPTY: ItemStack;
+}
+
+fn at_player_data(player: &Player) -> EssentialsPlayerDataHc {
+    let opt = (player as AtPlayerHc).getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data = opt.orElse(null);
+    if data == null { return null; }
+    return data as EssentialsPlayerDataHc;
+}
+
+fn at_item_id(stack: &ItemStack) -> ResourceLocation {
+    return ForgeRegistriesItem::ITEMS.getKey(stack.getItem() as JObjectItem);
+}
+
+fn at_on_pickup(e: JObjectEvent) {
+    let ev = e as AtPickupEventHc;
+    let player = ev.getEntity();
+    let data = at_player_data(&player);
+    if data == null { return; }
+    if !data.hasAlwaysTrash() { return; }
+    let entity = ev.getItem();
+    let stack = entity.getItem();
+    let id = at_item_id(&stack);
+    if id == null { return; }
+    if !data.isAlwaysTrash(id) { return; }
+    ev.setCanceled(true);
+    entity.discard();
+}
+
+// Returns true if slot `slot` held an always-trashed item and was cleared.
+fn at_sweep_slot(inv: &AtInventoryHc, data: &EssentialsPlayerDataHc, slot: Int) -> Bool {
+    let stack = inv.getItem(slot);
+    if stack.isEmpty() { return false; }
+    let id = at_item_id(&stack);
+    if id == null { return false; }
+    if !data.isAlwaysTrash(id) { return false; }
+    inv.setItem(slot, AtItemStackHc::EMPTY);
+    return true;
+}
+
+fn at_on_player_tick(e: JObjectEvent) {
+    let ev = e as PlayerTickEventHc;
+    if ev.phase != TickPhaseHc::END { return; }
+    let who = ev.player;
+    if !(who is ServerPlayer) { return; }
+    if (who as AtServerPlayerHc).tickCount % 10 != 0 { return; }
+    let data = at_player_data(&who);
+    if data == null { return; }
+    if !data.hasAlwaysTrash() { return; }
+    let inv = (who as AtPlayerHc).getInventory();
+    var changed = false;
+    var slot = 0;
+    while slot < 36 {
+        if at_sweep_slot(&inv, &data, slot) { changed = true; }
+        slot = slot + 1;
+    }
+    if at_sweep_slot(&inv, &data, 40) { changed = true; }
+    if changed { inv.setChanged(); }
+}
+
+pub fn register_autotrash_events() {
+    let bus = MinecraftForgeHc::EVENT_BUS;
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.entity.player.EntityItemPickupEvent") as JClassNet,
+        |e| { at_on_pickup(e); });
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.TickEvent$PlayerTickEvent") as JClassNet,
+        |e| { at_on_player_tick(e); });
+}

@@ -80,6 +80,8 @@ extern class EssentialsPlayerDataHc = "net.phoenixvine.essentials.capability.Pla
     
     fn toggleAlwaysTrash(&self, id: ResourceLocation) -> Bool;
     fn removeAlwaysTrash(&self, id: ResourceLocation);
+    fn hasAlwaysTrash(&self) -> Bool;
+    fn isAlwaysTrash(&self, id: ResourceLocation) -> Bool;
 }
 
 extern class NamedLocationHc = "net.phoenixvine.essentials.data.NamedLocation" {

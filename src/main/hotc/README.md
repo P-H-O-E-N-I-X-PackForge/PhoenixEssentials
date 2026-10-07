@@ -52,6 +52,7 @@ config button and the suite-bar button.
 | `EssentialsDataRegistries.hotc` | `WarpRegistry` / `SpawnRegistry` / `OfflinePlayerIndex` -- HC stores + hand-written JSON codec over the same `config/phoenix_essentials/*.json` files (Java classes are facades; shim `EssentialsHcData.java` does file IO + `NamedLocation` access). |
 | `EssentialsKitRegistry.hotc` | `KitRegistry` -- HC kit store + `kits.json` codec (reuses the registries' JSON reader, extended for nested arrays); `KitRegistry.java` builds `KitDefinition` POJOs from scalar accessors |
 | `EssentialsClientSettings.hotc` | `EssentialsSettings` (client settings JSON) + `EssentialsSuiteBarButton`'s gamemode/weather/time cycling logic; the Java classes are facades (`EssentialsKeyBindings` and `EssentialsClientProxy` stay Java) |
+| `EssentialsAutoTrash.hotc` | `EssentialsAutoTrashEvents` -- item-pickup cancel + 10-tick inventory sweep for always-trash items (Java handlers early-return in takeover) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
 
@@ -64,7 +65,7 @@ config button and the suite-bar button.
 * `/hctpx` deliberately improves on the original: it force-loads the target chunk (the original
   drops you into the void) and scans for floor in ceilinged dimensions like the Nether.
 * `/hcplayerinfo` is plain text (no section-sign colors).
-* `/sethomelimit`, auto-AFK detection, `EssentialsAutoTrashEvents`, the
+* `/sethomelimit`, auto-AFK detection, the
   remaining systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
   sync the flag to the client) and doesn't resync on login.
 

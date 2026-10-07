@@ -58,6 +58,7 @@ public class PhoenixEssentials {
             if (EssentialsHcMode.takeover()) {
                 hcCompileMerged1.register_player_events();
                 hcCompileMerged1.register_teleport_events();
+                hcCompileMerged1.register_autotrash_events();
             }
         });
     }

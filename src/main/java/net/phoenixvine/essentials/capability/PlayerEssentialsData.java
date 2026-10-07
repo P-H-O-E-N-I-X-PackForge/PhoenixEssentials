@@ -106,6 +106,11 @@ public class PlayerEssentialsData {
         return alwaysTrash;
     }
 
+    /** True when at least one item is on the always-trash list (the HC auto-trash events' fast path). */
+    public boolean hasAlwaysTrash() {
+        return !alwaysTrash.isEmpty();
+    }
+
     public boolean isAlwaysTrash(ResourceLocation id) {
         return alwaysTrash.contains(id);
     }

@@ -19,6 +19,7 @@ public final class EssentialsAutoTrashEvents {
 
     @SubscribeEvent
     public static void onItemPickup(EntityItemPickupEvent event) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return; // HC port: EssentialsAutoTrash.hotc
         Player player = event.getEntity();
         PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
                 .orElse(null);
@@ -35,6 +36,7 @@ public final class EssentialsAutoTrashEvents {
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return; // HC port: EssentialsAutoTrash.hotc
         if (event.phase != TickEvent.Phase.END) return;
         if (!(event.player instanceof ServerPlayer player)) return;
         if (player.tickCount % SWEEP_INTERVAL_TICKS != 0) return;
