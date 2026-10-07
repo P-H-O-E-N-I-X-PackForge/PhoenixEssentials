@@ -1,0 +1,531 @@
+// --- HC port of WarpRegistry / SpawnRegistry / OfflinePlayerIndex (the JSON-backed data stores) ---
+//
+// The Java classes stay as FACADES with their original public API (the Java commands, packets,
+// `EssentialsAPI` and the shims keep calling `WarpRegistry.get(...)` etc.); in takeover mode they
+// delegate to the `dr_*` functions below, so the stores, lookups, ordering and JSON codec are HC.
+// Both implementations read/write the SAME files under `config/phoenix_essentials/`
+// (`warps.json`, `spawn.json`, `player_index.json`) in the same shape Gson wrote, so switching
+// `-Dphoenix_essentials.use_java=true` on and off loses nothing.
+//
+// There's no JSON binding in hotc-mc, so this file has a tiny hand-written reader for the one shape
+// these three files use -- an object whose members are scalars or one-level nested objects of
+// scalars -- flattened into `JsCell { entry, name, value }` rows (a top-level scalar has entry "").
+// Disclosed shim: `EssentialsHcData.java` (config-file text IO + `NamedLocation` construction and
+// field access, since `NamedLocation` carries a `ResourceKey`).
+// NOT ported here: `KitRegistry` (its `KitDefinition`/`KitItemEntry` item+NBT model is used all over
+// the Java side) -- still Java.
+
+extern class EssentialsHcDataHc = "net.phoenixvine.essentials.EssentialsHcData" {
+    static fn readFile(name: String) -> String?;
+    static fn writeFile(name: String, content: String);
+    static fn makeLocation(dim: String, x: Double, y: Double, z: Double, yaw: Float, pitch: Float) -> NamedLocationHc;
+    static fn dim(l: &NamedLocationHc) -> String;
+    static fn x(l: &NamedLocationHc) -> Double;
+    static fn y(l: &NamedLocationHc) -> Double;
+    static fn z(l: &NamedLocationHc) -> Double;
+    static fn yaw(l: &NamedLocationHc) -> Float;
+    static fn pitch(l: &NamedLocationHc) -> Float;
+}
+
+extern class DrChar = "java.lang.Character" {
+    static fn toString(cp: Int) -> String;
+}
+extern class DrInt = "java.lang.Integer" {
+    static fn parseInt(s: String, radix: Int) -> Int;
+}
+extern class DrLong = "java.lang.Long" {
+    static fn parseLong(s: String, radix: Int) -> Long;
+}
+extern class DrDouble = "java.lang.Double" {
+    static fn parseDouble(s: String) -> Double;
+}
+extern class DrFloat = "java.lang.Float" {
+    static fn parseFloat(s: String) -> Float;
+}
+
+// ---------- tiny JSON reader / writer helpers ----------
+
+struct JsCell {
+    entry: String,
+    name: String,
+    value: String,
+}
+
+static js_src: String = "";
+static js_i: Int = 0;
+static js_cells: [JsCell] = [JsCell { entry: "", name: "", value: "" }; 0];
+
+fn js_q() -> String { return DrChar::toString(34); }
+fn js_lb() -> String { return DrChar::toString(123); }
+fn js_rb() -> String { return DrChar::toString(125); }
+
+fn js_push(entry: String, name: String, value: String) {
+    var out = [JsCell { entry: "", name: "", value: "" }; js_cells.length + 1];
+    var i = 0;
+    while i < js_cells.length {
+        out[i] = js_cells[i];
+        i = i + 1;
+    }
+    out[js_cells.length] = JsCell { entry: entry, name: name, value: value };
+    js_cells = out;
+}
+
+fn js_skip_ws() {
+    while js_i < js_src.length() && js_src.codePointAt(js_i) <= 32 {
+        js_i = js_i + 1;
+    }
+}
+
+// Cursor sits on the opening quote; leaves it just past the closing one.
+fn js_read_string() -> String {
+    js_i = js_i + 1;
+    var out = "";
+    var done = false;
+    while !done && js_i < js_src.length() {
+        let c = js_src.codePointAt(js_i);
+        if c == 34 {
+            done = true;
+            js_i = js_i + 1;
+        } else {
+            if c == 92 && js_i + 1 < js_src.length() {
+                let n = js_src.codePointAt(js_i + 1);
+                if n == 117 && js_i + 5 < js_src.length() {
+                    let cp = DrInt::parseInt(js_src.substring(js_i + 2, js_i + 6), 16);
+                    let ch = DrChar::toString(cp);
+                    out = "{out}{ch}";
+                    js_i = js_i + 6;
+                } else {
+                    var m = n;
+                    if n == 110 { m = 10; }
+                    if n == 116 { m = 9; }
+                    if n == 114 { m = 13; }
+                    let ch = DrChar::toString(m);
+                    out = "{out}{ch}";
+                    js_i = js_i + 2;
+                }
+            } else {
+                let ch = DrChar::toString(c);
+                out = "{out}{ch}";
+                js_i = js_i + 1;
+            }
+        }
+    }
+    return out;
+}
+
+// Cursor is just past an opening `{`; consumes through the matching `}`.
+fn js_parse_members(entry: String) {
+    var running = true;
+    while running {
+        js_skip_ws();
+        if js_i >= js_src.length() {
+            running = false;
+        } else {
+            let c = js_src.codePointAt(js_i);
+            if c == 125 {
+                js_i = js_i + 1;
+                running = false;
+            } else {
+                if c != 34 {
+                    js_i = js_i + 1;
+                } else {
+                    let key = js_read_string();
+                    js_skip_ws();
+                    if js_i < js_src.length() && js_src.codePointAt(js_i) == 58 { js_i = js_i + 1; }
+                    js_skip_ws();
+                    if js_i < js_src.length() {
+                        let v = js_src.codePointAt(js_i);
+                        if v == 123 {
+                            js_i = js_i + 1;
+                            js_parse_members(key);
+                        } else {
+                            if v == 34 {
+                                let val = js_read_string();
+                                js_push(entry, key, val);
+                            } else {
+                                let start = js_i;
+                                while js_i < js_src.length() && js_src.codePointAt(js_i) > 32 && js_src.codePointAt(js_i) != 44 && js_src.codePointAt(js_i) != 125 {
+                                    js_i = js_i + 1;
+                                }
+                                js_push(entry, key, js_src.substring(start, js_i));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn js_parse(text: String) {
+    js_src = text;
+    js_i = 0;
+    js_cells = [JsCell { entry: "", name: "", value: "" }; 0];
+    js_skip_ws();
+    if js_i < js_src.length() && js_src.codePointAt(js_i) == 123 {
+        js_i = js_i + 1;
+        js_parse_members("");
+    }
+}
+
+fn js_escape(s: String) -> String {
+    var out = "";
+    var i = 0;
+    while i < s.length() {
+        let c = s.codePointAt(i);
+        if c == 34 || c == 92 {
+            let b = DrChar::toString(92);
+            let ch = DrChar::toString(c);
+            out = "{out}{b}{ch}";
+        } else {
+            if c == 10 {
+                let b = DrChar::toString(92);
+                out = "{out}{b}n";
+            } else {
+                let ch = DrChar::toString(c);
+                out = "{out}{ch}";
+            }
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+fn dr_read(file: String) -> String {
+    let raw = EssentialsHcDataHc::readFile(file);
+    var text = "";
+    if raw != null { text = raw; }
+    return text;
+}
+
+// ---------- location rows (warps + spawn) ----------
+
+struct LocRow {
+    name: String,
+    dim: String,
+    x: Double,
+    y: Double,
+    z: Double,
+    yaw: Float,
+    pitch: Float,
+}
+
+fn dr_blank_loc(name: String) -> LocRow {
+    return LocRow { name: name, dim: "minecraft:overworld", x: 0.0, y: 0.0, z: 0.0, yaw: 0.0f, pitch: 0.0f };
+}
+
+fn dr_apply_field(row: LocRow, field: String, value: String) -> LocRow {
+    var r = row;
+    if field == "dimension" { r = LocRow { name: r.name, dim: value, x: r.x, y: r.y, z: r.z, yaw: r.yaw, pitch: r.pitch }; }
+    if field == "x" { r = LocRow { name: r.name, dim: r.dim, x: DrDouble::parseDouble(value), y: r.y, z: r.z, yaw: r.yaw, pitch: r.pitch }; }
+    if field == "y" { r = LocRow { name: r.name, dim: r.dim, x: r.x, y: DrDouble::parseDouble(value), z: r.z, yaw: r.yaw, pitch: r.pitch }; }
+    if field == "z" { r = LocRow { name: r.name, dim: r.dim, x: r.x, y: r.y, z: DrDouble::parseDouble(value), yaw: r.yaw, pitch: r.pitch }; }
+    if field == "yaw" { r = LocRow { name: r.name, dim: r.dim, x: r.x, y: r.y, z: r.z, yaw: DrFloat::parseFloat(value), pitch: r.pitch }; }
+    if field == "pitch" { r = LocRow { name: r.name, dim: r.dim, x: r.x, y: r.y, z: r.z, yaw: r.yaw, pitch: DrFloat::parseFloat(value) }; }
+    return r;
+}
+
+fn dr_row_from_loc(name: String, loc: &NamedLocationHc) -> LocRow {
+    return LocRow {
+        name: name,
+        dim: EssentialsHcDataHc::dim(loc),
+        x: EssentialsHcDataHc::x(loc),
+        y: EssentialsHcDataHc::y(loc),
+        z: EssentialsHcDataHc::z(loc),
+        yaw: EssentialsHcDataHc::yaw(loc),
+        pitch: EssentialsHcDataHc::pitch(loc),
+    };
+}
+
+fn dr_loc_from_row(row: &LocRow) -> NamedLocationHc {
+    return EssentialsHcDataHc::makeLocation(row.dim, row.x, row.y, row.z, row.yaw, row.pitch);
+}
+
+// Parses `text` into rows, one per nested entry (or a single "" row for a flat top-level object).
+fn dr_parse_loc_rows(text: String) -> [LocRow] {
+    js_parse(text);
+    var rows = [dr_blank_loc(""); js_cells.length];
+    var n = 0;
+    var cur = "";
+    var have = false;
+    var row = dr_blank_loc("");
+    var i = 0;
+    while i < js_cells.length {
+        let cell = js_cells[i];
+        if !have || cell.entry != cur {
+            if have {
+                rows[n] = row;
+                n = n + 1;
+            }
+            cur = cell.entry;
+            row = dr_blank_loc(cell.entry);
+            have = true;
+        }
+        row = dr_apply_field(row, cell.name, cell.value);
+        i = i + 1;
+    }
+    if have {
+        rows[n] = row;
+        n = n + 1;
+    }
+    var out = [dr_blank_loc(""); n];
+    var k = 0;
+    while k < n {
+        out[k] = rows[k];
+        k = k + 1;
+    }
+    return out;
+}
+
+// One location object's members at `ind` indentation (no braces), Gson pretty-print style.
+fn dr_loc_fields(row: &LocRow, ind: String) -> String {
+    let q = js_q();
+    let d = js_escape(row.dim);
+    return "{ind}{q}dimension{q}: {q}{d}{q},\n{ind}{q}x{q}: {row.x},\n{ind}{q}y{q}: {row.y},\n{ind}{q}z{q}: {row.z},\n{ind}{q}yaw{q}: {row.yaw},\n{ind}{q}pitch{q}: {row.pitch}\n";
+}
+
+// ---------- warps ----------
+
+static dr_warps: [LocRow] = [dr_blank_loc(""); 0];
+
+fn dr_warp_find(name: String) -> Int {
+    var i = 0;
+    while i < dr_warps.length {
+        if dr_warps[i].name == name { return i; }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn dr_warp_save() {
+    let q = js_q();
+    let lb = js_lb();
+    let rb = js_rb();
+    if dr_warps.length == 0 {
+        EssentialsHcDataHc::writeFile("warps.json", "{lb}{rb}");
+        return;
+    }
+    var out = "{lb}\n";
+    var i = 0;
+    while i < dr_warps.length {
+        let row = dr_warps[i];
+        let nm = js_escape(row.name);
+        let body = dr_loc_fields(&row, "    ");
+        var comma = "";
+        if i + 1 < dr_warps.length { comma = ","; }
+        out = "{out}  {q}{nm}{q}: {lb}\n{body}  {rb}{comma}\n";
+        i = i + 1;
+    }
+    out = "{out}{rb}";
+    EssentialsHcDataHc::writeFile("warps.json", out);
+}
+
+pub fn dr_warp_load() {
+    dr_warps = dr_parse_loc_rows(dr_read("warps.json"));
+}
+
+pub fn dr_warp_get(name: String) -> NamedLocationHc? {
+    let i = dr_warp_find(name);
+    if i < 0 { return null; }
+    let row = dr_warps[i];
+    return dr_loc_from_row(&row);
+}
+
+pub fn dr_warp_set(name: String, loc: NamedLocationHc) {
+    let row = dr_row_from_loc(name, &loc);
+    let i = dr_warp_find(name);
+    if i >= 0 {
+        dr_warps[i] = row;
+    } else {
+        var out = [dr_blank_loc(""); dr_warps.length + 1];
+        var k = 0;
+        while k < dr_warps.length {
+            out[k] = dr_warps[k];
+            k = k + 1;
+        }
+        out[dr_warps.length] = row;
+        dr_warps = out;
+    }
+    dr_warp_save();
+}
+
+// 1 if a warp was removed, else 0.
+pub fn dr_warp_remove(name: String) -> Int {
+    let idx = dr_warp_find(name);
+    if idx < 0 { return 0; }
+    var out = [dr_blank_loc(""); dr_warps.length - 1];
+    var w = 0;
+    var k = 0;
+    while k < dr_warps.length {
+        if k != idx {
+            out[w] = dr_warps[k];
+            w = w + 1;
+        }
+        k = k + 1;
+    }
+    dr_warps = out;
+    dr_warp_save();
+    return 1;
+}
+
+// Names in insertion order, newline-separated ("" when empty).
+pub fn dr_warp_names() -> String {
+    var out = "";
+    var i = 0;
+    while i < dr_warps.length {
+        if i > 0 { out = "{out}\n"; }
+        let nm = dr_warps[i].name;
+        out = "{out}{nm}";
+        i = i + 1;
+    }
+    return out;
+}
+
+// ---------- spawn ----------
+
+static dr_spawn: [LocRow] = [dr_blank_loc(""); 0];
+
+pub fn dr_spawn_load() {
+    dr_spawn = [dr_blank_loc(""); 0];
+    let rows = dr_parse_loc_rows(dr_read("spawn.json"));
+    if rows.length > 0 {
+        let first = rows[0];
+        if first.name == "" {
+            dr_spawn = [first];
+        }
+    }
+}
+
+pub fn dr_spawn_get() -> NamedLocationHc? {
+    if dr_spawn.length == 0 { return null; }
+    let row = dr_spawn[0];
+    return dr_loc_from_row(&row);
+}
+
+pub fn dr_spawn_set(loc: NamedLocationHc) {
+    let row = dr_row_from_loc("", &loc);
+    dr_spawn = [row];
+    let lb = js_lb();
+    let rb = js_rb();
+    let body = dr_loc_fields(&row, "  ");
+    EssentialsHcDataHc::writeFile("spawn.json", "{lb}\n{body}{rb}");
+}
+
+// ---------- offline player index ----------
+
+struct IdxRow {
+    uuid: String,
+    last_seen: Long,
+    name: String,
+}
+
+static dr_index: [IdxRow] = [IdxRow { uuid: "", last_seen: 0L, name: "" }; 0];
+static dr_index_loaded: Bool = false;
+
+fn dr_index_load() {
+    dr_index_loaded = true;
+    js_parse(dr_read("player_index.json"));
+    var rows = [IdxRow { uuid: "", last_seen: 0L, name: "" }; js_cells.length];
+    var n = 0;
+    var cur = "";
+    var have = false;
+    var row = IdxRow { uuid: "", last_seen: 0L, name: "" };
+    var i = 0;
+    while i < js_cells.length {
+        let cell = js_cells[i];
+        if cell.entry != "" {
+            if !have || cell.entry != cur {
+                if have {
+                    rows[n] = row;
+                    n = n + 1;
+                }
+                cur = cell.entry;
+                row = IdxRow { uuid: cell.entry, last_seen: 0L, name: "" };
+                have = true;
+            }
+            if cell.name == "lastSeenMs" { row = IdxRow { uuid: row.uuid, last_seen: DrLong::parseLong(cell.value, 10), name: row.name }; }
+            if cell.name == "lastKnownName" { row = IdxRow { uuid: row.uuid, last_seen: row.last_seen, name: cell.value }; }
+        }
+        i = i + 1;
+    }
+    if have {
+        rows[n] = row;
+        n = n + 1;
+    }
+    var out = [IdxRow { uuid: "", last_seen: 0L, name: "" }; n];
+    var k = 0;
+    while k < n {
+        out[k] = rows[k];
+        k = k + 1;
+    }
+    dr_index = out;
+}
+
+fn dr_index_ensure() {
+    if !dr_index_loaded { dr_index_load(); }
+}
+
+fn dr_index_find(uuid: String) -> Int {
+    var i = 0;
+    while i < dr_index.length {
+        if dr_index[i].uuid == uuid { return i; }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn dr_index_save() {
+    let q = js_q();
+    let lb = js_lb();
+    let rb = js_rb();
+    if dr_index.length == 0 {
+        EssentialsHcDataHc::writeFile("player_index.json", "{lb}{rb}");
+        return;
+    }
+    var out = "{lb}\n";
+    var i = 0;
+    while i < dr_index.length {
+        let row = dr_index[i];
+        let nm = js_escape(row.name);
+        var comma = "";
+        if i + 1 < dr_index.length { comma = ","; }
+        out = "{out}  {q}{row.uuid}{q}: {lb}\n    {q}lastSeenMs{q}: {row.last_seen},\n    {q}lastKnownName{q}: {q}{nm}{q}\n  {rb}{comma}\n";
+        i = i + 1;
+    }
+    out = "{out}{rb}";
+    EssentialsHcDataHc::writeFile("player_index.json", out);
+}
+
+// Last-seen epoch millis for `uuid`, or -1 when never recorded.
+pub fn dr_idx_seen(uuid: String) -> Long {
+    dr_index_ensure();
+    let i = dr_index_find(uuid);
+    if i < 0 { return -1L; }
+    return dr_index[i].last_seen;
+}
+
+pub fn dr_idx_name(uuid: String) -> String {
+    dr_index_ensure();
+    let i = dr_index_find(uuid);
+    if i < 0 { return ""; }
+    return dr_index[i].name;
+}
+
+pub fn dr_idx_record(uuid: String, name: String, now: Long) {
+    dr_index_ensure();
+    let row = IdxRow { uuid: uuid, last_seen: now, name: name };
+    let i = dr_index_find(uuid);
+    if i >= 0 {
+        dr_index[i] = row;
+    } else {
+        var out = [IdxRow { uuid: "", last_seen: 0L, name: "" }; dr_index.length + 1];
+        var k = 0;
+        while k < dr_index.length {
+            out[k] = dr_index[k];
+            k = k + 1;
+        }
+        out[dr_index.length] = row;
+        dr_index = out;
+    }
+    dr_index_save();
+}

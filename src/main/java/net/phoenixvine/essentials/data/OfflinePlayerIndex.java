@@ -29,11 +29,23 @@ public final class OfflinePlayerIndex {
     private OfflinePlayerIndex() {}
 
     public static Entry get(UUID uuid) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            long seen = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_idx_seen(uuid.toString());
+            if (seen < 0) return null;
+            Entry e = new Entry();
+            e.lastSeenMs = seen;
+            e.lastKnownName = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_idx_name(uuid.toString());
+            return e;
+        }
         ensureLoaded();
         return INDEX.get(uuid);
     }
 
     public static void recordSeen(UUID uuid, String name) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_idx_record(uuid.toString(), name, System.currentTimeMillis());
+            return;
+        }
         ensureLoaded();
         Entry e = new Entry();
         e.lastSeenMs = System.currentTimeMillis();

@@ -33,25 +33,44 @@ public final class WarpRegistry {
     private WarpRegistry() {}
 
     public static NamedLocation get(String name) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_get(name.toLowerCase());
         return WARPS.get(name.toLowerCase());
     }
 
     public static void set(String name, NamedLocation loc) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_set(name.toLowerCase(), loc);
+            return;
+        }
         WARPS.put(name.toLowerCase(), loc);
         save();
     }
 
     public static boolean remove(String name) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_remove(name.toLowerCase()) != 0;
         boolean removed = WARPS.remove(name.toLowerCase()) != null;
         if (removed) save();
         return removed;
     }
 
     public static Map<String, NamedLocation> getAll() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            // Snapshot (insertion order) of the HC store; callers only read it.
+            Map<String, NamedLocation> snapshot = new LinkedHashMap<>();
+            String names = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_names();
+            if (!names.isEmpty()) {
+                for (String n : names.split("\\n")) snapshot.put(n, net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_get(n));
+            }
+            return snapshot;
+        }
         return WARPS;
     }
 
     public static void load() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_load();
+            return;
+        }
         WARPS.clear();
         if (!Files.exists(FILE)) return;
         try {

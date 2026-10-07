@@ -29,11 +29,19 @@ public final class SpawnRegistry {
     private SpawnRegistry() {}
 
     public static void set(NamedLocation loc) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_spawn_set(loc);
+            return;
+        }
         spawn = loc;
         save();
     }
 
     public static NamedLocation getOrDefault(ServerLevel overworld) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            NamedLocation saved = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_spawn_get();
+            return saved != null ? saved : net.phoenixvine.essentials.EssentialsHcData.worldSpawn(overworld);
+        }
         if (spawn != null) return spawn;
         return new NamedLocation(overworld.dimension(), overworld.getSharedSpawnPos().getX() + 0.5,
                 overworld.getSharedSpawnPos().getY(), overworld.getSharedSpawnPos().getZ() + 0.5,
@@ -41,6 +49,10 @@ public final class SpawnRegistry {
     }
 
     public static void load() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_spawn_load();
+            return;
+        }
         spawn = null;
         if (!Files.exists(FILE)) return;
         try {
