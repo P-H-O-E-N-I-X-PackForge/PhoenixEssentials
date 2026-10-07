@@ -21,25 +21,62 @@ public final class KitRegistry {
     private KitRegistry() {}
 
     public static KitDefinition get(String name) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return hcGet(name.toLowerCase());
         return KITS.get(name.toLowerCase());
     }
 
     public static void set(KitDefinition kit) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            String key = kit.name.toLowerCase();
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_put(key, kit.name, kit.cooldownSeconds);
+            for (KitItemEntry e : kit.items) {
+                net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_put_item(key, e.item, e.count, e.nbt == null ? "" : e.nbt);
+            }
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_save();
+            return;
+        }
         KITS.put(kit.name.toLowerCase(), kit);
         save();
     }
 
     public static boolean remove(String name) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_remove(name.toLowerCase()) != 0;
         boolean removed = KITS.remove(name.toLowerCase()) != null;
         if (removed) save();
         return removed;
     }
 
     public static Map<String, KitDefinition> getAll() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            // Snapshot (insertion order) of the HC store; callers only read it.
+            Map<String, KitDefinition> snapshot = new LinkedHashMap<>();
+            String names = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_names();
+            if (!names.isEmpty()) {
+                for (String key : names.split("\n")) snapshot.put(key, hcGet(key));
+            }
+            return snapshot;
+        }
         return KITS;
     }
 
+    private static KitDefinition hcGet(String key) {
+        if (net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_exists(key) == 0) return null;
+        KitDefinition kit = new KitDefinition(net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_name(key));
+        kit.cooldownSeconds = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_cooldown(key);
+        int n = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_item_count(key);
+        for (int i = 0; i < n; i++) {
+            KitItemEntry e = new KitItemEntry(net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_item_id(key, i), net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_item_amount(key, i));
+            e.nbt = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_item_nbt(key, i);
+            kit.items.add(e);
+        }
+        return kit;
+    }
+
     public static void load() {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_load();
+            return;
+        }
         KITS.clear();
         if (!Files.exists(FILE)) return;
         try {

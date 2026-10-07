@@ -49,7 +49,8 @@ config button and the suite-bar button.
 | `EssentialsNetworkPackets.hotc` | `EssentialsNetwork` + the 7 sync/action packets + `EssentialsClientCache`, on its own `main_hc` channel (the Java channel stays registered for the H fallback / rollback) |
 | `EssentialsPlayerEvents.hotc` | `EssentialsPlayerEvents` -- playtime, clone, last-seen, death spot (first HC event handlers, via hotc-mc `ForgeEvents.hotc`) |
 | `EssentialsTeleportExecutor.hotc` | `TeleportExecutor` -- warmup/cooldown/cancel-on-move/cancel-on-damage state machine; the Java class is a facade that delegates here in takeover |
-| `EssentialsDataRegistries.hotc` | `WarpRegistry` / `SpawnRegistry` / `OfflinePlayerIndex` -- HC stores + hand-written JSON codec over the same `config/phoenix_essentials/*.json` files (Java classes are facades; shim `EssentialsHcData.java` does file IO + `NamedLocation` access). `KitRegistry` stays Java |
+| `EssentialsDataRegistries.hotc` | `WarpRegistry` / `SpawnRegistry` / `OfflinePlayerIndex` -- HC stores + hand-written JSON codec over the same `config/phoenix_essentials/*.json` files (Java classes are facades; shim `EssentialsHcData.java` does file IO + `NamedLocation` access). |
+| `EssentialsKitRegistry.hotc` | `KitRegistry` -- HC kit store + `kits.json` codec (reuses the registries' JSON reader, extended for nested arrays); `KitRegistry.java` builds `KitDefinition` POJOs from scalar accessors |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
 
@@ -63,7 +64,7 @@ config button and the suite-bar button.
   drops you into the void) and scans for floor in ceilinged dimensions like the Nether.
 * `/hcplayerinfo` is plain text (no section-sign colors).
 * `/sethomelimit`, auto-AFK detection, `EssentialsAutoTrashEvents`, the
-  kit registry and the remaining systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
+  remaining systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
   sync the flag to the client) and doesn't resync on login.
 
 ## HC gotchas found while porting

@@ -1,0 +1,303 @@
+// --- HC port of KitRegistry (kits.json) ---
+//
+// Same facade scheme as `EssentialsDataRegistries.hotc` (whose JSON reader/escaper this reuses):
+// `KitRegistry.java` keeps its public API and, in takeover mode, builds/consumes `KitDefinition`
+// POJOs through the small scalar accessors below (HC can't construct the Java POJO / `List`).
+// Same `config/phoenix_essentials/kits.json` shape Gson wrote:
+//   { "<key>": { "name": .., "items": [ { "item": .., "count": .., "nbt": .. } ], "cooldownSeconds": .. } }
+
+struct KitRow {
+    key: String,
+    name: String,
+    cooldown: Int,
+}
+
+struct KitItemRow {
+    key: String,
+    item: String,
+    count: Int,
+    nbt: String,
+}
+
+static dr_kits: [KitRow] = [KitRow { key: "", name: "", cooldown: 0 }; 0];
+static dr_kit_items: [KitItemRow] = [KitItemRow { key: "", item: "", count: 1, nbt: "" }; 0];
+
+fn kit_find(key: String) -> Int {
+    var i = 0;
+    while i < dr_kits.length {
+        if dr_kits[i].key == key { return i; }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// The `n`-th item row of kit `key`, as an index into `dr_kit_items` (-1 if out of range).
+fn kit_item_index(key: String, n: Int) -> Int {
+    var seen = 0;
+    var i = 0;
+    while i < dr_kit_items.length {
+        if dr_kit_items[i].key == key {
+            if seen == n { return i; }
+            seen = seen + 1;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn kit_save() {
+    let q = js_q();
+    let lb = js_lb();
+    let rb = js_rb();
+    if dr_kits.length == 0 {
+        EssentialsHcDataHc::writeFile("kits.json", "{lb}{rb}");
+        return;
+    }
+    var out = "{lb}\n";
+    var i = 0;
+    while i < dr_kits.length {
+        let kit = dr_kits[i];
+        let key = js_escape(kit.key);
+        let nm = js_escape(kit.name);
+        var items = "";
+        var count = 0;
+        var j = 0;
+        while j < dr_kit_items.length {
+            if dr_kit_items[j].key == kit.key {
+                let it = dr_kit_items[j];
+                let id = js_escape(it.item);
+                let tag = js_escape(it.nbt);
+                var sep = "";
+                if count > 0 { sep = ",\n"; }
+                items = "{items}{sep}      {lb}\n        {q}item{q}: {q}{id}{q},\n        {q}count{q}: {it.count},\n        {q}nbt{q}: {q}{tag}{q}\n      {rb}";
+                count = count + 1;
+            }
+            j = j + 1;
+        }
+        var arr = "[]";
+        if count > 0 { arr = "[\n{items}\n    ]"; }
+        var comma = "";
+        if i + 1 < dr_kits.length { comma = ","; }
+        out = "{out}  {q}{key}{q}: {lb}\n    {q}name{q}: {q}{nm}{q},\n    {q}items{q}: {arr},\n    {q}cooldownSeconds{q}: {kit.cooldown}\n  {rb}{comma}\n";
+        i = i + 1;
+    }
+    out = "{out}{rb}";
+    EssentialsHcDataHc::writeFile("kits.json", out);
+}
+
+pub fn dr_kit_load() {
+    dr_kits = [KitRow { key: "", name: "", cooldown: 0 }; 0];
+    dr_kit_items = [KitItemRow { key: "", item: "", count: 1, nbt: "" }; 0];
+    js_parse(dr_read("kits.json"));
+    let sep = js_sep();
+    let cells = js_cells;
+    var kits = [KitRow { key: "", name: "", cooldown: 0 }; cells.length];
+    var nk = 0;
+    var items = [KitItemRow { key: "", item: "", count: 1, nbt: "" }; cells.length];
+    var ni = 0;
+    var cur_item_entry = "";
+    var have_item = false;
+    var item = KitItemRow { key: "", item: "", count: 1, nbt: "" };
+    var i = 0;
+    while i < cells.length {
+        let cell = cells[i];
+        let cut = cell.entry.indexOf(sep);
+        if cut < 0 {
+            // kit-level scalar: entry is the kit key
+            var k = -1;
+            var q = 0;
+            while q < nk {
+                if kits[q].key == cell.entry { k = q; }
+                q = q + 1;
+            }
+            if k < 0 {
+                kits[nk] = KitRow { key: cell.entry, name: cell.entry, cooldown: 0 };
+                k = nk;
+                nk = nk + 1;
+            }
+            if cell.name == "name" { kits[k] = KitRow { key: kits[k].key, name: cell.value, cooldown: kits[k].cooldown }; }
+            if cell.name == "cooldownSeconds" { kits[k] = KitRow { key: kits[k].key, name: kits[k].name, cooldown: DrInt::parseInt(cell.value, 10) }; }
+        } else {
+            // "<key><sep>items<sep><idx>" -> an item field
+            if !have_item || cell.entry != cur_item_entry {
+                if have_item {
+                    items[ni] = item;
+                    ni = ni + 1;
+                }
+                cur_item_entry = cell.entry;
+                item = KitItemRow { key: cell.entry.substring(0, cut), item: "", count: 1, nbt: "" };
+                have_item = true;
+            }
+            if cell.name == "item" { item = KitItemRow { key: item.key, item: cell.value, count: item.count, nbt: item.nbt }; }
+            if cell.name == "count" { item = KitItemRow { key: item.key, item: item.item, count: DrInt::parseInt(cell.value, 10), nbt: item.nbt }; }
+            if cell.name == "nbt" { item = KitItemRow { key: item.key, item: item.item, count: item.count, nbt: cell.value }; }
+        }
+        i = i + 1;
+    }
+    if have_item {
+        items[ni] = item;
+        ni = ni + 1;
+    }
+    // A kit whose only content is its (possibly empty) `items` array has no scalar cells of its own
+    // beyond name/cooldown, so it is already present; make sure item-only keys exist too.
+    var out_kits = [KitRow { key: "", name: "", cooldown: 0 }; nk];
+    var a = 0;
+    while a < nk {
+        out_kits[a] = kits[a];
+        a = a + 1;
+    }
+    var out_items = [KitItemRow { key: "", item: "", count: 1, nbt: "" }; ni];
+    var b = 0;
+    while b < ni {
+        out_items[b] = items[b];
+        b = b + 1;
+    }
+    dr_kits = out_kits;
+    dr_kit_items = out_items;
+}
+
+// Newline-separated kit keys in insertion order ("" when none).
+pub fn dr_kit_names() -> String {
+    var out = "";
+    var i = 0;
+    while i < dr_kits.length {
+        if i > 0 { out = "{out}\n"; }
+        let k = dr_kits[i].key;
+        out = "{out}{k}";
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn dr_kit_exists(key: String) -> Int {
+    if kit_find(key) >= 0 { return 1; }
+    return 0;
+}
+
+pub fn dr_kit_name(key: String) -> String {
+    let i = kit_find(key);
+    if i < 0 { return ""; }
+    return dr_kits[i].name;
+}
+
+pub fn dr_kit_cooldown(key: String) -> Int {
+    let i = kit_find(key);
+    if i < 0 { return 0; }
+    return dr_kits[i].cooldown;
+}
+
+pub fn dr_kit_item_count(key: String) -> Int {
+    var n = 0;
+    var i = 0;
+    while i < dr_kit_items.length {
+        if dr_kit_items[i].key == key { n = n + 1; }
+        i = i + 1;
+    }
+    return n;
+}
+
+pub fn dr_kit_item_id(key: String, n: Int) -> String {
+    let i = kit_item_index(key, n);
+    if i < 0 { return ""; }
+    return dr_kit_items[i].item;
+}
+
+pub fn dr_kit_item_amount(key: String, n: Int) -> Int {
+    let i = kit_item_index(key, n);
+    if i < 0 { return 0; }
+    return dr_kit_items[i].count;
+}
+
+pub fn dr_kit_item_nbt(key: String, n: Int) -> String {
+    let i = kit_item_index(key, n);
+    if i < 0 { return ""; }
+    return dr_kit_items[i].nbt;
+}
+
+// Replaces/creates kit `key` with no items yet; follow with `dr_kit_put_item` calls, then `dr_kit_save`.
+pub fn dr_kit_put(key: String, name: String, cooldown: Int) {
+    // drop any existing items for this key
+    var kept = 0;
+    var i = 0;
+    while i < dr_kit_items.length {
+        if dr_kit_items[i].key != key { kept = kept + 1; }
+        i = i + 1;
+    }
+    var items = [KitItemRow { key: "", item: "", count: 1, nbt: "" }; kept];
+    var w = 0;
+    var j = 0;
+    while j < dr_kit_items.length {
+        if dr_kit_items[j].key != key {
+            items[w] = dr_kit_items[j];
+            w = w + 1;
+        }
+        j = j + 1;
+    }
+    dr_kit_items = items;
+
+    let row = KitRow { key: key, name: name, cooldown: cooldown };
+    let idx = kit_find(key);
+    if idx >= 0 {
+        dr_kits[idx] = row;
+    } else {
+        var out = [KitRow { key: "", name: "", cooldown: 0 }; dr_kits.length + 1];
+        var k = 0;
+        while k < dr_kits.length {
+            out[k] = dr_kits[k];
+            k = k + 1;
+        }
+        out[dr_kits.length] = row;
+        dr_kits = out;
+    }
+}
+
+pub fn dr_kit_put_item(key: String, item: String, count: Int, nbt: String) {
+    var out = [KitItemRow { key: "", item: "", count: 1, nbt: "" }; dr_kit_items.length + 1];
+    var k = 0;
+    while k < dr_kit_items.length {
+        out[k] = dr_kit_items[k];
+        k = k + 1;
+    }
+    out[dr_kit_items.length] = KitItemRow { key: key, item: item, count: count, nbt: nbt };
+    dr_kit_items = out;
+}
+
+pub fn dr_kit_save() {
+    kit_save();
+}
+
+// 1 if a kit was removed, else 0.
+pub fn dr_kit_remove(key: String) -> Int {
+    let idx = kit_find(key);
+    if idx < 0 { return 0; }
+    var out = [KitRow { key: "", name: "", cooldown: 0 }; dr_kits.length - 1];
+    var w = 0;
+    var k = 0;
+    while k < dr_kits.length {
+        if k != idx {
+            out[w] = dr_kits[k];
+            w = w + 1;
+        }
+        k = k + 1;
+    }
+    dr_kits = out;
+    var kept = 0;
+    var i = 0;
+    while i < dr_kit_items.length {
+        if dr_kit_items[i].key != key { kept = kept + 1; }
+        i = i + 1;
+    }
+    var items = [KitItemRow { key: "", item: "", count: 1, nbt: "" }; kept];
+    var iw = 0;
+    var j = 0;
+    while j < dr_kit_items.length {
+        if dr_kit_items[j].key != key {
+            items[iw] = dr_kit_items[j];
+            iw = iw + 1;
+        }
+        j = j + 1;
+    }
+    dr_kit_items = items;
+    kit_save();
+    return 1;
+}
