@@ -1,0 +1,334 @@
+// --- HC port of EssentialsConfigOverrides (phoenix_essentials-server-overrides.toml) ---
+//
+// Same behavior as the Java original, which stays in place as the `use_java=true` fallback and
+// delegates here in takeover mode (`EssentialsConfigOverrides.apply` -> `ovr_apply`):
+//   * on every server-config (re)load, make sure `config/phoenix_essentials-server-overrides.toml`
+//     exists -- generating it from the spec's CURRENT defaults (with each key's comment, under a
+//     header explaining the file) the first time;
+//   * read it, and for every key whose value DIFFERS from the spec's current default, force that
+//     value onto the live config value ("global override"); unknown keys are warned about, a bad
+//     value is warned about, a value left at its default is ignored.
+// Talks to NightConfig (`CommentedFileConfig`, the same TOML library Forge uses) and to the
+// `ForgeConfigSpec` value tree directly. Disclosed difference: the original's `EnumValue` coercion
+// is not carried over -- this mod's spec has no enum keys (only int / boolean / list).
+//
+// Disclosed shims (`EssentialsHcData.java`): `java.nio.file.Path` handling for the config file and
+// the logger -- `Path`, `Files` and log4j varargs aren't bound.
+
+extern class OvPath = "java.nio.file.Path" interface {}
+
+extern class OvData = "net.phoenixvine.essentials.EssentialsHcData" {
+    static fn configPath(name: String) -> OvPath;
+    static fn pathExists(p: &OvPath) -> Bool;
+    static fn readPath(p: &OvPath) -> String?;
+    static fn writePath(p: &OvPath, content: String);
+    static fn logInfo(msg: String);
+    static fn logWarn(msg: String);
+}
+
+extern class OvThrowable = "java.lang.Throwable" {
+    fn toString(&self) -> String;
+}
+
+extern class OvObject = "java.lang.Object" {
+    fn getClass(&self) -> OvClass;
+    fn toString(&self) -> String;
+}
+extern class OvClass = "java.lang.Class" {
+    fn getSimpleName(&self) -> String;
+}
+extern class OvObjects = "java.util.Objects" {
+    static fn deepEquals(a: CfgObject, b: CfgObject) -> Bool;
+}
+extern class OvNumber = "java.lang.Number" {
+    fn intValue(&self) -> Int;
+    fn longValue(&self) -> Long;
+    fn doubleValue(&self) -> Double;
+}
+extern class OvInteger = "java.lang.Integer" {
+    static fn valueOf(v: Int) -> OvInteger;
+}
+extern class OvLong = "java.lang.Long" {
+    static fn valueOf(v: Long) -> OvLong;
+}
+extern class OvDouble = "java.lang.Double" {
+    static fn valueOf(v: Double) -> OvDouble;
+}
+extern class OvBooleanParse = "java.lang.Boolean" {
+    static fn parseBoolean(s: String) -> Bool;
+}
+
+extern class OvArrayList = "java.util.ArrayList" {
+    fn new() -> Self;
+    fn add(&self, o: CfgObject) -> Bool;
+}
+
+// NightConfig
+extern class OvEntry = "com.electronwill.nightconfig.core.UnmodifiableConfig$Entry" interface {
+    fn getKey(&self) -> String;
+    fn getValue(&self) -> CfgObject;
+}
+extern class OvUnmodConfig = "com.electronwill.nightconfig.core.UnmodifiableConfig" interface {
+    fn entrySet(&self) -> TcSet;
+    fn get(&self, path: CfgListI) -> CfgObject;
+}
+extern class OvFileConfig = "com.electronwill.nightconfig.core.file.CommentedFileConfig" interface {
+    static fn of(p: &OvPath) -> OvFileConfig;
+    fn load(&self);
+    fn save(&self);
+    fn close(&self);
+    fn entrySet(&self) -> TcSet;
+    fn set(&self, path: CfgListI, value: CfgObject) -> CfgObject;
+    fn setComment(&self, path: CfgListI, comment: String) -> String;
+}
+
+// Forge
+extern class OvSpec = "net.minecraftforge.common.ForgeConfigSpec" {
+    fn getValues(&self) -> OvUnmodConfig;
+    fn getSpec(&self) -> OvUnmodConfig;
+}
+extern class OvValueSpec = "net.minecraftforge.common.ForgeConfigSpec$ValueSpec" {
+    fn getComment(&self) -> String;
+}
+extern class OvLongValue = "net.minecraftforge.common.ForgeConfigSpec$LongValue" {}
+extern class OvDoubleValue = "net.minecraftforge.common.ForgeConfigSpec$DoubleValue" {}
+extern class OvConfigValue = "net.minecraftforge.common.ForgeConfigSpec$ConfigValue" {
+    fn getDefault(&self) -> CfgObject;
+    fn set(&self, v: CfgObject);
+}
+extern class OvIConfigSpec = "net.minecraftforge.fml.config.IConfigSpec" interface {}
+extern class OvModConfig = "net.minecraftforge.fml.config.ModConfig" {
+    fn getSpec(&self) -> OvIConfigSpec;
+}
+extern class OvModConfigEvent = "net.minecraftforge.fml.event.config.ModConfigEvent" {
+    fn getConfig(&self) -> OvModConfig;
+}
+
+// `EssentialsServerConfig.SPEC`
+extern class OvServerConfig = "net.phoenixvine.essentials.config.EssentialsServerConfig" {
+    static SPEC: OvSpec;
+}
+
+// ---- flat (dotted-path, value) rows ----
+
+struct OvRow {
+    path: String,
+    value: CfgObject,
+}
+
+static ov_rows: [OvRow] = [OvRow { path: "", value: null as CfgObject }; 0];
+
+fn ov_push(rows: [OvRow], path: String, value: CfgObject) -> [OvRow] {
+    var out = [OvRow { path: "", value: null as CfgObject }; rows.length + 1];
+    var i = 0;
+    while i < rows.length {
+        out[i] = rows[i];
+        i = i + 1;
+    }
+    out[rows.length] = OvRow { path: path, value: value };
+    return out;
+}
+
+fn ov_join(prefix: String, key: String) -> String {
+    if prefix == "" { return key; }
+    return "{prefix}.{key}";
+}
+
+// Overrides file: every leaf under `config`, nested tables flattened to dotted paths.
+fn ov_flatten_file(prefix: String, entries: TcSet) {
+    let it = entries.iterator();
+    while it.hasNext() {
+        let entry = it.next() as OvEntry;
+        let key = ov_join(prefix, entry.getKey());
+        let value = entry.getValue();
+        if value is OvUnmodConfig {
+            ov_flatten_file(key, (value as OvUnmodConfig).entrySet());
+        } else {
+            ov_rows = ov_push(ov_rows, key, value);
+        }
+    }
+}
+
+// Spec: every `ConfigValue` under `SPEC.getValues()`, by dotted path.
+fn ov_collect_values(prefix: String, entries: TcSet) {
+    let it = entries.iterator();
+    while it.hasNext() {
+        let entry = it.next() as OvEntry;
+        let key = ov_join(prefix, entry.getKey());
+        let value = entry.getValue();
+        if value is OvConfigValue {
+            ov_rows = ov_push(ov_rows, key, value);
+        } else {
+            if value is OvUnmodConfig {
+                ov_collect_values(key, (value as OvUnmodConfig).entrySet());
+            }
+        }
+    }
+}
+
+fn ov_values_by_path() -> [OvRow] {
+    ov_rows = [OvRow { path: "", value: null as CfgObject }; 0];
+    ov_collect_values("", OvServerConfig::SPEC.getValues().entrySet());
+    return ov_rows;
+}
+
+fn ov_find(rows: &[OvRow], path: String) -> Int {
+    var i = 0;
+    while i < rows.length {
+        if rows[i].path == path { return i; }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// "a.b.c" -> ["a", "b", "c"] as a java.util.List.
+fn ov_split_path(dotted: String) -> CfgListI {
+    let list = OvArrayList::new();
+    var rest = dotted;
+    var more = true;
+    while more {
+        let cut = rest.indexOf(".");
+        if cut < 0 {
+            list.add(rest as CfgObject);
+            more = false;
+        } else {
+            list.add(rest.substring(0, cut) as CfgObject);
+            rest = rest.substring(cut + 1, rest.length());
+        }
+    }
+    return list as CfgListI;
+}
+
+fn ov_header() -> String {
+    return "# phoenix_essentials-server-overrides.toml\n#\n# Auto-generated on first load with every Phoenix Essentials server-config key set to\n# its CURRENT SHIPPED DEFAULT. Nothing here is an active override yet.\n#\n# To force a setting across every world/server this modpack is deployed to, edit the\n# value below away from its default and save the file. Only keys whose value differs\n# from this mod's current default are treated as active overrides - a line left exactly\n# as generated is ignored, so upgrading the mod and getting a new default for a key you\n# never touched works as expected.\n#\n# This file is re-applied every time the server config (re)loads, before any command or\n# feature reads a config value. It is never written to by the mod after this initial\n# generation, and the per-world serverconfig/phoenix_essentials-server.toml is never\n# touched by this mechanism either.\n";
+}
+
+fn ov_comment_for(path: CfgListI) -> String {
+    let raw = OvServerConfig::SPEC.getSpec().get(path);
+    if raw is OvValueSpec {
+        return (raw as OvValueSpec).getComment();
+    }
+    return "";
+}
+
+fn ov_ensure_file_exists(path: &OvPath) {
+    if OvData::pathExists(&path) { return; }
+    try {
+        let values = ov_values_by_path();
+        let file = OvFileConfig::of(&path);
+        var i = 0;
+        while i < values.length {
+            let list = ov_split_path(values[i].path);
+            file.set(list, (values[i].value as OvConfigValue).getDefault());
+            let comment = ov_comment_for(ov_split_path(values[i].path));
+            if comment != "" {
+                file.setComment(ov_split_path(values[i].path), comment);
+            }
+            i = i + 1;
+        }
+        file.save();
+        file.close();
+
+        let raw = OvData::readPath(&path);
+        var body = "";
+        if raw != null { body = raw; }
+        let header = ov_header();
+        OvData::writePath(&path, "{header}\n{body}");
+        OvData::logInfo("[phoenix_essentials] Generated default config override file");
+    } catch (e: OvThrowable) {
+        let msg = e.toString();
+        OvData::logWarn("[phoenix_essentials] Could not generate default config override file phoenix_essentials-server-overrides.toml: {msg}");
+    }
+}
+
+struct OvCoerced {
+    ok: Bool,
+    value: CfgObject,
+    err: String,
+}
+
+fn ov_fail(msg: String) -> OvCoerced {
+    return OvCoerced { ok: false, value: null as CfgObject, err: msg };
+}
+
+fn ov_ok(v: CfgObject) -> OvCoerced {
+    return OvCoerced { ok: true, value: v, err: "" };
+}
+
+fn ov_coerce(cv: &CfgObject, raw: CfgObject?) -> OvCoerced {
+    if raw == null { return ov_fail("override value is null"); }
+    let rv = raw as CfgObject;
+    let simple = (rv as OvObject).getClass().getSimpleName();
+    if cv is CfgBoolValue {
+        if rv is JBooleanPerm { return ov_ok(rv); }
+        if rv is String { return ov_ok(JBooleanPerm::valueOf(OvBooleanParse::parseBoolean(rv as String)) as CfgObject); }
+        return ov_fail("expected a boolean, got {simple}");
+    }
+    if cv is CfgIntValue {
+        if rv is OvNumber { return ov_ok(OvInteger::valueOf((rv as OvNumber).intValue()) as CfgObject); }
+        return ov_fail("expected an integer, got {simple}");
+    }
+    if cv is OvLongValue {
+        if rv is OvNumber { return ov_ok(OvLong::valueOf((rv as OvNumber).longValue()) as CfgObject); }
+        return ov_fail("expected a long, got {simple}");
+    }
+    if cv is OvDoubleValue {
+        if rv is OvNumber { return ov_ok(OvDouble::valueOf((rv as OvNumber).doubleValue()) as CfgObject); }
+        return ov_fail("expected a double, got {simple}");
+    }
+    return ov_ok(rv);
+}
+
+// Entry point (the `ModConfigEvent.Loading` / `.Reloading` handlers in the Java facade call this).
+pub fn ovr_apply(ev: OvModConfigEvent) {
+    if (ev.getConfig().getSpec() as CfgObject) != (OvServerConfig::SPEC as CfgObject) { return; }
+
+    let path = OvData::configPath("phoenix_essentials-server-overrides.toml");
+    ov_ensure_file_exists(&path);
+    if !OvData::pathExists(&path) { return; }
+
+    ov_rows = [OvRow { path: "", value: null as CfgObject }; 0];
+    try {
+        let overrides = OvFileConfig::of(&path);
+        overrides.load();
+        ov_flatten_file("", overrides.entrySet());
+        overrides.close();
+    } catch (e: OvThrowable) {
+        let msg = e.toString();
+        OvData::logWarn("[phoenix_essentials] Could not read config override file phoenix_essentials-server-overrides.toml: {msg}");
+        return;
+    }
+    let flattened = ov_rows;
+    if flattened.length == 0 { return; }
+
+    let values = ov_values_by_path();
+    var i = 0;
+    while i < flattened.length {
+        let key = flattened[i].path;
+        let idx = ov_find(&values, key);
+        if idx < 0 {
+            OvData::logWarn("[phoenix_essentials] Config override file phoenix_essentials-server-overrides.toml references unknown config key '{key}' - ignoring. Check for typos.");
+        } else {
+            let cv = values[idx].value;
+            try {
+                let coerced = ov_coerce(&cv, flattened[i].value);
+                if !coerced.ok {
+                    let why = coerced.err;
+                    OvData::logWarn("[phoenix_essentials] Failed to apply config override for '{key}' from phoenix_essentials-server-overrides.toml: java.lang.IllegalArgumentException: {why}");
+                } else {
+                    let cfg = cv as OvConfigValue;
+                    let current_default = cfg.getDefault();
+                    if !OvObjects::deepEquals(coerced.value, current_default) {
+                        cfg.set(coerced.value);
+                        let shown = (coerced.value as OvObject).toString();
+                        OvData::logInfo("[phoenix_essentials] Applied global config override: {key} = {shown}");
+                    }
+                }
+            } catch (e: OvThrowable) {
+                let msg = e.toString();
+                OvData::logWarn("[phoenix_essentials] Failed to apply config override for '{key}' from phoenix_essentials-server-overrides.toml: {msg}");
+            }
+        }
+        i = i + 1;
+    }
+}

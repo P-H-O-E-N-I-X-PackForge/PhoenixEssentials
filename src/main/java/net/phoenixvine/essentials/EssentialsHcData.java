@@ -5,6 +5,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.data.NamedLocation;
 
 import java.nio.file.Files;
@@ -63,6 +64,42 @@ public final class EssentialsHcData {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // ---- config-override helpers (EssentialsConfigOverrides.hotc) ----
+
+    public static Path configPath(String name) {
+        return net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get().resolve(name);
+    }
+
+    public static boolean pathExists(Path p) {
+        return Files.exists(p);
+    }
+
+    public static String readPath(Path p) {
+        try {
+            return Files.exists(p) ? Files.readString(p, java.nio.charset.StandardCharsets.UTF_8) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static void writePath(Path p, String content) {
+        try {
+            Path parent = p.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            Files.writeString(p, content, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void logInfo(String msg) {
+        PhoenixEssentials.LOGGER.info(msg);
+    }
+
+    public static void logWarn(String msg) {
+        PhoenixEssentials.LOGGER.warn(msg);
     }
 
     public static NamedLocation makeLocation(String dim, double x, double y, double z, float yaw, float pitch) {

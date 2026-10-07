@@ -48,6 +48,10 @@ public final class EssentialsConfigOverrides {
     }
 
     private static void apply(ModConfigEvent event) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.ovr_apply(event);
+            return;
+        }
         if (event.getConfig().getSpec() != EssentialsServerConfig.SPEC) {
             return;
         }
