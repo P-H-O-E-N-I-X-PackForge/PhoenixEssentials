@@ -115,7 +115,7 @@ pub fn register_real_home_commands(dispatcher: CommandDispatcherSrc) {
         .executes(|ctx| {
         return hc_teleport_home2(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
     });
-    let home_builder = CommandsHc::literal("hchome")
+    let home_builder = ess_literal("home", "hchome", "HOME")
         .executes(|ctx| { return hc_teleport_home2(ctx.getSource() as CommandSourceStackHc, "home"); })
         .then(home_name_arg);
     dispatcher.register(home_builder as LiteralArgumentBuilderSrc);
@@ -123,7 +123,7 @@ pub fn register_real_home_commands(dispatcher: CommandDispatcherSrc) {
     let sethome_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_set_home2(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
     });
-    let sethome_builder = CommandsHc::literal("hcsethome")
+    let sethome_builder = ess_literal("sethome", "hcsethome", "SETHOME")
         .executes(|ctx| { return hc_set_home2(ctx.getSource() as CommandSourceStackHc, "home"); })
         .then(sethome_name_arg);
     dispatcher.register(sethome_builder as LiteralArgumentBuilderSrc);
@@ -133,10 +133,10 @@ pub fn register_real_home_commands(dispatcher: CommandDispatcherSrc) {
         .executes(|ctx| {
         return hc_delete_home2(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
     });
-    let delhome_builder = CommandsHc::literal("hcdelhome").then(delhome_name_arg);
+    let delhome_builder = ess_literal("delhome", "hcdelhome", "DELHOME").then(delhome_name_arg);
     dispatcher.register(delhome_builder as LiteralArgumentBuilderSrc);
 
-    let homes_builder = CommandsHc::literal("hchomes").executes(|ctx| {
+    let homes_builder = ess_literal("homes", "hchomes", "HOMES").executes(|ctx| {
         return hc_list_homes2(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(homes_builder as LiteralArgumentBuilderSrc);

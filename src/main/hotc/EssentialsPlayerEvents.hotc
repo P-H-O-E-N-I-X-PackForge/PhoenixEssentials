@@ -1,0 +1,102 @@
+// --- Port of EssentialsPlayerEvents.java (the first event handlers in HC) ---
+//
+// Uses hotc-mc's new `ForgeEvents.hotc` (`IEventBus.addListener` with an explicit event `Class`),
+// so these are real Forge listeners written in HC -- no `@SubscribeEvent` shim class. Same five
+// handlers as the original:
+//   * `PlayerEvent.Clone`   -- copy the essentials capability to the respawned/cloned player
+//   * `PlayerTickEvent`     -- +1 playtime tick per server player per tick
+//   * `PlayerLoggedIn/Out`  -- record last-seen in the offline index
+//   * `LivingDeathEvent`    -- remember the death spot for `/back` (if `BACK_AFTER_DEATH`)
+//
+// Registered from `PhoenixEssentials` only in takeover mode (the default) -- the Java class guards
+// its own handlers the same way, so with `-Dphoenix_essentials.use_java=true` exactly one set is
+// live. Three small Java shims (`copyPlayerData`, `recordSeen`, `backAfterDeath`) cover capability
+// revive/invalidate, a UUID-keyed index and a config boolean.
+
+extern class TickPhaseHc = "net.minecraftforge.event.TickEvent$Phase" {
+    static START: TickPhaseHc;
+    static END: TickPhaseHc;
+}
+
+extern class PlayerTickEventHc = "net.minecraftforge.event.TickEvent$PlayerTickEvent" {
+    // `phase` is declared on the `TickEvent` superclass -- a real public field, resolved by the JVM
+    // through the subclass reference.
+    phase: TickPhaseHc;
+    player: Player;
+}
+
+extern class PlayerLoggedInEventHc = "net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent" {
+    fn getEntity(&self) -> Player;
+}
+
+extern class PlayerLoggedOutEventHc = "net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedOutEvent" {
+    fn getEntity(&self) -> Player;
+}
+
+extern class PlayerCloneEventHc = "net.minecraftforge.event.entity.player.PlayerEvent$Clone" {
+    fn getOriginal(&self) -> Player;
+    fn getEntity(&self) -> Player;
+}
+
+extern class LivingDeathEventHc = "net.minecraftforge.event.entity.living.LivingDeathEvent" {
+    fn getEntity(&self) -> LivingEntity;
+}
+
+fn ess_on_player_clone(e: JObjectEvent) {
+    let ev = e as PlayerCloneEventHc;
+    EssentialsHcServerBridgeHc::copyPlayerData(ev.getOriginal(), ev.getEntity());
+}
+
+fn ess_on_player_tick(e: JObjectEvent) {
+    let ev = e as PlayerTickEventHc;
+    if ev.phase != TickPhaseHc::END { return; }
+    let who = ev.player;
+    if !(who is ServerPlayer) { return; }
+    let player = who as ServerPlayer;
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data_obj = opt.orElse(null);
+    if data_obj == null { return; }
+    (data_obj as EssentialsPlayerDataHc).addPlaytimeTicks(1L);
+}
+
+fn ess_on_player_logged_in(e: JObjectEvent) {
+    let who = (e as PlayerLoggedInEventHc).getEntity();
+    if !(who is ServerPlayer) { return; }
+    EssentialsHcServerBridgeHc::recordSeen(who as ServerPlayer);
+}
+
+fn ess_on_player_logged_out(e: JObjectEvent) {
+    let who = (e as PlayerLoggedOutEventHc).getEntity();
+    if !(who is ServerPlayer) { return; }
+    EssentialsHcServerBridgeHc::recordSeen(who as ServerPlayer);
+}
+
+fn ess_on_living_death(e: JObjectEvent) {
+    if !EssentialsHcServerBridgeHc::backAfterDeath() { return; }
+    let who = (e as LivingDeathEventHc).getEntity();
+    if !(who is ServerPlayer) { return; }
+    let player = who as ServerPlayer;
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data_obj = opt.orElse(null);
+    if data_obj == null { return; }
+    (data_obj as EssentialsPlayerDataHc).setBack(NamedLocationHc::of(player));
+}
+
+pub fn register_player_events() {
+    let bus = MinecraftForgeHc::EVENT_BUS;
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.entity.player.PlayerEvent$Clone") as JClassNet,
+        |e| { ess_on_player_clone(e); });
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.TickEvent$PlayerTickEvent") as JClassNet,
+        |e| { ess_on_player_tick(e); });
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent") as JClassNet,
+        |e| { ess_on_player_logged_in(e); });
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedOutEvent") as JClassNet,
+        |e| { ess_on_player_logged_out(e); });
+    bus.addListener(EventPriorityHc::NORMAL, false,
+        class("net.minecraftforge.event.entity.living.LivingDeathEvent") as JClassNet,
+        |e| { ess_on_living_death(e); });
+}

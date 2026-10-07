@@ -49,19 +49,21 @@ fn hc_gm_named(source: CommandSourceStackHc, target_name: String, code: Int) -> 
     return hc_set_gamemode(&source, target, code, true);
 }
 
-fn hc_register_gm(dispatcher: &CommandDispatcherSrc, literal_name: String, code: Int) {
-    let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+fn hc_register_gm(dispatcher: &CommandDispatcherSrc, real_name: String, twin_name: String, code: Int) {
+    let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .requires(|src| { return ess_op_required(src); })
+        .executes(|ctx| {
         return hc_gm_named(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), code);
     });
-    let builder = CommandsHc::literal(literal_name)
+    let builder = ess_literal(real_name, twin_name, "GAMEMODE")
         .executes(|ctx| { return hc_gm_self(ctx.getSource() as CommandSourceStackHc, code); })
         .then(player_arg);
     dispatcher.register(builder as LiteralArgumentBuilderSrc);
 }
 
 pub fn register_real_gamemode_commands(dispatcher: CommandDispatcherSrc) {
-    hc_register_gm(&dispatcher, "hcgms", 0);
-    hc_register_gm(&dispatcher, "hcgmc", 1);
-    hc_register_gm(&dispatcher, "hcgma", 2);
-    hc_register_gm(&dispatcher, "hcgmsp", 3);
+    hc_register_gm(&dispatcher, "gms", "hcgms", 0);
+    hc_register_gm(&dispatcher, "gmc", "hcgmc", 1);
+    hc_register_gm(&dispatcher, "gma", "hcgma", 2);
+    hc_register_gm(&dispatcher, "gmsp", "hcgmsp", 3);
 }

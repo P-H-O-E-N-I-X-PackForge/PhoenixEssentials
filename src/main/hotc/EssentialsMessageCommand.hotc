@@ -14,6 +14,10 @@
 fn hc_send_message(source: CommandSourceStackHc, target_name: String, message: String) -> Int {
     let sender = source.getPlayer();
     if sender == null { return 0; }
+    if !EssentialsHcModeHc::featureEnabled(&sender, "social") {
+        source.sendFailure(Component::literal("Social commands aren't available here right now.") as Component);
+        return 0;
+    }
     let target = source.getServer().getPlayerList().getPlayerByName(target_name);
     if target == null {
         source.sendFailure(Component::literal("Player \"{target_name}\" isn't online.") as Component);
@@ -38,17 +42,32 @@ fn hc_reply_message(source: CommandSourceStackHc, message: String) -> Int {
     return hc_send_message(source, target_name, message);
 }
 
-pub fn register_real_message_commands(dispatcher: CommandDispatcherSrc) {
+// The original registers `/msg` + `/tell` and `/r` + `/reply`; the HC twins register one name each.
+fn hc_register_msg_alias(dispatcher: &CommandDispatcherSrc, name: String) {
     let message_arg = CommandsHc::argument("message", StringArgumentTypeSrc::greedyString() as ArgumentTypeSrc).executes(|ctx| {
         return hc_send_message(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), StringArgumentTypeSrc::getString(ctx, "message"));
     });
     let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).then(message_arg);
-    let msg_builder = CommandsHc::literal("hcmsg").then(player_arg);
+    let msg_builder = ess_literal(name, name, "MSG").then(player_arg);
     dispatcher.register(msg_builder as LiteralArgumentBuilderSrc);
+}
 
+fn hc_register_reply_alias(dispatcher: &CommandDispatcherSrc, name: String) {
     let reply_message_arg = CommandsHc::argument("message", StringArgumentTypeSrc::greedyString() as ArgumentTypeSrc).executes(|ctx| {
         return hc_reply_message(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "message"));
     });
-    let reply_builder = CommandsHc::literal("hcr").then(reply_message_arg);
+    let reply_builder = ess_literal(name, name, "MSG").then(reply_message_arg);
     dispatcher.register(reply_builder as LiteralArgumentBuilderSrc);
+}
+
+pub fn register_real_message_commands(dispatcher: CommandDispatcherSrc) {
+    if EssentialsHcModeHc::takeover() {
+        hc_register_msg_alias(&dispatcher, "msg");
+        hc_register_msg_alias(&dispatcher, "tell");
+        hc_register_reply_alias(&dispatcher, "r");
+        hc_register_reply_alias(&dispatcher, "reply");
+    } else {
+        hc_register_msg_alias(&dispatcher, "hcmsg");
+        hc_register_reply_alias(&dispatcher, "hcr");
+    }
 }

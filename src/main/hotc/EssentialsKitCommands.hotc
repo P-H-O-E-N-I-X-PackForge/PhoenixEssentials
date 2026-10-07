@@ -18,6 +18,10 @@
 fn hc_claim_kit(source: CommandSourceStackHc, name: String) -> Int {
     let player = source.getPlayer();
     if player == null { return 0; }
+    if !EssentialsHcModeHc::featureEnabled(&player, "kits") {
+        source.sendFailure(Component::literal("Kits aren't available here right now.") as Component);
+        return 0;
+    }
     if !EssentialsHcServerBridgeHc::kitExists(name) {
         source.sendFailure(Component::literal("No kit named \"{name}\".") as Component);
         return 0;
@@ -56,10 +60,10 @@ pub fn register_real_kit_commands(dispatcher: CommandDispatcherSrc) {
         .executes(|ctx| {
         return hc_claim_kit(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
     });
-    let kit_builder = CommandsHc::literal("hckit").then(kit_name_arg);
+    let kit_builder = ess_literal("kit", "hckit", "KIT").then(kit_name_arg);
     dispatcher.register(kit_builder as LiteralArgumentBuilderSrc);
 
-    let kits_builder = CommandsHc::literal("hckits").executes(|ctx| {
+    let kits_builder = ess_literal("kits", "hckits", "KIT").executes(|ctx| {
         return hc_list_kits(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(kits_builder as LiteralArgumentBuilderSrc);

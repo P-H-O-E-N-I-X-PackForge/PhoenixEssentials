@@ -18,7 +18,7 @@ fn hc_top(source: CommandSourceStackHc) -> Int {
 }
 
 pub fn register_real_top_command(dispatcher: CommandDispatcherSrc) {
-    let top_builder = CommandsHc::literal("hctop").executes(|ctx| {
+    let top_builder = ess_literal("top", "hctop", "TOP").executes(|ctx| {
         return hc_top(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(top_builder as LiteralArgumentBuilderSrc);

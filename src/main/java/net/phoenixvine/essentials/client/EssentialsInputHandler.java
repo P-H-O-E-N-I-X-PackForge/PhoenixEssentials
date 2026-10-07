@@ -20,7 +20,13 @@ public class EssentialsInputHandler {
         }
 
         if (EssentialsKeyBindings.OPEN_MENU.consumeClick()) {
-            mc.setScreen(new EssentialsConfigScreen(null));
+            // Hot Chocolate port by default (src/main/hotc); -Dphoenix_essentials.use_java=true restores
+            // the original Java screen. See EssentialsHcMode.
+            if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+                net.phoenixvine.essentials.hc.hcCompileMerged1.open_essentials_config_screen_hc();
+            } else {
+                mc.setScreen(new EssentialsConfigScreen(null));
+            }
         }
     }
 }

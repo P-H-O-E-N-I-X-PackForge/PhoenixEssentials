@@ -51,26 +51,26 @@ pub fn register_real_tpa_commands(dispatcher: CommandDispatcherSrc) {
     let tpa_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_tpa_request(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), false);
     });
-    let tpa_builder = CommandsHc::literal("hctpa").then(tpa_arg);
+    let tpa_builder = ess_literal("tpa", "hctpa", "TPA").then(tpa_arg);
     dispatcher.register(tpa_builder as LiteralArgumentBuilderSrc);
 
     let tpahere_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_tpa_request(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), true);
     });
-    let tpahere_builder = CommandsHc::literal("hctpahere").then(tpahere_arg);
+    let tpahere_builder = ess_literal("tpahere", "hctpahere", "TPA").then(tpahere_arg);
     dispatcher.register(tpahere_builder as LiteralArgumentBuilderSrc);
 
-    let accept_builder = CommandsHc::literal("hctpaccept").executes(|ctx| {
+    let accept_builder = ess_literal("tpaccept", "hctpaccept", "TPA").executes(|ctx| {
         return hc_tpa_respond(ctx.getSource() as CommandSourceStackHc, true);
     });
     dispatcher.register(accept_builder as LiteralArgumentBuilderSrc);
 
-    let deny_builder = CommandsHc::literal("hctpdeny").executes(|ctx| {
+    let deny_builder = ess_literal("tpdeny", "hctpdeny", "TPA").executes(|ctx| {
         return hc_tpa_respond(ctx.getSource() as CommandSourceStackHc, false);
     });
     dispatcher.register(deny_builder as LiteralArgumentBuilderSrc);
 
-    let cancel_builder = CommandsHc::literal("hctpcancel").executes(|ctx| {
+    let cancel_builder = ess_literal("tpcancel", "hctpcancel", "TPA").executes(|ctx| {
         return hc_tpa_cancel(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(cancel_builder as LiteralArgumentBuilderSrc);

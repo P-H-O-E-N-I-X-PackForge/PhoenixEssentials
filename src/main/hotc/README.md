@@ -7,6 +7,22 @@ is **not** replaced: HC code compiles into `net.phoenixvine.essentials.hc.hcComp
 `hotChocolate { }` in `build.gradle`) and is called from `PhoenixEssentials.java` /
 `EssentialsHcClient.java`.
 
+## Takeover mode (default) and rollback
+
+The HC ports **own the real command names** (`/home`, `/warp`, `/gmc`, ...) and the **Y** key; **H**
+opens the original Java config screen as a fallback. Launch with
+`-Dphoenix_essentials.use_java=true` to put the original Java commands/screen/event handlers back
+exactly as they were -- the HC versions then register as `hc`-prefixed twins (`/hchome`, ...) on H.
+The switch is `EssentialsHcMode`; `EssentialsCommands.registerAll` picks per command group (still
+gated by each `ENABLE_*` config), and the Java event handlers early-return in takeover mode so each
+event runs once. Parity carried across so a takeover doesn't loosen anything: every command applies its
+`EssentialsPermissions` node (`EssentialsHcMode.allowed`), the op-level-2 gate on the `<player>`
+forms, and the per-dimension `social`/`kits` feature toggles. `/sethomelimit` stays Java.
+
+Two Java entry points still open the ORIGINAL config screen (they live in `EssentialsClientProxy`,
+which has uncommitted work, and pass a parent screen the HC screen doesn't take yet): the Mods-menu
+config button and the suite-bar button.
+
 ## Approach
 
 * **Call the real Java, don't reimplement it.** The ported screens call the real
@@ -29,21 +45,22 @@ is **not** replaced: HC code compiles into `net.phoenixvine.essentials.hc.hcComp
 | `EssentialsConfigScreenHc.hotc` | `EssentialsConfigScreen` |
 | `EssentialsListScreenPort.hotc` | `EssentialsListScreen` (homes / warps / kits / auto-trash) |
 | `EssentialsHome/Warp/Kit/BackSpawn/Nick/Playtime/Message/Ignore/HealFeed/GodFly/Gamemode/Top/Seen/Afk/Tpa/TpForce/Tpx/Rtp/PlayerInfo/Trash/InvseeCommand(s).hotc` | the matching `*Command.java` |
+| `EssentialsCommandSupport.hotc` | `ess_literal` (real-or-twin name + permission gate), op-level gate |
+| `EssentialsPlayerEvents.hotc` | `EssentialsPlayerEvents` -- playtime, clone, last-seen, death spot (first HC event handlers, via hotc-mc `ForgeEvents.hotc`) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
 
 ## Not ported / known differences
 
-* `EssentialsAPI.isFeatureEnabled(...)` per-dimension feature toggles and `TeamCompat` are skipped.
-* Per-command permission nodes (`EssentialsPermissions.check`) and the op-level-2 gate on the
-  `<player>` forms are not ported.
+* `TeamCompat` (teammate teleport-delay bypass is applied in the Java `tpa` shim; `/sethomelimit
+  team` is Java) is not ported.
 * Warp/back/spawn/top/tpx teleports use the 4-arg `TeleportExecutor.request`, so they share the
   default cooldown rather than each command's own `*_COOLDOWN_SECONDS`.
 * `/hctpx` deliberately improves on the original: it force-loads the target chunk (the original
   drops you into the void) and scans for floor in ceilinged dimensions like the Nether.
 * `/hcplayerinfo` is plain text (no section-sign colors).
-* `/sethomelimit`, auto-AFK detection, `EssentialsInputHandler` and the remaining non-command
-  systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
+* `/sethomelimit`, auto-AFK detection, `EssentialsAutoTrashEvents`, `TeleportExecutor`, the
+  sync packets/`EssentialsNetwork`, the data registries and the remaining systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
   sync the flag to the client) and doesn't resync on login.
 
 ## HC gotchas found while porting

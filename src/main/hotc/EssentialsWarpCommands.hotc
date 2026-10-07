@@ -51,13 +51,13 @@ pub fn register_real_warp_commands(dispatcher: CommandDispatcherSrc) {
         .executes(|ctx| {
         return hc_teleport_warp(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
     });
-    let warp_builder = CommandsHc::literal("hcwarp").then(warp_name_arg);
+    let warp_builder = ess_literal("warp", "hcwarp", "WARP").then(warp_name_arg);
     dispatcher.register(warp_builder as LiteralArgumentBuilderSrc);
 
     let setwarp_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_set_warp(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
     });
-    let setwarp_builder = CommandsHc::literal("hcsetwarp").then(setwarp_name_arg);
+    let setwarp_builder = ess_literal("setwarp", "hcsetwarp", "SETWARP").then(setwarp_name_arg);
     dispatcher.register(setwarp_builder as LiteralArgumentBuilderSrc);
 
     let delwarp_name_arg = CommandsHc::argument("name", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
@@ -65,10 +65,10 @@ pub fn register_real_warp_commands(dispatcher: CommandDispatcherSrc) {
         .executes(|ctx| {
         return hc_delete_warp(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "name"));
     });
-    let delwarp_builder = CommandsHc::literal("hcdelwarp").then(delwarp_name_arg);
+    let delwarp_builder = ess_literal("delwarp", "hcdelwarp", "DELWARP").then(delwarp_name_arg);
     dispatcher.register(delwarp_builder as LiteralArgumentBuilderSrc);
 
-    let warps_builder = CommandsHc::literal("hcwarps").executes(|ctx| {
+    let warps_builder = ess_literal("warps", "hcwarps", "WARPS").executes(|ctx| {
         return hc_list_warps(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(warps_builder as LiteralArgumentBuilderSrc);

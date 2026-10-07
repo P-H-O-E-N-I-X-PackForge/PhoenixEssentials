@@ -51,13 +51,15 @@ fn hc_toggle_fly(source: &CommandSourceStackHc, target: ServerPlayer, named: Boo
 }
 
 pub fn register_real_god_fly_commands(dispatcher: CommandDispatcherSrc) {
-    let god_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+    let god_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .requires(|src| { return ess_op_required(src); })
+        .executes(|ctx| {
         let source = ctx.getSource() as CommandSourceStackHc;
         let target = hc_god_resolve(&source, StringArgumentTypeSrc::getString(ctx, "player"));
         if target == null { return 0; }
         return hc_toggle_god(&source, target, true);
     });
-    let god_builder = CommandsHc::literal("hcgod")
+    let god_builder = ess_literal("god", "hcgod", "GOD")
         .executes(|ctx| {
             let source = ctx.getSource() as CommandSourceStackHc;
             let player = source.getPlayer();
@@ -67,13 +69,15 @@ pub fn register_real_god_fly_commands(dispatcher: CommandDispatcherSrc) {
         .then(god_player_arg);
     dispatcher.register(god_builder as LiteralArgumentBuilderSrc);
 
-    let fly_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+    let fly_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .requires(|src| { return ess_op_required(src); })
+        .executes(|ctx| {
         let source = ctx.getSource() as CommandSourceStackHc;
         let target = hc_god_resolve(&source, StringArgumentTypeSrc::getString(ctx, "player"));
         if target == null { return 0; }
         return hc_toggle_fly(&source, target, true);
     });
-    let fly_builder = CommandsHc::literal("hcfly")
+    let fly_builder = ess_literal("fly", "hcfly", "FLY")
         .executes(|ctx| {
             let source = ctx.getSource() as CommandSourceStackHc;
             let player = source.getPlayer();

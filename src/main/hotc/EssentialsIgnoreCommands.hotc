@@ -12,6 +12,10 @@
 fn hc_set_ignored(source: CommandSourceStackHc, target_name: String, ignore: Bool) -> Int {
     let player = source.getPlayer();
     if player == null { return 0; }
+    if !EssentialsHcModeHc::featureEnabled(&player, "social") {
+        source.sendFailure(Component::literal("Social commands aren't available here right now.") as Component);
+        return 0;
+    }
     let target = source.getServer().getPlayerList().getPlayerByName(target_name);
     if target == null {
         source.sendFailure(Component::literal("Player \"{target_name}\" isn't online.") as Component);
@@ -37,12 +41,12 @@ pub fn register_real_ignore_commands(dispatcher: CommandDispatcherSrc) {
     let ignore_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_set_ignored(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), true);
     });
-    let ignore_builder = CommandsHc::literal("hcignore").then(ignore_arg);
+    let ignore_builder = ess_literal("ignore", "hcignore", "IGNORE").then(ignore_arg);
     dispatcher.register(ignore_builder as LiteralArgumentBuilderSrc);
 
     let unignore_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_set_ignored(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), false);
     });
-    let unignore_builder = CommandsHc::literal("hcunignore").then(unignore_arg);
+    let unignore_builder = ess_literal("unignore", "hcunignore", "IGNORE").then(unignore_arg);
     dispatcher.register(unignore_builder as LiteralArgumentBuilderSrc);
 }

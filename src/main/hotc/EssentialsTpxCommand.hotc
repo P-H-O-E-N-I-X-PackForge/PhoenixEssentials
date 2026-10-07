@@ -25,6 +25,6 @@ pub fn register_real_tpx_command(dispatcher: CommandDispatcherSrc) {
     let dimension_arg = CommandsHc::argument("dimension", DimensionArgumentSrc::dimension() as ArgumentTypeSrc).executes(|ctx| {
         return hc_tpx(ctx.getSource() as CommandSourceStackHc, DimensionArgumentSrc::getDimension(ctx, "dimension"));
     });
-    let tpx_builder = CommandsHc::literal("hctpx").then(dimension_arg);
+    let tpx_builder = ess_literal("tpx", "hctpx", "TPX").then(dimension_arg);
     dispatcher.register(tpx_builder as LiteralArgumentBuilderSrc);
 }

@@ -51,12 +51,12 @@ pub fn register_real_tpforce_commands(dispatcher: CommandDispatcherSrc) {
         return hc_tpforce(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"), StringArgumentTypeSrc::getString(ctx, "target"));
     });
     let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).then(target_arg);
-    let tpforce_builder = CommandsHc::literal("hctpforce").then(player_arg);
+    let tpforce_builder = ess_literal("tpforce", "hctpforce", "TPFORCE").then(player_arg);
     dispatcher.register(tpforce_builder as LiteralArgumentBuilderSrc);
 
     let here_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_tphere(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"));
     });
-    let tphere_builder = CommandsHc::literal("hctphere").then(here_arg);
+    let tphere_builder = ess_literal("tphere", "hctphere", "TPFORCE").then(here_arg);
     dispatcher.register(tphere_builder as LiteralArgumentBuilderSrc);
 }

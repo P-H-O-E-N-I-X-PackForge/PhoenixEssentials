@@ -247,6 +247,28 @@ public final class EssentialsHcServerBridge {
         return ((java.util.function.Supplier<?>) supplier).get();
     }
 
+    // --- Event-handler helpers (EssentialsPlayerEvents.hotc) ---
+
+    // Direct copy of EssentialsPlayerEvents.onPlayerClone's capability transfer.
+    public static void copyPlayerData(net.minecraft.world.entity.player.Player original,
+                                      net.minecraft.world.entity.player.Player entity) {
+        original.reviveCaps();
+        original.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                .ifPresent(oldData -> entity.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                        .ifPresent(newData -> newData.deserializeNBT(oldData.serializeNBT())));
+        original.invalidateCaps();
+    }
+
+    // The offline index is keyed by UUID, which HC has no binding for.
+    public static void recordSeen(ServerPlayer player) {
+        OfflinePlayerIndex.recordSeen(player.getUUID(), player.getGameProfile().getName());
+    }
+
+    // `BACK_AFTER_DEATH` is a ForgeConfigSpec.BooleanValue.
+    public static boolean backAfterDeath() {
+        return EssentialsServerConfig.BACK_AFTER_DEATH.get();
+    }
+
     public static String dimensionLabel(ServerLevel level) {
         return level.dimension().location().toString();
     }
@@ -303,7 +325,8 @@ public final class EssentialsHcServerBridge {
                 + "§7. Expires in " + timeoutSeconds + "s."));
         String action = here ? "wants you to teleport to them" : "wants to teleport to you";
         target.sendSystemMessage(Component.literal("§f" + requester.getName().getString() + " §7" + action
-                + ". §a/hctpaccept §7or §c/hctpdeny §7(expires in " + timeoutSeconds + "s)"));
+                + ". §a/" + EssentialsHcMode.literal("tpaccept", "hctpaccept") + " §7or §c/" + EssentialsHcMode.literal("tpdeny", "hctpdeny")
+                + " §7(expires in " + timeoutSeconds + "s)"));
         return null;
     }
 

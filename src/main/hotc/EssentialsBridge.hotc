@@ -196,6 +196,8 @@ extern class EssentialsPlayerDataHc = "net.phoenixvine.essentials.capability.Pla
     fn setNickname(&self, nickname: String);
     fn isAfk(&self) -> Bool;
     fn setAfk(&self, afk: Bool);
+    fn addPlaytimeTicks(&self, ticks: Long);
+    fn setBack(&self, loc: NamedLocationHc);
     // Real auto-trash set ops -- `toggleAlwaysTrash` returns `true` if the id is NOW trashed.
     fn toggleAlwaysTrash(&self, id: ResourceLocation) -> Bool;
     fn removeAlwaysTrash(&self, id: ResourceLocation);
@@ -258,6 +260,10 @@ extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.Essentials
     // Real, nullable -- `null` if the target has no essentials data.
     static fn playerInfo(target: ServerPlayer) -> String?;
     static fn openTrash(player: ServerPlayer);
+    // Event-handler helpers -- see `EssentialsPlayerEvents.hotc`.
+    static fn copyPlayerData(original: Player, entity: Player);
+    static fn recordSeen(player: ServerPlayer);
+    static fn backAfterDeath() -> Bool;
     static fn autoTrashCsv(data: &EssentialsPlayerDataHc) -> String;
     // Real, nullable -- an error message string on failure, `null` on success.
     static fn sendDirectMessage(sender: ServerPlayer, target: ServerPlayer, message: String) -> String?;

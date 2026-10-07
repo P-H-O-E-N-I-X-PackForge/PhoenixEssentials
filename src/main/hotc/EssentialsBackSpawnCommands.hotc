@@ -43,21 +43,24 @@ fn hc_set_spawn(source: CommandSourceStackHc) -> Int {
     return 1;
 }
 
-pub fn register_real_back_spawn_commands(dispatcher: CommandDispatcherSrc) {
-    let back_builder = CommandsHc::literal("hcback").executes(|ctx| {
+// Split in two because the real mod gates them separately (`ENABLE_BACK` vs `ENABLE_SPAWN`).
+pub fn register_real_back_command(dispatcher: CommandDispatcherSrc) {
+    let back_builder = ess_literal("back", "hcback", "BACK").executes(|ctx| {
         return hc_teleport_back(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(back_builder as LiteralArgumentBuilderSrc);
+}
 
+pub fn register_real_spawn_commands(dispatcher: CommandDispatcherSrc) {
     // `hcspawn2`, not `hcspawn` -- hotc-mc's own `command_example.hc` (vendored into this same
     // merged compile) already declares a `register_hcspawn` with that literal; nothing currently
     // calls it from this project, but the name is avoided here to not create a latent collision.
-    let spawn_builder = CommandsHc::literal("hcspawn2").executes(|ctx| {
+    let spawn_builder = ess_literal("spawn", "hcspawn2", "SPAWN").executes(|ctx| {
         return hc_teleport_spawn(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(spawn_builder as LiteralArgumentBuilderSrc);
 
-    let setspawn_builder = CommandsHc::literal("hcsetspawn").executes(|ctx| {
+    let setspawn_builder = ess_literal("setspawn", "hcsetspawn", "SETSPAWN").executes(|ctx| {
         return hc_set_spawn(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(setspawn_builder as LiteralArgumentBuilderSrc);

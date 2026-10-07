@@ -42,7 +42,7 @@ pub fn register_real_playtime_command(dispatcher: CommandDispatcherSrc) {
     let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_playtime_named(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"));
     });
-    let playtime_builder = CommandsHc::literal("hcplaytime")
+    let playtime_builder = ess_literal("playtime", "hcplaytime", "PLAYTIME")
         .executes(|ctx| { return hc_playtime_self(ctx.getSource() as CommandSourceStackHc); })
         .then(player_arg);
     dispatcher.register(playtime_builder as LiteralArgumentBuilderSrc);

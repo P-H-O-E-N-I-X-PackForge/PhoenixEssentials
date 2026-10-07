@@ -21,6 +21,6 @@ pub fn register_real_seen_command(dispatcher: CommandDispatcherSrc) {
     let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_seen(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"));
     });
-    let seen_builder = CommandsHc::literal("hcseen").then(player_arg);
+    let seen_builder = ess_literal("seen", "hcseen", "SEEN").then(player_arg);
     dispatcher.register(seen_builder as LiteralArgumentBuilderSrc);
 }

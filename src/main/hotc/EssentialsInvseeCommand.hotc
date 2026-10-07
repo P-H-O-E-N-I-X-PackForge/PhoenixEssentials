@@ -28,6 +28,6 @@ pub fn register_real_invsee_command(dispatcher: CommandDispatcherSrc) {
     let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_invsee(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"));
     });
-    let invsee_builder = CommandsHc::literal("hcinvsee").then(player_arg);
+    let invsee_builder = ess_literal("invsee", "hcinvsee", "INVSEE").then(player_arg);
     dispatcher.register(invsee_builder as LiteralArgumentBuilderSrc);
 }

@@ -15,6 +15,10 @@
 fn hc_set_nick(source: CommandSourceStackHc, nickname: String) -> Int {
     let player = source.getPlayer();
     if player == null { return 0; }
+    if !EssentialsHcModeHc::featureEnabled(&player, "social") {
+        source.sendFailure(Component::literal("Social commands aren't available here right now.") as Component);
+        return 0;
+    }
     if nickname.length() > 24 {
         source.sendFailure(Component::literal("Nicknames can be at most 24 characters.") as Component);
         return 0;
@@ -27,6 +31,12 @@ fn hc_set_nick(source: CommandSourceStackHc, nickname: String) -> Int {
 }
 
 fn hc_clear_nick(source: CommandSourceStackHc) -> Int {
+    let player = source.getPlayer();
+    if player == null { return 0; }
+    if !EssentialsHcModeHc::featureEnabled(&player, "social") {
+        source.sendFailure(Component::literal("Social commands aren't available here right now.") as Component);
+        return 0;
+    }
     let data = ess_player_data(&source);
     if data == null { return 0; }
     data.setNickname("");
@@ -41,7 +51,7 @@ pub fn register_real_nick_command(dispatcher: CommandDispatcherSrc) {
     // `hcnick2`, not `hcnick` -- hotc-mc's own `command_example.hc` (vendored into this same merged
     // compile) already declares a `register_hcnick` with that literal; same latent-collision
     // avoidance `EssentialsBackSpawnCommands.hotc`'s own `hcspawn2` already explains.
-    let nick_builder = CommandsHc::literal("hcnick2")
+    let nick_builder = ess_literal("nick", "hcnick2", "NICK")
         .executes(|ctx| { return hc_clear_nick(ctx.getSource() as CommandSourceStackHc); })
         .then(nickname_arg);
     dispatcher.register(nick_builder as LiteralArgumentBuilderSrc);

@@ -63,7 +63,7 @@ fn hc_suggest_autotrash_ids(ctx: CommandContextSrc, builder: SuggestionsBuilderH
 }
 
 pub fn register_real_trash_commands(dispatcher: CommandDispatcherSrc) {
-    let trash_builder = CommandsHc::literal("hctrash").executes(|ctx| {
+    let trash_builder = ess_literal("essentialstrash", "hctrash", "").executes(|ctx| {
         return hc_open_trash(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(trash_builder as LiteralArgumentBuilderSrc);
@@ -74,7 +74,7 @@ pub fn register_real_trash_commands(dispatcher: CommandDispatcherSrc) {
         return hc_remove_autotrash(ctx.getSource() as CommandSourceStackHc, ResourceLocationArgumentSrc::getId(ctx, "item"));
     });
     let remove_literal = CommandsHc::literal("remove").then(item_arg);
-    let autotrash_builder = CommandsHc::literal("hcautotrash")
+    let autotrash_builder = ess_literal("essentialsautotrash", "hcautotrash", "")
         .executes(|ctx| { return hc_toggle_held_autotrash(ctx.getSource() as CommandSourceStackHc); })
         .then(remove_literal);
     dispatcher.register(autotrash_builder as LiteralArgumentBuilderSrc);

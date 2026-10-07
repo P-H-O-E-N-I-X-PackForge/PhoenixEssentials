@@ -62,6 +62,7 @@ public class PhoenixEssentials {
             LOGGER.info("[Phoenix Essentials] Bootstrapping server essentials...");
             EssentialsNetwork.init();
             hcCompileMerged1.setup_afk_networking();
+            if (EssentialsHcMode.takeover()) hcCompileMerged1.register_player_events();
         });
     }
 
@@ -119,28 +120,34 @@ public class PhoenixEssentials {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         EssentialsCommands.registerAll(event.getDispatcher());
-        // Hot Chocolate ports (src/main/hotc, see its README) -- `hc`-prefixed, side by side with the real commands above.
-        hcCompileMerged1.register_real_home_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_warp_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_kit_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_back_spawn_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_nick_command(event.getDispatcher());
-        hcCompileMerged1.register_real_playtime_command(event.getDispatcher());
-        hcCompileMerged1.register_real_message_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_ignore_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_heal_feed_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_god_fly_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_gamemode_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_top_command(event.getDispatcher());
-        hcCompileMerged1.register_real_seen_command(event.getDispatcher());
-        hcCompileMerged1.register_real_afk_command(event.getDispatcher());
-        hcCompileMerged1.register_real_tpa_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_tpforce_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_tpx_command(event.getDispatcher());
-        hcCompileMerged1.register_real_rtp_command(event.getDispatcher());
-        hcCompileMerged1.register_real_playerinfo_command(event.getDispatcher());
-        hcCompileMerged1.register_real_trash_commands(event.getDispatcher());
-        hcCompileMerged1.register_real_invsee_command(event.getDispatcher());
+        // By default the Hot Chocolate ports own the real command names and are registered by
+        // EssentialsCommands.registerAll. With -Dphoenix_essentials.use_java=true the original Java
+        // commands are used instead and the HC versions come up here as `hc`-prefixed twins
+        // (/hchome, /hcwarp, ...) for side-by-side comparison.
+        if (!EssentialsHcMode.takeover()) {
+            hcCompileMerged1.register_real_home_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_warp_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_kit_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_back_command(event.getDispatcher());
+            hcCompileMerged1.register_real_spawn_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_nick_command(event.getDispatcher());
+            hcCompileMerged1.register_real_playtime_command(event.getDispatcher());
+            hcCompileMerged1.register_real_message_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_ignore_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_heal_feed_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_god_fly_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_gamemode_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_top_command(event.getDispatcher());
+            hcCompileMerged1.register_real_seen_command(event.getDispatcher());
+            hcCompileMerged1.register_real_afk_command(event.getDispatcher());
+            hcCompileMerged1.register_real_tpa_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_tpforce_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_tpx_command(event.getDispatcher());
+            hcCompileMerged1.register_real_rtp_command(event.getDispatcher());
+            hcCompileMerged1.register_real_playerinfo_command(event.getDispatcher());
+            hcCompileMerged1.register_real_trash_commands(event.getDispatcher());
+            hcCompileMerged1.register_real_invsee_command(event.getDispatcher());
+        }
     }
 
     public static ResourceLocation id(String path) {

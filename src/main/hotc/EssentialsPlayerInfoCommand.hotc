@@ -33,7 +33,7 @@ pub fn register_real_playerinfo_command(dispatcher: CommandDispatcherSrc) {
     let player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
         return hc_player_info_named(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "player"));
     });
-    let info_builder = CommandsHc::literal("hcplayerinfo")
+    let info_builder = ess_literal("playerinfo", "hcplayerinfo", "PLAYERINFO")
         .executes(|ctx| { return hc_player_info_self(ctx.getSource() as CommandSourceStackHc); })
         .then(player_arg);
     dispatcher.register(info_builder as LiteralArgumentBuilderSrc);

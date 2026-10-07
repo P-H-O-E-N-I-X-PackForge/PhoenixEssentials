@@ -221,6 +221,11 @@ impl HcEssentialsConfigScreen {
             Minecraft::getInstance().setScreen(null);
             return true;
         }
+        // The original also closes when its own open-key is pressed again.
+        if EssentialsHcClientHc::isOpenMenuKey(key_code, scan_code) {
+            Minecraft::getInstance().setScreen(null);
+            return true;
+        }
         return false;
     }
 
@@ -235,4 +240,8 @@ impl HcEssentialsConfigScreen {
 pub fn open_essentials_config_screen_hc() {
     let screen = HcEssentialsConfigScreen::new(Component::literal("Phoenix Essentials") as Component);
     Minecraft::getInstance().setScreen(screen as ScreenHc);
+}
+
+extern class EssentialsHcClientHc = "net.phoenixvine.essentials.client.EssentialsHcClient" {
+    static fn isOpenMenuKey(key: Int, scan_code: Int) -> Bool;
 }

@@ -59,6 +59,12 @@ public final class HomeCommand {
         dispatcher.register(Commands.literal("homes")
                 .requires(source -> EssentialsPermissions.check(source, EssentialsPermissions.HOMES))
                 .executes(ctx -> listHomes(ctx.getSource())));
+        registerLimit(dispatcher);
+    }
+
+    // Split out so the Hot Chocolate takeover (EssentialsHcMode) can register the HC /home family
+    // while still keeping this Java-only /sethomelimit.
+    public static void registerLimit(CommandDispatcher<CommandSourceStack> dispatcher) {
 
         dispatcher.register(Commands.literal("sethomelimit")
                 .requires(source -> EssentialsPermissions.check(source, EssentialsPermissions.SETHOMELIMIT))

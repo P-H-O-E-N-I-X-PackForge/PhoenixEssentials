@@ -53,7 +53,9 @@ fn hc_feed(source: &CommandSourceStackHc, target: ServerPlayer, named: Bool) -> 
 }
 
 pub fn register_real_heal_feed_commands(dispatcher: CommandDispatcherSrc) {
-    let heal_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+    let heal_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .requires(|src| { return ess_op_required(src); })
+        .executes(|ctx| {
         let source = ctx.getSource() as CommandSourceStackHc;
         let target = hc_resolve_target(&source, StringArgumentTypeSrc::getString(ctx, "player"));
         if target == null { return 0; }
@@ -62,7 +64,7 @@ pub fn register_real_heal_feed_commands(dispatcher: CommandDispatcherSrc) {
     // `hcheal2`, not `hcheal` -- hotc-mc's own `command_example.hc` (vendored into this same merged
     // compile) already declares a `register_hcheal` with that literal; same latent-collision
     // avoidance `EssentialsBackSpawnCommands.hotc`'s own `hcspawn2` already explains.
-    let heal_builder = CommandsHc::literal("hcheal2")
+    let heal_builder = ess_literal("heal", "hcheal2", "HEAL")
         .executes(|ctx| {
             let source = ctx.getSource() as CommandSourceStackHc;
             let player = source.getPlayer();
@@ -72,13 +74,15 @@ pub fn register_real_heal_feed_commands(dispatcher: CommandDispatcherSrc) {
         .then(heal_player_arg);
     dispatcher.register(heal_builder as LiteralArgumentBuilderSrc);
 
-    let feed_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+    let feed_player_arg = CommandsHc::argument("player", StringArgumentTypeSrc::word() as ArgumentTypeSrc)
+        .requires(|src| { return ess_op_required(src); })
+        .executes(|ctx| {
         let source = ctx.getSource() as CommandSourceStackHc;
         let target = hc_resolve_target(&source, StringArgumentTypeSrc::getString(ctx, "player"));
         if target == null { return 0; }
         return hc_feed(&source, target, true);
     });
-    let feed_builder = CommandsHc::literal("hcfeed")
+    let feed_builder = ess_literal("feed", "hcfeed", "FEED")
         .executes(|ctx| {
             let source = ctx.getSource() as CommandSourceStackHc;
             let player = source.getPlayer();

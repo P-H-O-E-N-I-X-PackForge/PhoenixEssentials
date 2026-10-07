@@ -18,7 +18,7 @@ fn hc_rtp(source: CommandSourceStackHc) -> Int {
 }
 
 pub fn register_real_rtp_command(dispatcher: CommandDispatcherSrc) {
-    let rtp_builder = CommandsHc::literal("hcrtp").executes(|ctx| {
+    let rtp_builder = ess_literal("rtp", "hcrtp", "RTP").executes(|ctx| {
         return hc_rtp(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(rtp_builder as LiteralArgumentBuilderSrc);
