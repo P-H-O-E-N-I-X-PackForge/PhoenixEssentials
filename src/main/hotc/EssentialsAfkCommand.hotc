@@ -19,6 +19,9 @@ fn hc_toggle_afk(source: CommandSourceStackHc) -> Int {
     var suffix = "is no longer AFK.";
     if now_afk { suffix = "is now AFK."; }
     source.getServer().getPlayerList().broadcastSystemMessage(Component::literal("{display_name} {suffix}") as Component, false);
+    // Sync the flag to this player's own client so the HUD badge (`EssentialsAfkOverlay.hotc`) shows.
+    // Last use of `player` -- `send_afk_state` takes it by value (it's captured by a lambda).
+    send_afk_state(player, now_afk);
     return 1;
 }
 

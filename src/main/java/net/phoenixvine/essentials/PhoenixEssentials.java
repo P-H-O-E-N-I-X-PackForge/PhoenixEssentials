@@ -61,6 +61,7 @@ public class PhoenixEssentials {
         event.enqueueWork(() -> {
             LOGGER.info("[Phoenix Essentials] Bootstrapping server essentials...");
             EssentialsNetwork.init();
+            hcCompileMerged1.setup_afk_networking();
         });
     }
 

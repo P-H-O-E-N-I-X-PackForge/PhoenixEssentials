@@ -30,6 +30,7 @@ is **not** replaced: HC code compiles into `net.phoenixvine.essentials.hc.hcComp
 | `EssentialsListScreenPort.hotc` | `EssentialsListScreen` (homes / warps / kits / auto-trash) |
 | `EssentialsHome/Warp/Kit/BackSpawn/Nick/Playtime/Message/Ignore/HealFeed/GodFly/Gamemode/Top/Seen/Afk/Tpa/TpForce/Tpx/Rtp/PlayerInfo/Trash/InvseeCommand(s).hotc` | the matching `*Command.java` |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
+| `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
 
 ## Not ported / known differences
 
@@ -41,8 +42,9 @@ is **not** replaced: HC code compiles into `net.phoenixvine.essentials.hc.hcComp
 * `/hctpx` deliberately improves on the original: it force-loads the target chunk (the original
   drops you into the void) and scans for floor in ceilinged dimensions like the Nether.
 * `/hcplayerinfo` is plain text (no section-sign colors).
-* `/sethomelimit`, the AFK overlay/detection, `EssentialsInputHandler` and the remaining
-  non-command systems are still Java only.
+* `/sethomelimit`, auto-AFK detection, `EssentialsInputHandler` and the remaining non-command
+  systems are still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
+  sync the flag to the client) and doesn't resync on login.
 
 ## HC gotchas found while porting
 

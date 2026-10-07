@@ -240,6 +240,13 @@ public final class EssentialsHcServerBridge {
         return String.join(",", ids);
     }
 
+    // `SimpleChannel.registerMessage`'s handler receives its Context wrapped in a Supplier<Context>;
+    // calling .get() on a value typed as a plain extern interface has no HC mechanism yet, so this
+    // is the same tiny unwrap hotc-mc's Ganache shim (GanacheNet.unwrapSupplier) provides there.
+    public static Object unwrapSupplier(Object supplier) {
+        return ((java.util.function.Supplier<?>) supplier).get();
+    }
+
     public static String dimensionLabel(ServerLevel level) {
         return level.dimension().location().toString();
     }

@@ -1,0 +1,110 @@
+// --- AFK overlay: a HUD badge, new in the HC port (the original has only the SETTING) ---
+//
+// PhoenixEssentials already ships the "Show AFK overlay indicator" toggle (config screen +
+// `EssentialsSettings`) but nothing in the Java mod reads it -- there is no overlay to port, so
+// this is the missing half, written in HC:
+//   * server: `/hcafk2` (`EssentialsAfkCommand.hotc`) calls `send_afk_state` after flipping the
+//     real `PlayerEssentialsData.afk` flag;
+//   * network: a tiny S2C `AfkSyncPacket` on its OWN channel (the real `EssentialsNetwork.CHANNEL`
+//     registers its ids from Java, so this doesn't touch it) -- same shape as hotc-mc's
+//     `UiDataPacket`, including the `enqueueWork` hop onto the main thread;
+//   * client: `EssentialsHcAfkOverlay` (Java: the `RegisterGuiOverlaysEvent` hook + the synced
+//     flag/timer) calls `render_afk_overlay` every frame; this draws the badge in the real
+//     `EssentialsThemePalette` colors, only when the setting is on AND the flag is set.
+// Disclosed scope: only `/hcafk2` syncs the flag (the real `/afk` and any auto-AFK are Java and
+// don't send it); no resync on login/respawn.
+
+struct AfkSyncPacket {
+    afk: Int,
+}
+
+impl AfkSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) {
+        buf.writeVarInt(self.afk);
+    }
+
+    static fn decode(buf: FriendlyByteBuf) -> AfkSyncPacket {
+        return AfkSyncPacket { afk: buf.readVarInt() };
+    }
+
+    fn on_received(&self) {
+        EssentialsHcAfkOverlayHc::setActive(self.afk != 0);
+    }
+}
+
+// `hotc-mc`'s own `GanacheNetHc::unwrapSupplier` binds a Ganache-only shim class -- this project's
+// equivalent lives in `EssentialsHcServerBridge` (second alias to the same class `EssentialsBridge`
+// already binds, just exposing the one extra method).
+extern class EssentialsNetUnwrapHc = "net.phoenixvine.essentials.EssentialsHcServerBridge" {
+    static fn unwrapSupplier(o: PhoenixObject4Net) -> PhoenixObject4Net;
+}
+
+extern class EssentialsHcAfkOverlayHc = "net.phoenixvine.essentials.client.EssentialsHcAfkOverlay" {
+    static fn setActive(afk: Bool);
+    static fn isActive() -> Bool;
+    static fn label() -> String;
+}
+
+pub static ess_afk_channel: SimpleChannel? = null;
+
+// Same nullable-static assignment trick `ui_render.hc`'s own `set_ui_channel` documents: a plain
+// `SimpleChannel` can't be assigned straight into a `SimpleChannel?` static, but passing it
+// through a `SimpleChannel?`-typed parameter is accepted.
+fn set_afk_channel(channel: SimpleChannel?) {
+    ess_afk_channel = channel;
+}
+
+fn register_afk_packet(channel: &SimpleChannel, id: Int) {
+    let cls = class("AfkSyncPacket") as JClassNet;
+    channel.registerMessage(
+        id,
+        cls,
+        |pkt, buf| { (pkt as AfkSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return AfkSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as AfkSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        }
+    );
+}
+
+// Called once from `PhoenixEssentials.commonSetup` (both sides need the channel registered).
+pub fn setup_afk_networking() {
+    let channel = NetworkRegistry::newSimpleChannel(
+        ResourceLocation::new("phoenix_essentials", "afk_hc"),
+        || { return "1" as PhoenixObject4Net; },
+        |v| { return true; },
+        |v| { return true; }
+    );
+    register_afk_packet(channel, 0);
+    set_afk_channel(channel);
+}
+
+// Server -> exactly one player (`PacketDistributor.PLAYER`), same targeting `send_ui_data` uses.
+pub fn send_afk_state(player: ServerPlayer, afk: Bool) {
+    let chan = ess_afk_channel;
+    if chan == null { return; }
+    var flag = 0;
+    if afk { flag = 1; }
+    let target = PacketDistributorHc::PLAYER.with(|| { return player as PhoenixObject4Net; });
+    chan.send(target, AfkSyncPacket { afk: flag } as PhoenixObject4Net);
+}
+
+// Client, every frame -- registered through `EssentialsHcAfkOverlay.onRegisterOverlays` (Java).
+pub fn render_afk_overlay(gfx: GuiGraphicsHc, screen_w: Int, screen_h: Int) {
+    if !EssentialsSettingsHc::get().isShowAfkOverlay() { return; }
+    if !EssentialsHcAfkOverlayHc::isActive() { return; }
+    EssentialsThemePaletteHc::refresh(PhoenixThemeHc::current());
+
+    let text = EssentialsHcAfkOverlayHc::label();
+    let text_w = Minecraft::getInstance().font.width(text);
+    let box_w = text_w + 16;
+    let box_h = 16;
+    let box_x = (screen_w - box_w) / 2;
+    let box_y = 6;
+
+    gfx.fill(box_x, box_y, box_x + box_w, box_y + box_h, EssentialsThemePaletteHc::PANEL);
+    EssentialsUIKitHc::drawBorder(&gfx, box_x, box_y, box_w, box_h, EssentialsThemePaletteHc::ACCENT);
+    gfx.drawCenteredString(Minecraft::getInstance().font, text, box_x + box_w / 2, box_y + 4, EssentialsThemePaletteHc::TEXT);
+}
