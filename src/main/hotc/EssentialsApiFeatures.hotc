@@ -1,0 +1,286 @@
+// --- HC port of EssentialsAPI's feature-gate / tier / feature-state machinery + simple data readers ---
+//
+// `EssentialsAPI.java` is the PUBLIC surface other mods compile against (e.g. a dimension mod gating
+// `teleport` per dimension), so its signatures stay exactly as they were -- `ResourceLocation` keys,
+// `BooleanSupplier` gates, the `EssentialsFeatureState` enum. It is now a facade: each method
+// converts those Java types to plain values (a dimension becomes its `toString()`, the enum its ordinal)
+// and calls the `api_*` functions below, which hold the actual state:
+//   * gates  -- feature id -> a `BooleanSupplier` the other mod registered (null = always allowed);
+//   * tiers  -- dimension -> integer tier;       * requirements -- (feature, dimension) -> minimum tier;
+//   * states -- (feature, dimension) -> DISABLED(0) / VISIBLE(1) / ENABLED(2).
+// Thread-safety: the original used ConcurrentHashMaps; other mods may register gates from parallel
+// mod-load dispatch, so every facade method takes one class-level lock (`synchronized`) instead.
+// `getHomes` (Java `Map` copy) and `isIgnoring` (a `UUID`) stay Java in the facade; `getBack` /
+// `getNickname` / `isAfk` / `getPlaytimeTicks` read the player's capability here.
+
+extern class FgBooleanSupplier = "java.util.function.BooleanSupplier" interface {
+    fn getAsBoolean(&self) -> Bool;
+}
+
+extern class FgData = "net.phoenixvine.essentials.EssentialsHcData" {
+    static fn logDebug(msg: String);
+}
+
+struct FgGate {
+    id: String,
+    check: FgBooleanSupplier,
+}
+struct FgTier {
+    dim: String,
+    tier: Int,
+}
+struct FgReq {
+    feature: String,
+    dim: String,
+    tier: Int,
+}
+struct FgState {
+    feature: String,
+    dim: String,
+    st: Int,
+}
+
+static fg_gates: [FgGate] = [FgGate { id: "", check: null as FgBooleanSupplier }; 0];
+static fg_tiers: [FgTier] = [FgTier { dim: "", tier: 0 }; 0];
+static fg_reqs: [FgReq] = [FgReq { feature: "", dim: "", tier: 0 }; 0];
+static fg_states: [FgState] = [FgState { feature: "", dim: "", st: 2 }; 0];
+static fg_known: [String] = ["teleport", "kits", "social"];
+static fg_warned: [String] = [""; 0];
+
+fn fg_contains(list: &[String], s: String) -> Bool {
+    var i = 0;
+    while i < list.length {
+        if list[i] == s { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn fg_add_known(id: String) {
+    if fg_contains(&fg_known, id) { return; }
+    var out = [""; fg_known.length + 1];
+    var i = 0;
+    while i < fg_known.length {
+        out[i] = fg_known[i];
+        i = i + 1;
+    }
+    out[fg_known.length] = id;
+    fg_known = out;
+}
+
+fn fg_warn_if_unknown(id: String) {
+    if fg_contains(&fg_known, id) { return; }
+    if fg_contains(&fg_warned, id) { return; }
+    var out = [""; fg_warned.length + 1];
+    var i = 0;
+    while i < fg_warned.length {
+        out[i] = fg_warned[i];
+        i = i + 1;
+    }
+    out[fg_warned.length] = id;
+    fg_warned = out;
+    FgData::logDebug("Feature id '{id}' was queried but has never been gated, tiered, or given an explicit state - defaulting to enabled. Fine if that's intentional; if not, check for a typo against whatever was supposed to configure it.");
+}
+
+// ---- gates ----
+
+fn fg_find_gate(id: String) -> Int {
+    var i = 0;
+    while i < fg_gates.length {
+        if fg_gates[i].id == id { return i; }
+        i = i + 1;
+    }
+    return -1;
+}
+
+pub fn api_register_gate(id: String, check: FgBooleanSupplier) {
+    fg_add_known(id);
+    let idx = fg_find_gate(id);
+    if idx >= 0 {
+        fg_gates[idx] = FgGate { id: id, check: check };
+        return;
+    }
+    var out = [FgGate { id: "", check: null as FgBooleanSupplier }; fg_gates.length + 1];
+    var i = 0;
+    while i < fg_gates.length {
+        out[i] = fg_gates[i];
+        i = i + 1;
+    }
+    out[fg_gates.length] = FgGate { id: id, check: check };
+    fg_gates = out;
+}
+
+pub fn api_clear_gate(id: String) {
+    let idx = fg_find_gate(id);
+    if idx < 0 { return; }
+    var out = [FgGate { id: "", check: null as FgBooleanSupplier }; fg_gates.length - 1];
+    var w = 0;
+    var i = 0;
+    while i < fg_gates.length {
+        if i != idx {
+            out[w] = fg_gates[i];
+            w = w + 1;
+        }
+        i = i + 1;
+    }
+    fg_gates = out;
+}
+
+fn fg_check_gate(id: String) -> Bool {
+    let idx = fg_find_gate(id);
+    if idx < 0 { return true; }
+    return fg_gates[idx].check.getAsBoolean();
+}
+
+// ---- tiers ----
+
+pub fn api_set_tier(dim: String, tier: Int) {
+    var i = 0;
+    while i < fg_tiers.length {
+        if fg_tiers[i].dim == dim {
+            fg_tiers[i] = FgTier { dim: dim, tier: tier };
+            return;
+        }
+        i = i + 1;
+    }
+    var out = [FgTier { dim: "", tier: 0 }; fg_tiers.length + 1];
+    var k = 0;
+    while k < fg_tiers.length {
+        out[k] = fg_tiers[k];
+        k = k + 1;
+    }
+    out[fg_tiers.length] = FgTier { dim: dim, tier: tier };
+    fg_tiers = out;
+}
+
+pub fn api_get_tier(dim: String) -> Int {
+    var i = 0;
+    while i < fg_tiers.length {
+        if fg_tiers[i].dim == dim { return fg_tiers[i].tier; }
+        i = i + 1;
+    }
+    return 0;
+}
+
+pub fn api_require_tier(feature: String, dim: String, tier: Int) {
+    fg_add_known(feature);
+    var i = 0;
+    while i < fg_reqs.length {
+        if fg_reqs[i].feature == feature && fg_reqs[i].dim == dim {
+            fg_reqs[i] = FgReq { feature: feature, dim: dim, tier: tier };
+            return;
+        }
+        i = i + 1;
+    }
+    var out = [FgReq { feature: "", dim: "", tier: 0 }; fg_reqs.length + 1];
+    var k = 0;
+    while k < fg_reqs.length {
+        out[k] = fg_reqs[k];
+        k = k + 1;
+    }
+    out[fg_reqs.length] = FgReq { feature: feature, dim: dim, tier: tier };
+    fg_reqs = out;
+}
+
+pub fn api_clear_tier_requirement(feature: String, dim: String) {
+    var idx = -1;
+    var i = 0;
+    while i < fg_reqs.length {
+        if fg_reqs[i].feature == feature && fg_reqs[i].dim == dim { idx = i; }
+        i = i + 1;
+    }
+    if idx < 0 { return; }
+    var out = [FgReq { feature: "", dim: "", tier: 0 }; fg_reqs.length - 1];
+    var w = 0;
+    var k = 0;
+    while k < fg_reqs.length {
+        if k != idx {
+            out[w] = fg_reqs[k];
+            w = w + 1;
+        }
+        k = k + 1;
+    }
+    fg_reqs = out;
+}
+
+// 1 if the feature is enabled in `dim`: its gate (if any) says yes AND any tier requirement for that
+// dimension is met.
+pub fn api_is_feature_enabled(feature: String, dim: String) -> Int {
+    fg_warn_if_unknown(feature);
+    if !fg_check_gate(feature) { return 0; }
+    var i = 0;
+    while i < fg_reqs.length {
+        if fg_reqs[i].feature == feature && fg_reqs[i].dim == dim {
+            if api_get_tier(dim) >= fg_reqs[i].tier { return 1; }
+            return 0;
+        }
+        i = i + 1;
+    }
+    return 1;
+}
+
+// ---- explicit feature states (0 DISABLED, 1 VISIBLE, 2 ENABLED) ----
+
+pub fn api_set_feature_state(feature: String, dim: String, state_value: Int) {
+    fg_add_known(feature);
+    var i = 0;
+    while i < fg_states.length {
+        if fg_states[i].feature == feature && fg_states[i].dim == dim {
+            fg_states[i] = FgState { feature: feature, dim: dim, st: state_value };
+            return;
+        }
+        i = i + 1;
+    }
+    var out = [FgState { feature: "", dim: "", st: 2 }; fg_states.length + 1];
+    var k = 0;
+    while k < fg_states.length {
+        out[k] = fg_states[k];
+        k = k + 1;
+    }
+    out[fg_states.length] = FgState { feature: feature, dim: dim, st: state_value };
+    fg_states = out;
+}
+
+pub fn api_get_feature_state(feature: String, dim: String) -> Int {
+    fg_warn_if_unknown(feature);
+    var i = 0;
+    while i < fg_states.length {
+        if fg_states[i].feature == feature && fg_states[i].dim == dim { return fg_states[i].st; }
+        i = i + 1;
+    }
+    return 2;
+}
+
+// ---- player data readers ----
+
+fn fg_data(player: &ServerPlayer) -> EssentialsPlayerDataHc {
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data = opt.orElse(null);
+    if data == null { return null; }
+    return data as EssentialsPlayerDataHc;
+}
+
+pub fn api_get_back(player: &ServerPlayer) -> NamedLocationHc? {
+    let data = fg_data(player);
+    if data == null { return null; }
+    return data.getBack();
+}
+
+pub fn api_get_nickname(player: &ServerPlayer) -> String {
+    let data = fg_data(player);
+    if data == null { return ""; }
+    return data.getNickname();
+}
+
+pub fn api_is_afk(player: &ServerPlayer) -> Int {
+    let data = fg_data(player);
+    if data == null { return 0; }
+    if data.isAfk() { return 1; }
+    return 0;
+}
+
+pub fn api_get_playtime_ticks(player: &ServerPlayer) -> Long {
+    let data = fg_data(player);
+    if data == null { return 0L; }
+    return data.getPlaytimeTicks();
+}

@@ -24,21 +24,25 @@ public final class EssentialsAPI {
     }
 
     public static NamedLocation getBack(ServerPlayer player) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.api_get_back(player);
         PlayerEssentialsData data = data(player);
         return data == null ? null : data.getBack();
     }
 
     public static String getNickname(ServerPlayer player) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.api_get_nickname(player);
         PlayerEssentialsData data = data(player);
         return data == null ? "" : data.getNickname();
     }
 
     public static boolean isAfk(ServerPlayer player) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.api_is_afk(player) != 0;
         PlayerEssentialsData data = data(player);
         return data != null && data.isAfk();
     }
 
     public static long getPlaytimeTicks(ServerPlayer player) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.api_get_playtime_ticks(player);
         PlayerEssentialsData data = data(player);
         return data == null ? 0 : data.getPlaytimeTicks();
     }
@@ -81,7 +85,11 @@ public final class EssentialsAPI {
         KNOWN_FEATURE_IDS.addAll(Set.of(FEATURE_TELEPORT, FEATURE_KITS, FEATURE_SOCIAL));
     }
 
-    public static void registerFeatureGate(String featureId, BooleanSupplier check) {
+    public static synchronized void registerFeatureGate(String featureId, BooleanSupplier check) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.api_register_gate(featureId, check);
+            return;
+        }
         KNOWN_FEATURE_IDS.add(featureId);
         FEATURE_GATES.put(featureId, check);
     }
@@ -90,29 +98,47 @@ public final class EssentialsAPI {
         registerFeatureGate(featureId, () -> enabled);
     }
 
-    public static void clearFeatureGate(String featureId) {
+    public static synchronized void clearFeatureGate(String featureId) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.api_clear_gate(featureId);
+            return;
+        }
         FEATURE_GATES.remove(featureId);
     }
 
-    public static void setTier(ResourceLocation dimension, int tier) {
+    public static synchronized void setTier(ResourceLocation dimension, int tier) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.api_set_tier(dimension.toString(), tier);
+            return;
+        }
         DIMENSION_TIERS.put(dimension, tier);
     }
 
-    public static int getTier(ResourceLocation dimension) {
+    public static synchronized int getTier(ResourceLocation dimension) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.api_get_tier(dimension.toString());
         return DIMENSION_TIERS.getOrDefault(dimension, 0);
     }
 
-    public static void requireTier(String featureId, ResourceLocation dimension, int requiredTier) {
+    public static synchronized void requireTier(String featureId, ResourceLocation dimension, int requiredTier) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.api_require_tier(featureId, dimension.toString(), requiredTier);
+            return;
+        }
         KNOWN_FEATURE_IDS.add(featureId);
         TIER_REQUIREMENTS.computeIfAbsent(featureId, id -> new ConcurrentHashMap<>()).put(dimension, requiredTier);
     }
 
-    public static void clearTierRequirement(String featureId, ResourceLocation dimension) {
+    public static synchronized void clearTierRequirement(String featureId, ResourceLocation dimension) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.api_clear_tier_requirement(featureId, dimension.toString());
+            return;
+        }
         Map<ResourceLocation, Integer> perDimension = TIER_REQUIREMENTS.get(featureId);
         if (perDimension != null) perDimension.remove(dimension);
     }
 
-    public static boolean isFeatureEnabled(String featureId, ResourceLocation dimension) {
+    public static synchronized boolean isFeatureEnabled(String featureId, ResourceLocation dimension) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.api_is_feature_enabled(featureId, dimension.toString()) != 0;
         warnIfUnknown(featureId);
         if (!checkGate(featureId)) return false;
 
@@ -139,12 +165,17 @@ public final class EssentialsAPI {
         }
     }
 
-    public static void setFeatureState(String featureId, ResourceLocation dimension, EssentialsFeatureState state) {
+    public static synchronized void setFeatureState(String featureId, ResourceLocation dimension, EssentialsFeatureState state) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
+            net.phoenixvine.essentials.hc.hcCompileMerged1.api_set_feature_state(featureId, dimension.toString(), state.ordinal());
+            return;
+        }
         KNOWN_FEATURE_IDS.add(featureId);
         FEATURE_STATES.computeIfAbsent(featureId, id -> new ConcurrentHashMap<>()).put(dimension, state);
     }
 
-    public static EssentialsFeatureState getFeatureState(String featureId, ResourceLocation dimension) {
+    public static synchronized EssentialsFeatureState getFeatureState(String featureId, ResourceLocation dimension) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return EssentialsFeatureState.values()[net.phoenixvine.essentials.hc.hcCompileMerged1.api_get_feature_state(featureId, dimension.toString())];
         warnIfUnknown(featureId);
         Map<ResourceLocation, EssentialsFeatureState> perDimension = FEATURE_STATES.get(featureId);
         return perDimension == null ? EssentialsFeatureState.ENABLED :

@@ -98,6 +98,10 @@ public final class EssentialsHcData {
         PhoenixEssentials.LOGGER.info(msg);
     }
 
+    public static void logDebug(String msg) {
+        PhoenixEssentials.LOGGER.debug(msg);
+    }
+
     public static void logWarn(String msg) {
         PhoenixEssentials.LOGGER.warn(msg);
     }

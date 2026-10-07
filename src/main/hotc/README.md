@@ -57,6 +57,7 @@ config button and the suite-bar button.
 | `EssentialsPermissions.hotc` | `EssentialsPermissions` -- builds/registers the 34 boolean permission nodes (always, even with `use_java`) and does the by-name gate lookup (`perm_allowed`) that replaced the old reflection; `EssentialsPermissions.java` copies the HC nodes into its static fields |
 | `EssentialsServerConfig.hotc` | `EssentialsServerConfig` -- builds the whole `ForgeConfigSpec` (same keys/defaults/ranges/comments); the Java class exposes `SPEC` + the typed value fields, filled from HC. Not switchable with `use_java` (the spec exists once) |
 | `EssentialsConfigOverrides.hotc` | `EssentialsConfigOverrides` -- generates/reads `phoenix_essentials-server-overrides.toml` (NightConfig) and applies non-default values onto the spec; the Java class keeps its original body for `use_java` and delegates here in takeover. Shim: `EssentialsHcData` (Path + logger). Enum-value coercion not carried over (the spec has no enum keys) |
+| `EssentialsApiFeatures.hotc` | `EssentialsAPI` -- feature gates / dimension tiers / tier requirements / feature states (plus the simple player-data readers); `EssentialsAPI.java` keeps the public signatures (`ResourceLocation`, `BooleanSupplier`, the enum) and delegates, `getHomes`/`isIgnoring`/kit+teleport one-liners stay Java. Covered by `EssentialsApiGameTests` |
 | `EssentialsSetHomeLimitCommand.hotc` | `/sethomelimit` incl. the `team` branch (calls `EssentialsTeamCompat.hotc`) |
 | `EssentialsSuggestions.hotc` | tab-complete helper shared by home/warp/kit/auto-trash |
 | `EssentialsAfkOverlay.hotc` (+ `client/EssentialsHcAfkOverlay.java`) | AFK HUD badge -- NEW, the original only has the setting; synced by `/hcafk2` over its own channel |
@@ -68,7 +69,7 @@ config button and the suite-bar button.
 * `/hctpx` deliberately improves on the original: it force-loads the target chunk (the original
   drops you into the void) and scans for floor in ceilinged dimensions like the Nether.
 * `/hcplayerinfo` is plain text (no section-sign colors).
-* Auto-AFK detection, `EssentialsAPI`, permissions/config registration and the remaining systems are
+* Auto-AFK detection and the remaining systems are
   still Java only. The AFK overlay only reflects `/hcafk2` (the real `/afk` doesn't
   sync the flag to the client) and doesn't resync on login.
 

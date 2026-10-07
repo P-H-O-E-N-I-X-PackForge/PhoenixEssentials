@@ -74,6 +74,8 @@ extern class EssentialsPlayerDataHc = "net.phoenixvine.essentials.capability.Pla
     fn getBack(&self) -> NamedLocationHc;
     fn setNickname(&self, nickname: String);
     fn isAfk(&self) -> Bool;
+    fn getNickname(&self) -> String;
+    fn getPlaytimeTicks(&self) -> Long;
     fn setAfk(&self, afk: Bool);
     fn addPlaytimeTicks(&self, ticks: Long);
     fn setBack(&self, loc: NamedLocationHc);
