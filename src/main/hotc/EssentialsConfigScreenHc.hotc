@@ -184,7 +184,7 @@ impl HcEssentialsConfigScreen {
             return true;
         }
         
-        if EssentialsHcClientHc::isOpenMenuKey(key_code, scan_code) {
+        if ce_is_open_menu_key(key_code, scan_code) {
             Minecraft::getInstance().setScreen(null);
             return true;
         }
@@ -201,6 +201,3 @@ pub fn open_essentials_config_screen_hc() {
     Minecraft::getInstance().setScreen(screen as ScreenHc);
 }
 
-extern class EssentialsHcClientHc = "net.phoenixvine.essentials.client.EssentialsHcClient" {
-    static fn isOpenMenuKey(key: Int, scan_code: Int) -> Bool;
-}

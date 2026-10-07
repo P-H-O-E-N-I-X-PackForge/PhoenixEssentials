@@ -1,15 +1,14 @@
 package net.phoenixvine.essentials.client;
 
 import net.minecraft.client.KeyMapping;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.phoenixvine.essentials.PhoenixEssentials;
 
 import org.lwjgl.glfw.GLFW;
 
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+/**
+ * The two menu keys. Only the {@link KeyMapping} objects live here (creating one is a client-only
+ * class-load side effect, and the Java config screen reads {@link #OPEN_MENU} directly); registering them
+ * and handling their presses is done by {@code EssentialsClientEntry.hotc}.
+ */
 public class EssentialsKeyBindings {
 
     public static final KeyMapping OPEN_MENU = new KeyMapping(
@@ -17,8 +16,9 @@ public class EssentialsKeyBindings {
             GLFW.GLFW_KEY_Y,
             "key.categories.phoenix_essentials");
 
-    @SubscribeEvent
-    public static void register(RegisterKeyMappingsEvent event) {
-        event.register(OPEN_MENU);
-    }
+    /** Second menu key (H): opens whichever config screen implementation Y does NOT. */
+    public static final KeyMapping OPEN_MENU_HC = new KeyMapping(
+            "key.phoenix_essentials.open_menu_hc",
+            GLFW.GLFW_KEY_H,
+            "key.categories.phoenix_essentials");
 }

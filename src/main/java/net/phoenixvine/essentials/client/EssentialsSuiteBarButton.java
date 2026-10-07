@@ -60,4 +60,20 @@ public final class EssentialsSuiteBarButton {
         if (tod < 13000L) return "midnight";
         return "day";
     }
+
+    // ---- command helpers for the HC suite-bar registrations (EssentialsClientEntry.hotc) ----
+
+    public static void gamemodeCommand() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.player.connection.sendCommand("gamemode " + nextGameMode(mc).getName());
+    }
+
+    public static void cycleWeatherNow() {
+        cycleWeather(Minecraft.getInstance());
+    }
+
+    public static void timeCommand() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.player.connection.sendCommand("time set " + nextTime(mc));
+    }
 }
