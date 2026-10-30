@@ -35,7 +35,7 @@ public class C2SGuiClaimKitPacket {
             ServerPlayer player = ctx.get().getSender();
             if (player == null) return;
 
-            if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_KITS, player.level().dimension().location())) {
+            if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_KITS, player.level().dimension().location(), player)) {
                 player.sendSystemMessage(Component.literal("§cKits aren't available here right now."));
                 return;
             }

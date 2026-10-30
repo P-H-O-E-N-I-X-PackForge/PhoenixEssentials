@@ -44,7 +44,7 @@ public final class MessageCommand {
         ServerPlayer sender = source.getPlayer();
         if (sender == null) return 0;
 
-        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_SOCIAL, sender.level().dimension().location())) {
+        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_SOCIAL, sender.level().dimension().location(), sender)) {
             source.sendFailure(Component.literal("§cSocial commands aren't available here right now."));
             return 0;
         }

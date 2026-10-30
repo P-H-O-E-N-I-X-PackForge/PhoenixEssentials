@@ -37,7 +37,7 @@ public final class KitCommand {
         ServerPlayer player = source.getPlayer();
         if (player == null) return 0;
 
-        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_KITS, player.level().dimension().location())) {
+        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_KITS, player.level().dimension().location(), player)) {
             source.sendFailure(Component.literal("§cKits aren't available here right now."));
             return 0;
         }

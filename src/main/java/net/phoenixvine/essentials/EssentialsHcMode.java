@@ -27,6 +27,6 @@ public final class EssentialsHcMode {
 
     // `feature` is one of "teleport" / "kits" / "social" (EssentialsAPI.FEATURE_*).
     public static boolean featureEnabled(ServerPlayer player, String feature) {
-        return EssentialsAPI.isFeatureEnabled(feature, player.level().dimension().location());
+        return EssentialsAPI.isFeatureEnabled(feature, player.level().dimension().location(), player);
     }
 }
