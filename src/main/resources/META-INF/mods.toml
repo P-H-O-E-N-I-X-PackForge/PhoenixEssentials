@@ -27,6 +27,6 @@ Phoenix Essentials - themed, configurable server essentials (homes, warps, tpa, 
 [[dependencies.${mod_id}]]
 modId="phoenix_wiki"
 mandatory=true
-versionRange="[0.4.7,)"
+versionRange="[0.6.0,)"
 ordering="NONE"
 side="BOTH"
