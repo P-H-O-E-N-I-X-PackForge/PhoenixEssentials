@@ -3,19 +3,18 @@ package net.phoenixvine.essentials.gametest;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.gametest.GameTestHolder;
-import net.minecraftforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.api.EssentialsAPI;
 import net.phoenixvine.essentials.api.EssentialsFeatureState;
 
-/** The public feature-gate / tier / state API (HC-backed in takeover mode, Java otherwise). */
 @GameTestHolder(PhoenixEssentials.MOD_ID)
 @PrefixGameTestTemplate(false)
 public class EssentialsApiGameTests {
 
-    private static final ResourceLocation DIM_A = new ResourceLocation("gametest", "dim_a");
-    private static final ResourceLocation DIM_B = new ResourceLocation("gametest", "dim_b");
+    private static final ResourceLocation DIM_A = ResourceLocation.fromNamespaceAndPath("gametest", "dim_a");
+    private static final ResourceLocation DIM_B = ResourceLocation.fromNamespaceAndPath("gametest", "dim_b");
 
     @GameTest(template = "gametest_empty", timeoutTicks = 100)
     public static void unknownFeatureDefaultsToEnabled(GameTestHelper helper) {

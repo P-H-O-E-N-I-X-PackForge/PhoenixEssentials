@@ -1,7 +1,7 @@
 
 
 fn hc_playtime_for(source: CommandSourceStackHc, target: ServerPlayer) -> Int {
-    let opt = target.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(target as JObjectEssCap);
     let data_obj = opt.orElse(null);
     if data_obj == null { return 0; }
     let data = data_obj as EssentialsPlayerDataHc;

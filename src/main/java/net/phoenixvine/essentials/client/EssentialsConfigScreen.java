@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class EssentialsConfigScreen extends Screen {
+    @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    }
 
     private static final int ROW_H = 18;
     private static final int PANEL_W = 260;

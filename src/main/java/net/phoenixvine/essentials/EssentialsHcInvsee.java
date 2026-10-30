@@ -6,20 +6,16 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.MenuType;
-import net.minecraftforge.event.entity.player.PlayerContainerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-// Shim for the hotc port of InvseeCommand (src/main/hotc/EssentialsInvseeCommand.hotc). The real
-// command needs a container-close EVENT HANDLER to write the viewer's edits back to the target,
-// and hotc-mc has no event-subscription binding -- so the open + write-back pair lives here as a
-// direct copy of InvseeCommand.java's own logic with its OWN session map (so /hcinvsee and the
-// real /invsee sessions can't cross-wire). Same snapshot-and-write-back behavior as the original.
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
+@EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
 public final class EssentialsHcInvsee {
 
     private record Session(UUID targetUuid, SimpleContainer container) {}
@@ -28,7 +24,6 @@ public final class EssentialsHcInvsee {
 
     private EssentialsHcInvsee() {}
 
-    // Returns null on success, or an error message to show via sendFailure.
     public static String open(ServerPlayer viewer, ServerPlayer target) {
         if (target == viewer) return "You can't /hcinvsee yourself - just open your own inventory.";
 

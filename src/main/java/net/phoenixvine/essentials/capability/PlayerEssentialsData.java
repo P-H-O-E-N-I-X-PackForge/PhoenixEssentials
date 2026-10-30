@@ -1,9 +1,11 @@
 package net.phoenixvine.essentials.capability;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.common.util.INBTSerializable;
 import net.phoenixvine.essentials.data.NamedLocation;
 
 import java.util.HashSet;
@@ -12,7 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public class PlayerEssentialsData {
+public class PlayerEssentialsData implements INBTSerializable<CompoundTag> {
 
     private final Map<String, NamedLocation> homes = new LinkedHashMap<>();
     private NamedLocation back;
@@ -106,7 +108,6 @@ public class PlayerEssentialsData {
         return alwaysTrash;
     }
 
-    /** True when at least one item is on the always-trash list (the HC auto-trash events' fast path). */
     public boolean hasAlwaysTrash() {
         return !alwaysTrash.isEmpty();
     }
@@ -125,6 +126,16 @@ public class PlayerEssentialsData {
 
     public void removeAlwaysTrash(ResourceLocation id) {
         alwaysTrash.remove(id);
+    }
+
+    @Override
+    public CompoundTag serializeNBT(HolderLookup.Provider provider) {
+        return serializeNBT();
+    }
+
+    @Override
+    public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
+        deserializeNBT(nbt);
     }
 
     public CompoundTag serializeNBT() {

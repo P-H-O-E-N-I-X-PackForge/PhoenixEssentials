@@ -29,7 +29,8 @@ fn ess_list_empty_message() -> String {
 fn ess_list_display_name_of(id: String) -> String {
     let loc = ResourceLocation::tryParse(id);
     if loc == null { return id; }
-    let item_obj = ForgeRegistriesItem::ITEMS.getValue(loc);
+    if !ForgeRegistriesItem::ITEM.containsKey(loc) { return id; }
+    let item_obj = ForgeRegistriesItem::ITEM.get(loc);
     if item_obj == null { return id; }
     let item = item_obj as Item;
     let stack = ItemStack::new(item as ItemLike, 1);
@@ -193,7 +194,7 @@ impl HcEssentialsListScreen {
         return true;
     }
 
-    override fn mouseScrolled(&self, mx: Double, my: Double, delta: Double) -> Bool {
+    override fn mouseScrolled(&self, mx: Double, my: Double, scroll_x: Double, delta: Double) -> Bool {
         let rows = ess_list_build_rows();
         let window = Minecraft::getInstance().getWindow();
         let layout = ess_list_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());

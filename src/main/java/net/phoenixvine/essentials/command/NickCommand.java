@@ -64,6 +64,6 @@ public final class NickCommand {
     }
 
     private static PlayerEssentialsData data(ServerPlayer player) {
-        return player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        return EssentialsCapabilityProvider.lookup(player).orElse(null);
     }
 }

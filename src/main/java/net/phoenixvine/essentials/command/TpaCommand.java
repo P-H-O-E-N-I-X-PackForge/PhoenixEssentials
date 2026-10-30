@@ -64,7 +64,7 @@ public final class TpaCommand {
             return 0;
         }
 
-        PlayerEssentialsData targetData = target.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+        PlayerEssentialsData targetData = EssentialsCapabilityProvider.lookup(target)
                 .orElse(null);
         if (targetData != null && targetData.isIgnoring(requester.getUUID())) {
             source.sendFailure(Component.literal("§cThat player isn't accepting teleport requests right now."));

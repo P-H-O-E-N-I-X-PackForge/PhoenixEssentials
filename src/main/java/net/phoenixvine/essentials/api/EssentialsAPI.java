@@ -53,7 +53,7 @@ public final class EssentialsAPI {
     }
 
     private static PlayerEssentialsData data(ServerPlayer player) {
-        return player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        return EssentialsCapabilityProvider.lookup(player).orElse(null);
     }
 
     public static void registerKit(KitDefinition kit) {

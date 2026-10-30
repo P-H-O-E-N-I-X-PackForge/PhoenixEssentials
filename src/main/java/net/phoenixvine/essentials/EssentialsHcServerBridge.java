@@ -24,24 +24,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-// Tiny, disclosed shim for the hotc port of HomeCommand (src/main/hotc/EssentialsHomeCommands.hotc)
-// -- hotc-mc has no java.util.Map/Set iteration binding, and this is the only server-side caller
-// that needs one (listing PlayerEssentialsData's own home-name key set, sorted, for /hchomes).
-// Top-level package (not .client/.command) so it loads fine on a dedicated server too.
 public final class EssentialsHcServerBridge {
     private EssentialsHcServerBridge() {}
 
-    // Real /msg + /reply round trip -- consolidates MessageCommand.java's own ignoring-check,
-    // the two sendSystemMessage calls, and the UUID->UUID "last messaged" bookkeeping into one
-    // real call each, rather than binding java.util.UUID/Map individually for this one real
-    // caller. Logic is a direct copy of MessageCommand.java's own send()/reply(), not a
-    // reimplementation.
     private static final Map<UUID, UUID> LAST_MESSAGED = new ConcurrentHashMap<>();
 
-    // Returns null on success, or a real error message to show via sendFailure.
     public static String sendDirectMessage(ServerPlayer sender, ServerPlayer target, String message) {
         if (target == sender) return "You can't message yourself.";
-        PlayerEssentialsData targetData = target.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        PlayerEssentialsData targetData = EssentialsCapabilityProvider.lookup(target).orElse(null);
         if (targetData != null && targetData.isIgnoring(sender.getUUID())) {
             return "That player isn't receiving messages right now.";
         }
@@ -52,8 +42,6 @@ public final class EssentialsHcServerBridge {
         return null;
     }
 
-    // Real, nullable -- the real login name of whoever `player` last messaged (either direction),
-    // or null if there's no one (or they've gone offline since).
     public static String getLastMessagedName(MinecraftServer server, ServerPlayer player) {
         UUID targetUuid = LAST_MESSAGED.get(player.getUUID());
         if (targetUuid == null) return null;
@@ -72,8 +60,6 @@ public final class EssentialsHcServerBridge {
         return data.getHomes().size();
     }
 
-    // Real /ignore + /unignore -- consolidates IgnoreCommand.java's own Set<UUID> add/remove into
-    // one real call, rather than binding java.util.UUID/Set individually for this one real caller.
     public static void setIgnored(PlayerEssentialsData data, ServerPlayer target, boolean ignore) {
         if (ignore) {
             data.getIgnored().add(target.getUUID());
@@ -82,9 +68,6 @@ public final class EssentialsHcServerBridge {
         }
     }
 
-    // Direct copy of TopCommand.java's own target computation (surface Y via the MOTION_BLOCKING_NO_LEAVES
-    // heightmap) -- avoids binding Heightmap/ResourceKey/NamedLocation's 6-arg ctor for one real
-    // caller. Returns null if the player isn't in a ServerLevel.
     public static NamedLocation topLocation(ServerPlayer player) {
         if (!(player.level() instanceof ServerLevel level)) return null;
         int x = player.getBlockX();
@@ -93,18 +76,11 @@ public final class EssentialsHcServerBridge {
         return new NamedLocation(level.dimension(), x + 0.5, y, z + 0.5, player.getYRot(), player.getXRot());
     }
 
-    // Direct copy of TpxCommand.java's own target computation (same X/Z, surface Y in the target
-    // dimension). Returns null if the player is already in that dimension.
-    // Deliberate IMPROVEMENT over the original, not a pure copy: the original calls getHeight on a
-    // chunk that may not be loaded in the target dimension, which returns the world floor and drops
-    // the player into the void (observed in the hc port). This forces the chunk to load first, and
-    // for ceilinged dimensions (the Nether) scans down from the roof for a solid block with two air
-    // blocks above instead of landing on the bedrock ceiling.
     public static NamedLocation tpxLocation(ServerPlayer player, ServerLevel targetLevel) {
         if (player.level() == targetLevel) return null;
         int x = player.getBlockX();
         int z = player.getBlockZ();
-        targetLevel.getChunk(x >> 4, z >> 4); // force load/generate
+        targetLevel.getChunk(x >> 4, z >> 4); 
         int y;
         if (targetLevel.dimensionType().hasCeiling()) {
             y = targetLevel.getMinBuildHeight() + 1;
@@ -124,9 +100,6 @@ public final class EssentialsHcServerBridge {
         return new NamedLocation(targetLevel.dimension(), x + 0.5, y, z + 0.5, player.getYRot(), player.getXRot());
     }
 
-    // Direct copy of RtpCommand.java's own whole flow (allowed-dimension check, RtpFinder search,
-    // distance detail, the real 7-arg TeleportExecutor with RTP_COOLDOWN_SECONDS). Returns null on
-    // success or a real error message to show via sendFailure.
     public static String rtp(ServerPlayer player) {
         if (!(player.level() instanceof ServerLevel level)) return "Not in a server level.";
         var allowedDims = EssentialsServerConfig.RTP_ALLOWED_DIMENSIONS.get();
@@ -153,11 +126,8 @@ public final class EssentialsHcServerBridge {
         return null;
     }
 
-    // Direct copy of PlayerInfoCommand.java's own report -- one multi-line string (newline-joined),
-    // or null if the target has no essentials data. Plain text (no section-sign colors) so the HC
-    // side stays simple; formatting is the only difference from the original.
     public static String playerInfo(ServerPlayer target) {
-        PlayerEssentialsData data = target.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(target).orElse(null);
         if (data == null) return null;
         String nickname = data.getNickname();
         String login = target.getGameProfile().getName();
@@ -171,9 +141,6 @@ public final class EssentialsHcServerBridge {
                 + "AFK: " + (data.isAfk() ? "yes" : "no");
     }
 
-    // Direct copy of EssentialsTrashCommand.java's own virtual 9x4 void container menu -- avoids
-    // binding SimpleContainer/SimpleMenuProvider/ChestMenu/MenuType (and the menu-factory lambda)
-    // for one real caller. Anything put in is discarded when the menu closes, same as the original.
     public static void openTrash(ServerPlayer player) {
         net.minecraft.world.SimpleContainer voidContainer = new net.minecraft.world.SimpleContainer(36);
         player.openMenu(new net.minecraft.world.SimpleMenuProvider(
@@ -182,8 +149,6 @@ public final class EssentialsHcServerBridge {
                 Component.literal("Trash")));
     }
 
-    // The player's own auto-trash ids, comma-joined and sorted -- feeds tab-complete for
-    // `/hcautotrash remove <item>` without binding Set<ResourceLocation> iteration.
     public static String autoTrashCsv(PlayerEssentialsData data) {
         List<String> ids = new ArrayList<>();
         for (net.minecraft.resources.ResourceLocation id : data.getAlwaysTrash()) ids.add(id.toString());
@@ -191,35 +156,14 @@ public final class EssentialsHcServerBridge {
         return String.join(",", ids);
     }
 
-    // `SimpleChannel.registerMessage`'s handler receives its Context wrapped in a Supplier<Context>;
-    // calling .get() on a value typed as a plain extern interface has no HC mechanism yet, so this
-    // is the same tiny unwrap hotc-mc's Ganache shim (GanacheNet.unwrapSupplier) provides there.
     public static Object unwrapSupplier(Object supplier) {
         return ((java.util.function.Supplier<?>) supplier).get();
     }
 
-    // --- Event-handler helpers (EssentialsPlayerEvents.hotc) ---
-
-    // Direct copy of EssentialsPlayerEvents.onPlayerClone's capability transfer.
-    public static void copyPlayerData(net.minecraft.world.entity.player.Player original,
-                                      net.minecraft.world.entity.player.Player entity) {
-        original.reviveCaps();
-        original.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
-                .ifPresent(oldData -> entity.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
-                        .ifPresent(newData -> newData.deserializeNBT(oldData.serializeNBT())));
-        original.invalidateCaps();
-    }
-
-    // --- TeleportExecutor helpers (EssentialsTeleportExecutor.hotc) ---
-    // The teleport state machine itself (pending list, cooldowns, the tick/damage handlers) is HC; these
-    // are the pieces that need Set/UUID/ResourceKey/event-class bindings HC doesn't have.
-
-    // Direct copy of executeNow's level lookup + `/back` bookkeeping + the real cross-dimension
-    // teleportTo. Returns null on success, else the message to show.
     public static String teleportPlayerTo(ServerPlayer player, NamedLocation target) {
         ServerLevel targetLevel = player.getServer().getLevel(target.dimension);
         if (targetLevel == null) return "That destination's dimension is no longer loaded.";
-        player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+        EssentialsCapabilityProvider.lookup(player)
                 .ifPresent(data -> data.setBack(NamedLocation.of(player)));
         player.teleportTo(targetLevel, target.x, target.y, target.z, java.util.Set.of(), target.yaw, target.pitch);
         return null;
@@ -229,9 +173,6 @@ public final class EssentialsHcServerBridge {
         return level.dimension().location().toString();
     }
 
-    // Direct copy of SeenCommand.java's own online/offline lookup + elapsed formatting -- one real
-    // call instead of binding GameProfileCache/Optional/UUID/OfflinePlayerIndex.Entry's public
-    // fields individually. Returns the plain-text result, or null if there's no record at all.
     public static String seenMessage(MinecraftServer server, String name) {
         ServerPlayer online = server.getPlayerList().getPlayerByName(name);
         if (online != null) return online.getGameProfile().getName() + " is online now.";
@@ -240,9 +181,7 @@ public final class EssentialsHcServerBridge {
             uuid = server.getProfileCache() == null ? null :
                     server.getProfileCache().get(name).map(p -> p.getId()).orElse(null);
         } catch (Exception e) {
-            // Real, observed: an unknown name's profile-cache lookup can throw (e.g. the online
-            // profile fetch failing in an offline/dev session) -- treat as "no record" instead of
-            // surfacing Brigadier's generic "unexpected error". Logged so it isn't silent.
+
             PhoenixEssentials.LOGGER.warn("[hc] /hcseen profile cache lookup failed for '{}'", name, e);
         }
         OfflinePlayerIndex.Entry entry = uuid == null ? null : OfflinePlayerIndex.get(uuid);
@@ -260,17 +199,12 @@ public final class EssentialsHcServerBridge {
         return entry.lastKnownName + " was last seen " + elapsed + " ago.";
     }
 
-    // Real /tpa family -- a direct copy of TpaCommand.java's own request/respond/cancel logic with
-    // this class's OWN pending-request map (so /hctpa* requests and the real /tpa* requests don't
-    // cross-wire while both are registered). Each method returns null on success, or a real error
-    // message for the caller to show via sendFailure; success messaging goes out via
-    // sendSystemMessage exactly like the original.
     private record TpaRequest(UUID fromUuid, String fromName, boolean here, long expiresAtMs) {}
     private static final Map<UUID, TpaRequest> TPA_PENDING = new ConcurrentHashMap<>();
 
     public static String tpaRequest(ServerPlayer requester, ServerPlayer target, boolean here) {
         if (target == requester) return "You can't send a teleport request to yourself.";
-        PlayerEssentialsData targetData = target.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        PlayerEssentialsData targetData = EssentialsCapabilityProvider.lookup(target).orElse(null);
         if (targetData != null && targetData.isIgnoring(requester.getUUID())) {
             return "That player isn't accepting teleport requests right now.";
         }
@@ -332,7 +266,6 @@ public final class EssentialsHcServerBridge {
         data.recordKitClaimed(name);
     }
 
-    // Same format as PlaytimeCommand (the HC `sup_playtime_formatted`); kept private for `playerInfo` only.
     private static String playtimeFormatted(PlayerEssentialsData data) {
         long totalSeconds = data.getPlaytimeTicks() / 20;
         long hours = totalSeconds / 3600;

@@ -1,57 +1,52 @@
 package net.phoenixvine.essentials.config;
 
-import net.minecraftforge.common.ForgeConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec;
 import net.phoenixvine.essentials.hc.hcCompileMerged1;
 
 import java.util.List;
 
-/**
- * The server config spec. The spec itself (every key, default, range and comment) is built by the Hot
- * Chocolate port in {@code EssentialsServerConfig.hotc}; this class just exposes it and the typed value
- * fields every Java reader uses.
- */
 public class EssentialsServerConfig {
 
-    public static final ForgeConfigSpec SPEC;
+    public static final ModConfigSpec SPEC;
 
-    public static final ForgeConfigSpec.IntValue TELEPORT_WARMUP_SECONDS;
-    public static final ForgeConfigSpec.IntValue TELEPORT_COOLDOWN_SECONDS;
-    public static final ForgeConfigSpec.BooleanValue CANCEL_ON_MOVE;
-    public static final ForgeConfigSpec.BooleanValue CANCEL_ON_DAMAGE;
-    public static final ForgeConfigSpec.IntValue WARP_COOLDOWN_SECONDS;
-    public static final ForgeConfigSpec.IntValue TPX_COOLDOWN_SECONDS;
-    public static final ForgeConfigSpec.IntValue TOP_COOLDOWN_SECONDS;
-    public static final ForgeConfigSpec.IntValue HOMES_PER_PLAYER;
-    public static final ForgeConfigSpec.BooleanValue BACK_AFTER_DEATH;
-    public static final ForgeConfigSpec.IntValue RTP_MIN_RADIUS;
-    public static final ForgeConfigSpec.IntValue RTP_MAX_RADIUS;
-    public static final ForgeConfigSpec.IntValue RTP_MAX_ATTEMPTS;
-    public static final ForgeConfigSpec.IntValue RTP_COOLDOWN_SECONDS;
-    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> RTP_ALLOWED_DIMENSIONS;
-    public static final ForgeConfigSpec.IntValue TPA_TIMEOUT_SECONDS;
-    public static final ForgeConfigSpec.IntValue TPA_COOLDOWN_SECONDS;
-    public static final ForgeConfigSpec.BooleanValue TPA_TEAMMATE_BYPASS_DELAY;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_HOME;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_SPAWN;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_WARP;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_BACK;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_RTP;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_TPA;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_MSG;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_NICK;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_IGNORE;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_AFK;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_PLAYERINFO;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_SEEN;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_PLAYTIME;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_KIT;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_HEAL_FEED;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_INVSEE;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_GODFLY;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_GAMEMODE_SHORTCUTS;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_TOP;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_TPX;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_TPFORCE;
+    public static final ModConfigSpec.IntValue TELEPORT_WARMUP_SECONDS;
+    public static final ModConfigSpec.IntValue TELEPORT_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.BooleanValue CANCEL_ON_MOVE;
+    public static final ModConfigSpec.BooleanValue CANCEL_ON_DAMAGE;
+    public static final ModConfigSpec.IntValue WARP_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue TPX_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue TOP_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.IntValue HOMES_PER_PLAYER;
+    public static final ModConfigSpec.BooleanValue BACK_AFTER_DEATH;
+    public static final ModConfigSpec.IntValue RTP_MIN_RADIUS;
+    public static final ModConfigSpec.IntValue RTP_MAX_RADIUS;
+    public static final ModConfigSpec.IntValue RTP_MAX_ATTEMPTS;
+    public static final ModConfigSpec.IntValue RTP_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> RTP_ALLOWED_DIMENSIONS;
+    public static final ModConfigSpec.IntValue TPA_TIMEOUT_SECONDS;
+    public static final ModConfigSpec.IntValue TPA_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.BooleanValue TPA_TEAMMATE_BYPASS_DELAY;
+    public static final ModConfigSpec.BooleanValue ENABLE_HOME;
+    public static final ModConfigSpec.BooleanValue ENABLE_SPAWN;
+    public static final ModConfigSpec.BooleanValue ENABLE_WARP;
+    public static final ModConfigSpec.BooleanValue ENABLE_BACK;
+    public static final ModConfigSpec.BooleanValue ENABLE_RTP;
+    public static final ModConfigSpec.BooleanValue ENABLE_TPA;
+    public static final ModConfigSpec.BooleanValue ENABLE_MSG;
+    public static final ModConfigSpec.BooleanValue ENABLE_NICK;
+    public static final ModConfigSpec.BooleanValue ENABLE_IGNORE;
+    public static final ModConfigSpec.BooleanValue ENABLE_AFK;
+    public static final ModConfigSpec.BooleanValue ENABLE_PLAYERINFO;
+    public static final ModConfigSpec.BooleanValue ENABLE_SEEN;
+    public static final ModConfigSpec.BooleanValue ENABLE_PLAYTIME;
+    public static final ModConfigSpec.BooleanValue ENABLE_KIT;
+    public static final ModConfigSpec.BooleanValue ENABLE_HEAL_FEED;
+    public static final ModConfigSpec.BooleanValue ENABLE_INVSEE;
+    public static final ModConfigSpec.BooleanValue ENABLE_GODFLY;
+    public static final ModConfigSpec.BooleanValue ENABLE_GAMEMODE_SHORTCUTS;
+    public static final ModConfigSpec.BooleanValue ENABLE_TOP;
+    public static final ModConfigSpec.BooleanValue ENABLE_TPX;
+    public static final ModConfigSpec.BooleanValue ENABLE_TPFORCE;
 
     static {
         SPEC = hcCompileMerged1.cfg_spec();

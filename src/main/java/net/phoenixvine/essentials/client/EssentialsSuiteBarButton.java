@@ -61,8 +61,6 @@ public final class EssentialsSuiteBarButton {
         return "day";
     }
 
-    // ---- command helpers for the HC suite-bar registrations (EssentialsClientEntry.hotc) ----
-
     public static void gamemodeCommand() {
         Minecraft mc = Minecraft.getInstance();
         mc.player.connection.sendCommand("gamemode " + nextGameMode(mc).getName());

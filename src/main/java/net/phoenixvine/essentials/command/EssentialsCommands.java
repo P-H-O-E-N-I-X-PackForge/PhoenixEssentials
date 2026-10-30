@@ -11,10 +11,6 @@ public final class EssentialsCommands {
 
     private EssentialsCommands() {}
 
-    // Each group is gated by the same `ENABLE_*` config switch as before. By default the Hot Chocolate
-    // port (src/main/hotc) owns the real command names; launch with
-    // `-Dphoenix_essentials.use_java=true` to register the original Java classes instead (the HC
-    // versions then come up as `hc`-prefixed twins -- see PhoenixEssentials#onRegisterCommands).
     public static void registerAll(CommandDispatcher<CommandSourceStack> dispatcher) {
 
         boolean configLoaded = EssentialsServerConfig.SPEC.isLoaded();

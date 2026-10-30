@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.capability.PlayerEssentialsData;
 
@@ -36,10 +36,10 @@ public final class EssentialsAutoTrashCommand {
             return 0;
         }
 
-        ResourceLocation id = ForgeRegistries.ITEMS.getKey(held.getItem());
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(held.getItem());
         if (id == null) return 0;
 
-        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+        PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                 .orElse(null);
         if (data == null) return 0;
 
@@ -55,7 +55,7 @@ public final class EssentialsAutoTrashCommand {
         if (player == null) return 0;
 
         ResourceLocation id = ResourceLocationArgument.getId(ctx, "item");
-        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+        PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                 .orElse(null);
         if (data == null) return 0;
 

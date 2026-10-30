@@ -36,7 +36,7 @@ public final class PlaytimeCommand {
             }
         }
 
-        PlayerEssentialsData data = target.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(target).orElse(null);
         if (data == null) return 0;
 
         ServerPlayer finalTarget = target;

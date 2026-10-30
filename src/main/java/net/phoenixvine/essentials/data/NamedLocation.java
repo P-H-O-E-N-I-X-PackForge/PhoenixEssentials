@@ -42,7 +42,7 @@ public class NamedLocation {
     public static NamedLocation deserialize(CompoundTag tag) {
         NamedLocation loc = new NamedLocation();
         loc.dimension = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION,
-                new ResourceLocation(tag.getString("dim")));
+                ResourceLocation.parse(tag.getString("dim")));
         loc.x = tag.getDouble("x");
         loc.y = tag.getDouble("y");
         loc.z = tag.getDouble("z");

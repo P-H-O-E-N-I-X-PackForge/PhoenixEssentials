@@ -37,7 +37,7 @@ public final class PlayerInfoCommand {
             }
         }
 
-        PlayerEssentialsData data = target.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(target).orElse(null);
         if (data == null) return 0;
 
         String nickname = data.getNickname();

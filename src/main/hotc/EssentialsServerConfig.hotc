@@ -8,7 +8,7 @@
 // `BooleanValue` / `ConfigValue<List>`). The HC code reads them through the same static fields as before
 // (`EssentialsServerConfigHc::HOMES_PER_PLAYER`).
 
-extern class CfgBuilder = "net.minecraftforge.common.ForgeConfigSpec$Builder" {
+extern class CfgBuilder = "net.neoforged.neoforge.common.ModConfigSpec$Builder" {
     fn new() -> Self;
     fn push(&self, path: String) -> CfgBuilder;
     fn pop(&self) -> CfgBuilder;
@@ -19,10 +19,10 @@ extern class CfgBuilder = "net.minecraftforge.common.ForgeConfigSpec$Builder" {
     fn build(&self) -> CfgSpec;
 }
 
-extern class CfgSpec = "net.minecraftforge.common.ForgeConfigSpec" {}
-extern class CfgIntValue = "net.minecraftforge.common.ForgeConfigSpec$IntValue" {}
-extern class CfgBoolValue = "net.minecraftforge.common.ForgeConfigSpec$BooleanValue" {}
-extern class CfgConfigValue = "net.minecraftforge.common.ForgeConfigSpec$ConfigValue" {}
+extern class CfgSpec = "net.neoforged.neoforge.common.ModConfigSpec" {}
+extern class CfgIntValue = "net.neoforged.neoforge.common.ModConfigSpec$IntValue" {}
+extern class CfgBoolValue = "net.neoforged.neoforge.common.ModConfigSpec$BooleanValue" {}
+extern class CfgConfigValue = "net.neoforged.neoforge.common.ModConfigSpec$ConfigValue" {}
 extern class CfgObject = "java.lang.Object" {}
 extern class CfgListI = "java.util.List" interface {}
 extern class CfgArrayList = "java.util.ArrayList" {

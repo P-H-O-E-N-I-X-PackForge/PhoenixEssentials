@@ -15,7 +15,7 @@ fn hc_toggle_held_autotrash(source: CommandSourceStackHc) -> Int {
         player.sendSystemMessage(Component::literal("Hold an item first.") as Component);
         return 0;
     }
-    let id = ForgeRegistriesItem::ITEMS.getKey(held.getItem() as JObjectItem);
+    let id = ForgeRegistriesItem::ITEM.getKey(held.getItem() as JObjectItem);
     if id == null { return 0; }
     let data = ess_player_data(&source);
     if data == null { return 0; }

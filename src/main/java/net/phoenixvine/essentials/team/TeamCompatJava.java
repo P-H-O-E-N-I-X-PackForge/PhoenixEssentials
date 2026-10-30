@@ -1,7 +1,7 @@
 package net.phoenixvine.essentials.team;
 
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 import net.phoenixvine.guilds.data.Guild;
 import net.phoenixvine.guilds.data.GuildManager;
 
@@ -10,7 +10,6 @@ import dev.ftb.mods.ftbteams.api.Team;
 
 import java.util.*;
 
-/** The original Java implementation, kept for {@code -Dphoenix_essentials.use_java=true}. */
 final class TeamCompatJava {
 
     private TeamCompatJava() {}

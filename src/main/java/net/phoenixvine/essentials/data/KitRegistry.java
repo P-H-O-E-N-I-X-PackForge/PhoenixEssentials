@@ -48,7 +48,7 @@ public final class KitRegistry {
 
     public static Map<String, KitDefinition> getAll() {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
-            // Snapshot (insertion order) of the HC store; callers only read it.
+            
             Map<String, KitDefinition> snapshot = new LinkedHashMap<>();
             String names = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_kit_names();
             if (!names.isEmpty()) {

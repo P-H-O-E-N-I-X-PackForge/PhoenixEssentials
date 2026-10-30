@@ -27,7 +27,7 @@ extern class CeKeys = "net.phoenixvine.essentials.client.EssentialsKeyBindings" 
     static OPEN_MENU_HC: CeKeyMapping;
 }
 
-extern class CeRegisterKeysEvent = "net.minecraftforge.client.event.RegisterKeyMappingsEvent" {
+extern class CeRegisterKeysEvent = "net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent" {
     fn register(&self, key: CeKeyMapping);
 }
 
@@ -38,9 +38,7 @@ extern class CeMinecraft = "net.minecraft.client.Minecraft" {
     screen: ScreenHc;
 }
 
-extern class CeClientTickEvent = "net.minecraftforge.event.TickEvent$ClientTickEvent" {
-    phase: TickPhaseHc;
-}
+extern class CeClientTickEvent = "net.neoforged.neoforge.client.event.ClientTickEvent$Post" {}
 
 // The original Java config screen (the side-by-side fallback / the suite-bar settings button).
 extern class CeJavaConfigScreen = "net.phoenixvine.essentials.client.EssentialsConfigScreen" {
@@ -83,7 +81,7 @@ extern class CeLog = "net.phoenixvine.essentials.EssentialsHcData" {
 }
 
 fn ce_icon(path: String) -> ResourceLocation {
-    return ResourceLocation::new("phoenix_essentials", path);
+    return ResourceLocation::fromNamespaceAndPath("phoenix_essentials", path);
 }
 
 fn ce_op_visible() -> Int {
@@ -144,7 +142,6 @@ fn ce_client_setup(e: JObjectEvent) {
 // Both keys, one tick handler (the Java had two handlers with these exact semantics).
 fn ce_client_tick(e: JObjectEvent) {
     let ev = e as CeClientTickEvent;
-    if ev.phase != TickPhaseHc::END { return; }
     let mc = CeMinecraft::getInstance();
 
     // Y -- the main open-menu key.
@@ -176,15 +173,14 @@ pub fn ce_is_open_menu_key(key: Int, scan: Int) -> Bool {
 }
 
 // Called (client only) from `EssentialsClientProxy.registerConfigScreen` during mod construction.
-pub fn client_construct() {
-    let mod_bus = MeModBusContext::get().getModEventBus();
+pub fn client_construct(mod_bus: IEventBusHc) {
     mod_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent") as JClassNet,
+        class("net.neoforged.fml.event.lifecycle.FMLClientSetupEvent") as JClassNet,
         |e| { ce_client_setup(e); });
     mod_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.client.event.RegisterKeyMappingsEvent") as JClassNet,
+        class("net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent") as JClassNet,
         |e| { ce_register_keys(e); });
     MinecraftForgeHc::EVENT_BUS.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.TickEvent$ClientTickEvent") as JClassNet,
+        class("net.neoforged.neoforge.client.event.ClientTickEvent$Post") as JClassNet,
         |e| { ce_client_tick(e); });
 }

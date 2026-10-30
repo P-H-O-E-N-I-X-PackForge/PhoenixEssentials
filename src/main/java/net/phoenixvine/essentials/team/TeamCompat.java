@@ -6,12 +6,6 @@ import net.phoenixvine.essentials.hc.hcCompileMerged1;
 
 import java.util.*;
 
-/**
- * Optional team/guild backends (Phoenix Guilds, FTB Teams). In takeover mode this is a thin facade over the
- * Hot Chocolate port ({@code EssentialsTeamCompat.hotc}), which calls both mods' real APIs directly behind
- * {@code ModList.isLoaded} guards. {@code -Dphoenix_essentials.use_java=true} restores the original Java
- * implementation, which lives in {@link TeamCompatJava}.
- */
 public final class TeamCompat {
 
     private TeamCompat() {}

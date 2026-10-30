@@ -62,8 +62,6 @@ public final class HomeCommand {
         registerLimit(dispatcher);
     }
 
-    // Split out so the Hot Chocolate takeover (EssentialsHcMode) can register the HC /home family
-    // while still keeping this Java-only /sethomelimit.
     public static void registerLimit(CommandDispatcher<CommandSourceStack> dispatcher) {
 
         dispatcher.register(Commands.literal("sethomelimit")
@@ -223,7 +221,7 @@ public final class HomeCommand {
     }
 
     private static PlayerEssentialsData data(ServerPlayer player) {
-        return player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        return EssentialsCapabilityProvider.lookup(player).orElse(null);
     }
 
     private static int effectiveHomeLimit(PlayerEssentialsData data) {

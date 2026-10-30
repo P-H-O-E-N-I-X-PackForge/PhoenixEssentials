@@ -1,8 +1,8 @@
 package net.phoenixvine.essentials.api.event;
 
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.eventbus.api.Cancelable;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.ICancellableEvent;
 import net.phoenixvine.essentials.data.NamedLocation;
 
 public abstract class TeleportEvent extends Event {
@@ -29,8 +29,7 @@ public abstract class TeleportEvent extends Event {
         return destinationLabel;
     }
 
-    @Cancelable
-    public static class Pre extends TeleportEvent {
+    public static class Pre extends TeleportEvent implements ICancellableEvent {
 
         private final NamedLocation target;
 

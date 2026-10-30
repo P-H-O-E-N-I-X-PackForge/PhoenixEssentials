@@ -113,7 +113,7 @@ fn ess_send_to_player(player: ServerPlayer, msg: PhoenixObject4Net) {
 }
 
 fn ess_player_data_of(player: &ServerPlayer) -> EssentialsPlayerDataHc {
-    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);
     let data_obj = opt.orElse(null);
     if data_obj == null { return null; }
     return data_obj as EssentialsPlayerDataHc;
@@ -284,7 +284,7 @@ fn ess_reg_s2c_trash(channel: &SimpleChannel, id: Int) {
 
 pub fn setup_hc_networking() {
     let channel = NetworkRegistry::newSimpleChannel(
-        ResourceLocation::new("phoenix_essentials", "main_hc"),
+        ResourceLocation::fromNamespaceAndPath("phoenix_essentials", "main_hc"),
         || { return "1" as PhoenixObject4Net; },
         |v| { return true; },
         |v| { return true; }

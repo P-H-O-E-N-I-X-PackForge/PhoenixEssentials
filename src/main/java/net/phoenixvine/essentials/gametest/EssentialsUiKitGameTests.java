@@ -2,12 +2,11 @@ package net.phoenixvine.essentials.gametest;
 
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraftforge.gametest.GameTestHolder;
-import net.minecraftforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.client.EssentialsUIKit;
 
-/** The pure (non-drawing) UIKit helpers: hex color parse / format. */
 @GameTestHolder(PhoenixEssentials.MOD_ID)
 @PrefixGameTestTemplate(false)
 public class EssentialsUiKitGameTests {

@@ -83,24 +83,24 @@ extern class OvFileConfig = "com.electronwill.nightconfig.core.file.CommentedFil
 }
 
 // Forge
-extern class OvSpec = "net.minecraftforge.common.ForgeConfigSpec" {
+extern class OvSpec = "net.neoforged.neoforge.common.ModConfigSpec" {
     fn getValues(&self) -> OvUnmodConfig;
     fn getSpec(&self) -> OvUnmodConfig;
 }
-extern class OvValueSpec = "net.minecraftforge.common.ForgeConfigSpec$ValueSpec" {
+extern class OvValueSpec = "net.neoforged.neoforge.common.ModConfigSpec$ValueSpec" {
     fn getComment(&self) -> String;
 }
-extern class OvLongValue = "net.minecraftforge.common.ForgeConfigSpec$LongValue" {}
-extern class OvDoubleValue = "net.minecraftforge.common.ForgeConfigSpec$DoubleValue" {}
-extern class OvConfigValue = "net.minecraftforge.common.ForgeConfigSpec$ConfigValue" {
+extern class OvLongValue = "net.neoforged.neoforge.common.ModConfigSpec$LongValue" {}
+extern class OvDoubleValue = "net.neoforged.neoforge.common.ModConfigSpec$DoubleValue" {}
+extern class OvConfigValue = "net.neoforged.neoforge.common.ModConfigSpec$ConfigValue" {
     fn getDefault(&self) -> CfgObject;
     fn set(&self, v: CfgObject);
 }
-extern class OvIConfigSpec = "net.minecraftforge.fml.config.IConfigSpec" interface {}
-extern class OvModConfig = "net.minecraftforge.fml.config.ModConfig" {
+extern class OvIConfigSpec = "net.neoforged.fml.config.IConfigSpec" interface {}
+extern class OvModConfig = "net.neoforged.fml.config.ModConfig" {
     fn getSpec(&self) -> OvIConfigSpec;
 }
-extern class OvModConfigEvent = "net.minecraftforge.fml.event.config.ModConfigEvent" {
+extern class OvModConfigEvent = "net.neoforged.fml.event.config.ModConfigEvent" {
     fn getConfig(&self) -> OvModConfig;
 }
 

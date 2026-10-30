@@ -11,7 +11,7 @@
 // `TeamCompat.java` is now a thin facade over these `tc_*` functions for its Java callers (`TpaCommand`,
 // the `tpa` shim); `/sethomelimit team` calls them directly from HC.
 
-extern class TcModList = "net.minecraftforge.fml.ModList" {
+extern class TcModList = "net.neoforged.fml.ModList" {
     static fn get() -> TcModList;
     fn isLoaded(&self, modid: String) -> Bool;
 }

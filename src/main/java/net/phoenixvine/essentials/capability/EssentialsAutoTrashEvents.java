@@ -1,49 +1,47 @@
 package net.phoenixvine.essentials.capability;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.util.TriState;
+import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.phoenixvine.essentials.PhoenixEssentials;
 
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
 public final class EssentialsAutoTrashEvents {
 
     private EssentialsAutoTrashEvents() {}
 
     @SubscribeEvent
-    public static void onItemPickup(EntityItemPickupEvent event) {
-        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return; // HC port: EssentialsAutoTrash.hotc
-        Player player = event.getEntity();
-        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
-                .orElse(null);
-        if (data == null || data.getAlwaysTrash().isEmpty()) return;
+    public static void onItemPickup(ItemEntityPickupEvent.Pre event) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return;
+        Player player = event.getPlayer();
+        PlayerEssentialsData data = EssentialsCapabilityProvider.get(player);
+        if (data.getAlwaysTrash().isEmpty()) return;
 
-        ResourceLocation id = ForgeRegistries.ITEMS.getKey(event.getItem().getItem().getItem());
-        if (id == null || !data.isAlwaysTrash(id)) return;
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(event.getItemEntity().getItem().getItem());
+        if (!data.isAlwaysTrash(id)) return;
 
-        event.setCanceled(true);
-        event.getItem().discard();
+        event.setCanPickup(TriState.FALSE);
+        event.getItemEntity().discard();
     }
 
     private static final int SWEEP_INTERVAL_TICKS = 10;
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return; // HC port: EssentialsAutoTrash.hotc
-        if (event.phase != TickEvent.Phase.END) return;
-        if (!(event.player instanceof ServerPlayer player)) return;
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.tickCount % SWEEP_INTERVAL_TICKS != 0) return;
 
-        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
-                .orElse(null);
-        if (data == null || data.getAlwaysTrash().isEmpty()) return;
+        PlayerEssentialsData data = EssentialsCapabilityProvider.get(player);
+        if (data.getAlwaysTrash().isEmpty()) return;
 
         Inventory inv = player.getInventory();
         boolean changed = sweepList(inv.items, data) | sweepList(inv.offhand, data);
@@ -55,8 +53,8 @@ public final class EssentialsAutoTrashEvents {
         for (int i = 0; i < slots.size(); i++) {
             ItemStack stack = slots.get(i);
             if (stack.isEmpty()) continue;
-            ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
-            if (id != null && data.isAlwaysTrash(id)) {
+            ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+            if (data.isAlwaysTrash(id)) {
                 slots.set(i, ItemStack.EMPTY);
                 changed = true;
             }

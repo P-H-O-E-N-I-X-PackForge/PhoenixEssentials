@@ -3,7 +3,7 @@ package net.phoenixvine.essentials.network.packet;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
+import hotc.mc.net.HcChannel;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.capability.PlayerEssentialsData;
 import net.phoenixvine.essentials.command.TeleportExecutor;
@@ -34,14 +34,14 @@ public class C2SGuiTeleportPacket {
         buf.writeUtf(name);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
+    public void handle(Supplier<HcChannel.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player == null) return;
 
             switch (kind) {
                 case HOME -> {
-                    PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                    PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                             .orElse(null);
                     if (data == null) return;
                     NamedLocation home = data.getHome(name);
@@ -54,7 +54,7 @@ public class C2SGuiTeleportPacket {
                     TeleportExecutor.request(player, warp, "warp", "warp \"" + name + "\"");
                 }
                 case BACK -> {
-                    PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                    PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                             .orElse(null);
                     if (data == null) return;
                     NamedLocation back = data.getBack();

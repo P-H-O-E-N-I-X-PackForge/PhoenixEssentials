@@ -28,6 +28,7 @@ class WarpRegistryTest {
 
     private static NamedLocation stubLocation(double x) {
         NamedLocation loc = new NamedLocation();
+        loc.dimension = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, ResourceLocation.parse("minecraft:overworld"));
         loc.x = x;
         loc.y = 64;
         loc.z = 0;

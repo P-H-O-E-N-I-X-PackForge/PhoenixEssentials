@@ -158,17 +158,14 @@ pub fn te_force_teleport(player: ServerPlayer, target: NamedLocationHc, category
     te_execute_now(player, target, category, label, "");
 }
 
-extern class ServerTickEventHc = "net.minecraftforge.event.TickEvent$ServerTickEvent" {
-    phase: TickPhaseHc;
-}
+extern class ServerTickEventHc = "net.neoforged.neoforge.event.tick.ServerTickEvent$Post" {}
 
-extern class LivingHurtEventHc = "net.minecraftforge.event.entity.living.LivingHurtEvent" {
+extern class LivingHurtEventHc = "net.neoforged.neoforge.event.entity.living.LivingDamageEvent$Post" {
     fn getEntity(&self) -> LivingEntity;
 }
 
 fn te_on_server_tick(e: JObjectEvent) {
     let ev = e as ServerTickEventHc;
-    if ev.phase != TickPhaseHc::END { return; }
     if te_pending.length == 0 { return; }
     let now = sup_now_ms();
 
@@ -233,9 +230,9 @@ fn te_on_living_hurt(e: JObjectEvent) {
 pub fn register_teleport_events() {
     let bus = MinecraftForgeHc::EVENT_BUS;
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.TickEvent$ServerTickEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.tick.ServerTickEvent$Post") as JClassNet,
         |e| { te_on_server_tick(e); });
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.entity.living.LivingHurtEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.entity.living.LivingDamageEvent$Post") as JClassNet,
         |e| { te_on_living_hurt(e); });
 }

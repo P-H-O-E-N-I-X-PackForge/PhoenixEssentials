@@ -23,7 +23,7 @@ fn hc_set_home_limit(source: CommandSourceStackHc, target_name: String, count: I
 }
 
 fn shl_player_data(player: &ServerPlayer) -> EssentialsPlayerDataHc {
-    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);
     let data = opt.orElse(null);
     if data == null { return null; }
     return data as EssentialsPlayerDataHc;

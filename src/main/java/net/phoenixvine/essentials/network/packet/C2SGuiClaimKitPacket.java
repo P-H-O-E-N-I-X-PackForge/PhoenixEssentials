@@ -4,7 +4,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.network.NetworkEvent;
+import hotc.mc.net.HcChannel;
 import net.phoenixvine.essentials.api.EssentialsAPI;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.capability.PlayerEssentialsData;
@@ -30,7 +30,7 @@ public class C2SGuiClaimKitPacket {
         buf.writeUtf(name);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
+    public void handle(Supplier<HcChannel.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player == null) return;
@@ -43,7 +43,7 @@ public class C2SGuiClaimKitPacket {
             KitDefinition kit = KitRegistry.get(name);
             if (kit == null) return;
 
-            PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+            PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                     .orElse(null);
             if (data == null) return;
 

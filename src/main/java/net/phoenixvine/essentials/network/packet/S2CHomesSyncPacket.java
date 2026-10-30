@@ -1,9 +1,7 @@
 package net.phoenixvine.essentials.network.packet;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import hotc.mc.net.HcChannel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,10 +30,9 @@ public class S2CHomesSyncPacket {
         buf.writeVarInt(cap);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
+    public void handle(Supplier<HcChannel.Context> ctx) {
         ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                        net.phoenixvine.essentials.client.EssentialsClientCache.setHomes(names, cap)));
+                net.phoenixvine.essentials.client.EssentialsClientCache.setHomes(names, cap));
         ctx.get().setPacketHandled(true);
     }
 }

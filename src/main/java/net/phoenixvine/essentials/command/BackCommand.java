@@ -26,7 +26,7 @@ public final class BackCommand {
         ServerPlayer player = source.getPlayer();
         if (player == null) return 0;
 
-        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player).orElse(null);
         if (data == null) return 0;
 
         NamedLocation back = data.getBack();

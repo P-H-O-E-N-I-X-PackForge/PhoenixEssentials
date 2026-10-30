@@ -48,7 +48,7 @@ public final class KitCommand {
             return 0;
         }
 
-        PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
+        PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player).orElse(null);
         if (data == null) return 0;
 
         long lastClaimedMs = data.getKitLastClaimedMs(name);

@@ -12,19 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/**
- * Tiny disclosed shim for the Hot Chocolate data registries ({@code EssentialsDataRegistries.hotc}):
- * config-file text IO and {@link NamedLocation} construction/field access (it holds a
- * {@code ResourceKey}, which HC doesn't bind). Everything else -- the stores, lookups, JSON codec --
- * is HC.
- */
 public final class EssentialsHcData {
 
     private static final Path DIR = Paths.get("config", "phoenix_essentials");
 
     private EssentialsHcData() {}
 
-    /** File contents under {@code config/phoenix_essentials/}, or {@code null} if missing/unreadable. */
     public static String readFile(String name) {
         try {
             Path p = DIR.resolve(name);
@@ -46,7 +39,6 @@ public final class EssentialsHcData {
 
     private static final Path ROOT = Paths.get("config");
 
-    /** File contents directly under {@code config/} (e.g. the client settings file), or null. */
     public static String readRootFile(String name) {
         try {
             Path p = ROOT.resolve(name);
@@ -66,10 +58,8 @@ public final class EssentialsHcData {
         }
     }
 
-    // ---- config-override helpers (EssentialsConfigOverrides.hotc) ----
-
     public static Path configPath(String name) {
-        return net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get().resolve(name);
+        return net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get().resolve(name);
     }
 
     public static boolean pathExists(Path p) {
@@ -107,7 +97,7 @@ public final class EssentialsHcData {
     }
 
     public static NamedLocation makeLocation(String dim, double x, double y, double z, float yaw, float pitch) {
-        ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(dim));
+        ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(dim));
         return new NamedLocation(key, x, y, z, yaw, pitch);
     }
 
@@ -118,7 +108,6 @@ public final class EssentialsHcData {
     public static float yaw(NamedLocation l) { return l.yaw; }
     public static float pitch(NamedLocation l) { return l.pitch; }
 
-    /** The world spawn used when no {@code /setspawn} has been saved. */
     public static NamedLocation worldSpawn(ServerLevel overworld) {
         return new NamedLocation(overworld.dimension(), overworld.getSharedSpawnPos().getX() + 0.5,
                 overworld.getSharedSpawnPos().getY(), overworld.getSharedSpawnPos().getZ() + 0.5,

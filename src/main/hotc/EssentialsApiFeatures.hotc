@@ -254,7 +254,7 @@ pub fn api_get_feature_state(feature: String, dim: String) -> Int {
 // ---- player data readers ----
 
 fn fg_data(player: &ServerPlayer) -> EssentialsPlayerDataHc {
-    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);
     let data = opt.orElse(null);
     if data == null { return null; }
     return data as EssentialsPlayerDataHc;

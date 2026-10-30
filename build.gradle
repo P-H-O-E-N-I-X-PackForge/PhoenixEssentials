@@ -1,15 +1,8 @@
-buildscript {
-    repositories {
-        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
-        mavenCentral()
-    }
-}
-
 plugins {
     id "idea"
     id "eclipse"
     id "maven-publish"
-    id 'net.neoforged.moddev.legacyforge' version '2.0.91'
+    id 'net.neoforged.moddev' version '2.0.143'
     id 'hc'
 }
 
@@ -17,11 +10,19 @@ sourceSets {
     main.resources {
         srcDir 'src/generated/resources'
     }
+    // the Java half of the hotc-mc 1.21.1 networking layer (HcChannel and friends)
+    main.java {
+        srcDir '../../PhoenixVineDigital/hotc-mc-1.21.1/java'
+    }
 }
 
 repositories {
     mavenLocal()
     mavenCentral()
+    maven {
+        name = "ParchmentMC"
+        url = 'https://maven.parchmentmc.org'
+    }
     maven {
         name = "ftbMavenReleases"
         url = uri("https://maven.ftb.dev/releases")
@@ -48,41 +49,47 @@ repositories {
 version = mod_version
 group = maven_group
 base { archivesName = archives_base_name }
-java { sourceCompatibility = targetCompatibility = JavaVersion.VERSION_17 }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-legacyForge {
-    version = project.minecraft_version + '-' + project.forge_version
+neoForge {
+    version = project.neo_version
 
     parchment {
-        mappingsVersion = project.mapping_version
-        minecraftVersion = project.minecraft_version
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
     }
 
     runs {
         configureEach {
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'neoforge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
         }
         client {
             client()
-            sourceSet = sourceSets.main
-            programArguments.addAll('--refresh-dependencies')
-            systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
+            gameDirectory = file('run121/client')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            programArguments.addAll('--username', 'Phoenixvine')
+        }
+        client2 {
+            client()
+            gameDirectory = file('run121/client2')
+            programArguments.addAll('--username', 'Dev2')
+            jvmArguments.addAll('-Xmx3G')
         }
         server {
             server()
-            sourceSet = sourceSets.main
-            systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
+            gameDirectory = file('run121/server')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             programArguments.addAll('--nogui')
         }
         gameTestServer {
             type = 'gameTestServer'
-            sourceSet = sourceSets.main
-            systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
+            gameDirectory = file('run121/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
         data {
             data()
-            sourceSet = sourceSets.main
+            gameDirectory = file('run121/data')
             programArguments.addAll('--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath())
         }
     }
@@ -96,32 +103,36 @@ legacyForge {
 
 hotChocolate {
     compilerHome = file("$rootDir/../../PhoenixVineDigital/HotChocolate/build/install/hotchocolate")
-    sourceDirs file('src/main/hotc'), file('../../PhoenixVineDigital/hotc-mc')
+    sourceDirs file('src/main/hotc'), file('../../PhoenixVineDigital/hotc-mc-1.21.1')
     driverPackage = 'net.phoenixvine.essentials.hc'
+}
+
+// The Hot Chocolate compile loads the Minecraft classes to check `extern` signatures, and 1.21.1's are Java 21 class files.
+tasks.withType(JavaExec).matching { it.name.startsWith('hcCompile') }.configureEach {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
 }
 
 dependencies {
     compileOnly("org.jetbrains:annotations:26.0.1")
 
+    compileOnly("dev.ftb.mods:ftb-library-neoforge:${ftblibrary_version}")
+    compileOnly("dev.ftb.mods:ftb-teams-neoforge:${ftbteams_version}")
+    runtimeOnly("dev.ftb.mods:ftb-library-neoforge:${ftblibrary_version}")
+    runtimeOnly("dev.ftb.mods:ftb-teams-neoforge:${ftbteams_version}")
 
-    modCompileOnly("dev.ftb.mods:ftb-library-forge:${ftblibrary_version}")
-    modCompileOnly("dev.ftb.mods:ftb-teams-forge:${ftbteams_version}")
-    modRuntimeOnly("dev.ftb.mods:ftb-library-forge:${ftblibrary_version}")
-    modRuntimeOnly("dev.ftb.mods:ftb-teams-forge:${ftbteams_version}")
+    runtimeOnly("dev.architectury:architectury-neoforge:${architectury_version}")
 
-    modRuntimeOnly("dev.architectury:architectury-forge:${architectury_version}")
+    // optional compat mods: their own dependency trees (GregTech, ModularUI, ...) are not needed to run Essentials
+    compileOnly("net.phoenixvine.guilds:phoenix-guilds-neoforge:${phoenix_guilds_version}") { transitive = false }
 
-    modCompileOnly('net.phoenixvine.guilds:phoenix_guilds:1.6.3')
-    modRuntimeOnly('net.phoenixvine.guilds:phoenix_guilds:1.6.3')
+    compileOnly("dev.ftb.mods:ftb-chunks-neoforge:${ftbchunks_version}")
+    // Guilds, Domains and FTB Chunks are compile-only here: their login handlers send payloads a game-test mock player cannot
+    // receive, which fails every test that creates a mock player. Add them to a normal dev run by hand when needed.
+    // (FTB Chunks: its login handler sends a payload a game-test mock player cannot receive)
 
-    modCompileOnly("dev.ftb.mods:ftb-chunks-forge:${ftbchunks_version}")
-    modRuntimeOnly("dev.ftb.mods:ftb-chunks-forge:${ftbchunks_version}")
+    compileOnly("net.phoenixvine.domains:phoenix_domains:${phoenix_domains_version}") { transitive = false }
 
-    modCompileOnly('net.phoenixvine.domains:phoenix_domains:2.4')
-    modRuntimeOnly('net.phoenixvine.domains:phoenix_domains:2.4')
-
-
-   modImplementation("net.phoenixvine.wiki:phoenix_wiki:0.4.8")
+    implementation("net.phoenixvine.wiki:neoforge:${phoenix_wiki_version}")
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -141,26 +152,27 @@ tasks.named('test', Test).configure {
 
 tasks.named('processResources', ProcessResources).configure {
     var properties = [
-            "mod_license"      : mod_license,
-            "mod_id"           : mod_id,
-            "version"          : version,
-            "mod_name"         : mod_name,
-            "mod_url"          : mod_url,
-            "mod_author"       : mod_author,
-            "forge_version"    : forge_version.split("\\.")[0],
-            "minecraft_version": minecraft_version,
+            "mod_license"            : mod_license,
+            "mod_id"                 : mod_id,
+            "mod_version"            : version,
+            "mod_name"               : mod_name,
+            "mod_url"                : mod_url,
+            "mod_author"             : mod_author,
+            "neo_version"            : neo_version,
+            "minecraft_version"      : minecraft_version,
+            "minecraft_version_range": minecraft_version_range,
+            "loader_version_range"   : loader_version_range,
     ]
     inputs.properties(properties)
 
-    filesMatching("META-INF/mods.toml") {
+    filesMatching("META-INF/neoforge.mods.toml") {
         expand properties + [project: project]
     }
 }
 
-tasks.named('jar', Jar).configure { finalizedBy 'reobfJar' }
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
-    options.release.set(17)
+    options.release.set(21)
 }
 publishing {
     publications {

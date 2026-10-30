@@ -3,12 +3,13 @@ package net.phoenixvine.essentials.command;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.server.ServerLifecycleHooks;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.api.EssentialsAPI;
 import net.phoenixvine.essentials.api.event.TeleportEvent;
@@ -23,7 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
+@EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
 public final class TeleportExecutor {
 
     private record Pending(NamedLocation target, long readyAtMs, double startX, double startY, double startZ,
@@ -84,7 +85,7 @@ public final class TeleportExecutor {
         }
 
         TeleportEvent.Pre pre = new TeleportEvent.Pre(player, category, destinationLabel, target);
-        MinecraftForge.EVENT_BUS.post(pre);
+        NeoForge.EVENT_BUS.post(pre);
         if (pre.isCanceled()) return;
 
         int warmupSeconds = bypassWarmupAndCooldown ? 0 : EssentialsServerConfig.TELEPORT_WARMUP_SECONDS.get();
@@ -127,7 +128,7 @@ public final class TeleportExecutor {
             return;
         }
 
-        player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+        EssentialsCapabilityProvider.lookup(player)
                 .ifPresent(data -> data.setBack(NamedLocation.of(player)));
 
         player.teleportTo(targetLevel, target.x, target.y, target.z, Set.of(), target.yaw, target.pitch);
@@ -137,7 +138,7 @@ public final class TeleportExecutor {
         String suffix = successDetail == null || successDetail.isBlank() ? "" : " §7(" + successDetail + ")";
         player.sendSystemMessage(Component.literal("§aTeleported to §f" + destinationLabel + "§a." + suffix));
 
-        MinecraftForge.EVENT_BUS.post(new TeleportEvent.Post(player, category, destinationLabel));
+        NeoForge.EVENT_BUS.post(new TeleportEvent.Post(player, category, destinationLabel));
     }
 
     private static long cooldownRemainingMs(UUID uuid, String category, int cooldownSeconds) {
@@ -148,9 +149,8 @@ public final class TeleportExecutor {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
+    public static void onServerTick(ServerTickEvent.Post event) {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return;
-        if (event.phase != TickEvent.Phase.END) return;
         if (PENDING.isEmpty()) return;
 
         long now = System.currentTimeMillis();
@@ -181,7 +181,7 @@ public final class TeleportExecutor {
     }
 
     @SubscribeEvent
-    public static void onDamage(LivingHurtEvent event) {
+    public static void onDamage(LivingDamageEvent.Post event) {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return;
         if (!EssentialsServerConfig.CANCEL_ON_DAMAGE.get()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;

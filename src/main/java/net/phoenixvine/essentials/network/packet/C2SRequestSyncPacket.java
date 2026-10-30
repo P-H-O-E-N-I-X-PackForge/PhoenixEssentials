@@ -2,8 +2,8 @@ package net.phoenixvine.essentials.network.packet;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.network.PacketDistributor;
+import hotc.mc.net.HcChannel;
+import hotc.mc.net.HcPacketDistributor;
 import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.capability.PlayerEssentialsData;
 import net.phoenixvine.essentials.config.EssentialsServerConfig;
@@ -34,27 +34,27 @@ public class C2SRequestSyncPacket {
         buf.writeEnum(kind);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
+    public void handle(Supplier<HcChannel.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player == null) return;
 
             switch (kind) {
                 case HOMES -> {
-                    PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                    PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                             .orElse(null);
                     List<String> names = data == null ? List.of() :
                             data.getHomes().keySet().stream().sorted().toList();
-                    EssentialsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    EssentialsNetwork.CHANNEL.send(HcPacketDistributor.PLAYER.with(() -> player),
                             new S2CHomesSyncPacket(names, EssentialsServerConfig.HOMES_PER_PLAYER.get()));
                 }
                 case WARPS -> {
                     List<String> names = WarpRegistry.getAll().keySet().stream().sorted().toList();
-                    EssentialsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    EssentialsNetwork.CHANNEL.send(HcPacketDistributor.PLAYER.with(() -> player),
                             new S2CWarpsSyncPacket(names));
                 }
                 case KITS -> {
-                    PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                    PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                             .orElse(null);
                     List<S2CKitsSyncPacket.Entry> entries = new ArrayList<>();
                     for (KitDefinition kit : KitRegistry.getAll().values()) {
@@ -65,15 +65,15 @@ public class C2SRequestSyncPacket {
                         entries.add(new S2CKitsSyncPacket.Entry(kit.name, remainingSeconds));
                     }
                     entries.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
-                    EssentialsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    EssentialsNetwork.CHANNEL.send(HcPacketDistributor.PLAYER.with(() -> player),
                             new S2CKitsSyncPacket(entries));
                 }
                 case TRASH -> {
-                    PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+                    PlayerEssentialsData data = EssentialsCapabilityProvider.lookup(player)
                             .orElse(null);
                     List<String> ids = data == null ? List.of() :
                             data.getAlwaysTrash().stream().map(Object::toString).sorted().toList();
-                    EssentialsNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    EssentialsNetwork.CHANNEL.send(HcPacketDistributor.PLAYER.with(() -> player),
                             new S2CAutoTrashSyncPacket(ids));
                 }
             }

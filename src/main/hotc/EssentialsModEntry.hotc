@@ -16,32 +16,22 @@
 // `-Dphoenix_essentials.use_java=true` still flips the *behavior* (commands, events, screens) exactly as
 // before; the entry plumbing itself is the same in both modes.
 
-extern class MeModBusContext = "net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext" {
-    static fn get() -> MeModBusContext;
-    fn getModEventBus(&self) -> IEventBusHc;
-}
-
-extern class MeLoadingContext = "net.minecraftforge.fml.ModLoadingContext" {
-    static fn get() -> MeLoadingContext;
+// 1.21: the mod bus and the mod container are handed to the Java constructor and passed in.
+extern class MeContainer = "net.neoforged.fml.ModContainer" {
     fn registerConfig(&self, kind: MeConfigType, spec: OvIConfigSpec);
 }
 
-extern class MeConfigType = "net.minecraftforge.fml.config.ModConfig$Type" {
+extern class MeConfigType = "net.neoforged.fml.config.ModConfig$Type" {
     static SERVER: MeConfigType;
 }
 
-extern class MeCommonSetupEvent = "net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent" {
+extern class MeCommonSetupEvent = "net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent" {
     fn enqueueWork(&self, work: &dyn JRunnableNet) -> JCompletableFutureVoidNet;
 }
-
-extern class MeCapabilityEvent = "net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent" {}
 
 // Java classes the entry still drives.
 extern class MeNetwork = "net.phoenixvine.essentials.network.EssentialsNetwork" {
     static fn init();
-}
-extern class MeCapabilityProvider = "net.phoenixvine.essentials.capability.EssentialsCapabilityProvider" {
-    static fn register(ev: MeCapabilityEvent);
 }
 extern class MeCommands = "net.phoenixvine.essentials.command.EssentialsCommands" {
     static fn registerAll(dispatcher: CommandDispatcherSrc);
@@ -120,10 +110,6 @@ fn me_on_register_commands(e: JObjectEvent) {
     }
 }
 
-fn me_on_capabilities(e: JObjectEvent) {
-    MeCapabilityProvider::register(e as MeCapabilityEvent);
-}
-
 fn me_on_config_event(e: JObjectEvent) {
     if MeMode::takeover() {
         ovr_apply(e as OvModConfigEvent);
@@ -133,28 +119,24 @@ fn me_on_config_event(e: JObjectEvent) {
 }
 
 // Called from the `PhoenixEssentials` constructor.
-pub fn mod_construct() {
-    let mod_bus = MeModBusContext::get().getModEventBus();
+pub fn mod_construct(mod_bus: IEventBusHc, container: MeContainer) {
     mod_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent") as JClassNet,
+        class("net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent") as JClassNet,
         |e| { me_common_setup(e); });
     mod_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent") as JClassNet,
-        |e| { me_on_capabilities(e); });
-    mod_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.fml.event.config.ModConfigEvent$Loading") as JClassNet,
+        class("net.neoforged.fml.event.config.ModConfigEvent$Loading") as JClassNet,
         |e| { me_on_config_event(e); });
     mod_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.fml.event.config.ModConfigEvent$Reloading") as JClassNet,
+        class("net.neoforged.fml.event.config.ModConfigEvent$Reloading") as JClassNet,
         |e| { me_on_config_event(e); });
 
     let forge_bus = MinecraftForgeHc::EVENT_BUS;
     forge_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.server.ServerStartingEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.server.ServerStartingEvent") as JClassNet,
         |e| { me_on_server_starting(e); });
     forge_bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.RegisterCommandsEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.RegisterCommandsEvent") as JClassNet,
         |e| { me_on_register_commands(e); });
 
-    MeLoadingContext::get().registerConfig(MeConfigType::SERVER, OvServerConfig::SPEC as OvIConfigSpec);
+    container.registerConfig(MeConfigType::SERVER, OvServerConfig::SPEC as OvIConfigSpec);
 }

@@ -1,21 +1,14 @@
 package net.phoenixvine.essentials.client;
 
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.hc.hcCompileMerged1;
 
-// Client side of the AFK overlay (src/main/hotc/EssentialsAfkOverlay.hotc). The ORIGINAL mod has the
-// "Show AFK overlay indicator" setting (EssentialsSettings / the config screen toggle) but no code
-// that reads it -- there is no overlay to port -- so this is a new feature: a HUD badge drawn by HC
-// whenever the server says this player is AFK and the setting is on.
-//
-// This class owns the two things HC can't express yet: registering a HUD overlay (needs the
-// RegisterGuiOverlaysEvent mod-bus event + an IGuiOverlay lambda) and the small piece of client
-// state (the synced AFK flag + when it started, for the "AFK 2m 5s" label).
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = PhoenixEssentials.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class EssentialsHcAfkOverlay {
 
     private static volatile boolean active = false;
@@ -23,7 +16,6 @@ public final class EssentialsHcAfkOverlay {
 
     private EssentialsHcAfkOverlay() {}
 
-    // Called by the HC packet handler (main thread, via enqueueWork) when the server syncs the flag.
     public static void setActive(boolean afk) {
         active = afk;
         sinceMs = afk ? System.currentTimeMillis() : 0L;
@@ -33,7 +25,6 @@ public final class EssentialsHcAfkOverlay {
         return active;
     }
 
-    // "AFK" plus elapsed time once it passes a second, e.g. "AFK 2m 5s".
     public static String label() {
         if (!active) return "";
         long seconds = (System.currentTimeMillis() - sinceMs) / 1000;
@@ -48,8 +39,8 @@ public final class EssentialsHcAfkOverlay {
     }
 
     @SubscribeEvent
-    public static void onRegisterOverlays(RegisterGuiOverlaysEvent event) {
-        event.registerAboveAll("afk_hc", (gui, graphics, partialTick, width, height) ->
-                hcCompileMerged1.render_afk_overlay(graphics, width, height));
+    public static void onRegisterOverlays(RegisterGuiLayersEvent event) {
+        event.registerAboveAll(ResourceLocation.fromNamespaceAndPath(PhoenixEssentials.MOD_ID, "afk_hc"), (graphics, deltaTracker) ->
+                hcCompileMerged1.render_afk_overlay(graphics, graphics.guiWidth(), graphics.guiHeight()));
     }
 }

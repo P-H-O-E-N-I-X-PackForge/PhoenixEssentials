@@ -6,7 +6,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.phoenixvine.essentials.network.EssentialsNetwork;
 import net.phoenixvine.essentials.network.packet.C2SGuiClaimKitPacket;
 import net.phoenixvine.essentials.network.packet.C2SGuiTeleportPacket;
@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class EssentialsListScreen extends Screen {
+    @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    }
 
     private record Row(String label, String actionName, boolean clickable) {}
 
@@ -175,7 +178,7 @@ public class EssentialsListScreen extends Screen {
 
     private static String displayNameOf(String id) {
         ResourceLocation loc = ResourceLocation.tryParse(id);
-        Item item = loc == null ? null : ForgeRegistries.ITEMS.getValue(loc);
+        Item item = loc == null ? null : BuiltInRegistries.ITEM.get(loc);
         return item == null ? id : new ItemStack(item).getHoverName().getString();
     }
 
@@ -213,7 +216,7 @@ public class EssentialsListScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double delta) {
+    public boolean mouseScrolled(double mx, double my, double scrollX, double delta) {
         int maxScroll = Math.max(0, rows.size() - listH / ROW_H);
         scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - (int) delta));
         return true;

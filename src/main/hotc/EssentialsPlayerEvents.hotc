@@ -1,45 +1,27 @@
 
 
-extern class TickPhaseHc = "net.minecraftforge.event.TickEvent$Phase" {
-    static START: TickPhaseHc;
-    static END: TickPhaseHc;
-}
-
-extern class PlayerTickEventHc = "net.minecraftforge.event.TickEvent$PlayerTickEvent" {
-
-    phase: TickPhaseHc;
-    player: Player;
-}
-
-extern class PlayerLoggedInEventHc = "net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent" {
+extern class PlayerTickEventHc = "net.neoforged.neoforge.event.tick.PlayerTickEvent$Post" {
     fn getEntity(&self) -> Player;
 }
 
-extern class PlayerLoggedOutEventHc = "net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedOutEvent" {
+extern class PlayerLoggedInEventHc = "net.neoforged.neoforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent" {
     fn getEntity(&self) -> Player;
 }
 
-extern class PlayerCloneEventHc = "net.minecraftforge.event.entity.player.PlayerEvent$Clone" {
-    fn getOriginal(&self) -> Player;
+extern class PlayerLoggedOutEventHc = "net.neoforged.neoforge.event.entity.player.PlayerEvent$PlayerLoggedOutEvent" {
     fn getEntity(&self) -> Player;
 }
 
-extern class LivingDeathEventHc = "net.minecraftforge.event.entity.living.LivingDeathEvent" {
+extern class LivingDeathEventHc = "net.neoforged.neoforge.event.entity.living.LivingDeathEvent" {
     fn getEntity(&self) -> LivingEntity;
-}
-
-fn ess_on_player_clone(e: JObjectEvent) {
-    let ev = e as PlayerCloneEventHc;
-    EssentialsHcServerBridgeHc::copyPlayerData(ev.getOriginal(), ev.getEntity());
 }
 
 fn ess_on_player_tick(e: JObjectEvent) {
     let ev = e as PlayerTickEventHc;
-    if ev.phase != TickPhaseHc::END { return; }
-    let who = ev.player;
+    let who = ev.getEntity();
     if !(who is ServerPlayer) { return; }
     let player = who as ServerPlayer;
-    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);
     let data_obj = opt.orElse(null);
     if data_obj == null { return; }
     (data_obj as EssentialsPlayerDataHc).addPlaytimeTicks(1L);
@@ -62,7 +44,7 @@ fn ess_on_living_death(e: JObjectEvent) {
     let who = (e as LivingDeathEventHc).getEntity();
     if !(who is ServerPlayer) { return; }
     let player = who as ServerPlayer;
-    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);
     let data_obj = opt.orElse(null);
     if data_obj == null { return; }
     (data_obj as EssentialsPlayerDataHc).setBack(NamedLocationHc::of(player));
@@ -71,18 +53,15 @@ fn ess_on_living_death(e: JObjectEvent) {
 pub fn register_player_events() {
     let bus = MinecraftForgeHc::EVENT_BUS;
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.entity.player.PlayerEvent$Clone") as JClassNet,
-        |e| { ess_on_player_clone(e); });
-    bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.TickEvent$PlayerTickEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.tick.PlayerTickEvent$Post") as JClassNet,
         |e| { ess_on_player_tick(e); });
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.entity.player.PlayerEvent$PlayerLoggedInEvent") as JClassNet,
         |e| { ess_on_player_logged_in(e); });
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.entity.player.PlayerEvent$PlayerLoggedOutEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.entity.player.PlayerEvent$PlayerLoggedOutEvent") as JClassNet,
         |e| { ess_on_player_logged_out(e); });
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.entity.living.LivingDeathEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.entity.living.LivingDeathEvent") as JClassNet,
         |e| { ess_on_living_death(e); });
 }

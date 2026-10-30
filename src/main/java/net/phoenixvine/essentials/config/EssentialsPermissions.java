@@ -2,15 +2,16 @@ package net.phoenixvine.essentials.config;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.server.permission.PermissionAPI;
-import net.minecraftforge.server.permission.events.PermissionGatherEvent;
-import net.minecraftforge.server.permission.nodes.PermissionNode;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.server.permission.PermissionAPI;
+import net.neoforged.neoforge.server.permission.events.PermissionGatherEvent;
+import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.hc.hcCompileMerged1;
 
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
+@EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
 public final class EssentialsPermissions {
 
     public static PermissionNode<Boolean> HOME;
@@ -51,9 +52,6 @@ public final class EssentialsPermissions {
 
     private EssentialsPermissions() {}
 
-    // The nodes themselves are built and registered by the Hot Chocolate port
-    // (`EssentialsPermissions.hotc`, `perm_gather`); this copies each one into the public static field so
-    // the Java commands' `check(source, HOME)` calls use the very same node objects.
     @SubscribeEvent
     public static void gather(PermissionGatherEvent.Nodes event) {
         hcCompileMerged1.perm_gather(event);

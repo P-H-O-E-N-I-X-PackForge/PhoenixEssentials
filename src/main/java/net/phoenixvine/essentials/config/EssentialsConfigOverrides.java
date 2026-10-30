@@ -2,9 +2,9 @@ package net.phoenixvine.essentials.config;
 
 import com.electronwill.nightconfig.core.UnmodifiableConfig;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.fml.loading.FMLPaths;
 import net.phoenixvine.essentials.PhoenixEssentials;
 
 import java.nio.charset.StandardCharsets;
@@ -47,7 +47,6 @@ public final class EssentialsConfigOverrides {
         apply(event);
     }
 
-    /** The original Java implementation, driven by the HC mod entry when {@code use_java=true}. */
     public static void applyJava(ModConfigEvent event) {
         apply(event);
     }
@@ -79,12 +78,12 @@ public final class EssentialsConfigOverrides {
             return;
         }
 
-        Map<String, ForgeConfigSpec.ConfigValue<?>> valuesByPath = collectConfigValues();
+        Map<String, ModConfigSpec.ConfigValue<?>> valuesByPath = collectConfigValues();
 
         for (Map.Entry<String, Object> entry : flattened.entrySet()) {
             String path = entry.getKey();
             Object rawValue = entry.getValue();
-            ForgeConfigSpec.ConfigValue<?> configValue = valuesByPath.get(path);
+            ModConfigSpec.ConfigValue<?> configValue = valuesByPath.get(path);
             if (configValue == null) {
                 PhoenixEssentials.LOGGER.warn(
                     "[{}] Config override file {} references unknown config key '{}' - ignoring. Check for typos.",
@@ -122,11 +121,11 @@ public final class EssentialsConfigOverrides {
                 Files.createDirectories(parent);
             }
 
-            Map<String, ForgeConfigSpec.ConfigValue<?>> valuesByPath = collectConfigValues();
+            Map<String, ModConfigSpec.ConfigValue<?>> valuesByPath = collectConfigValues();
             try (CommentedFileConfig generated = CommentedFileConfig.of(overridePath)) {
-                for (Map.Entry<String, ForgeConfigSpec.ConfigValue<?>> entry : valuesByPath.entrySet()) {
+                for (Map.Entry<String, ModConfigSpec.ConfigValue<?>> entry : valuesByPath.entrySet()) {
                     List<String> path = splitPath(entry.getKey());
-                    ForgeConfigSpec.ConfigValue<?> configValue = entry.getValue();
+                    ModConfigSpec.ConfigValue<?> configValue = entry.getValue();
                     generated.set(path, toTomlValue(configValue, configValue.getDefault()));
 
                     String comment = commentFor(path);
@@ -149,8 +148,8 @@ public final class EssentialsConfigOverrides {
         }
     }
 
-    private static Object toTomlValue(ForgeConfigSpec.ConfigValue<?> configValue, Object defaultValue) {
-        if (configValue instanceof ForgeConfigSpec.EnumValue<?> && defaultValue instanceof Enum<?> enumValue) {
+    private static Object toTomlValue(ModConfigSpec.ConfigValue<?> configValue, Object defaultValue) {
+        if (configValue instanceof ModConfigSpec.EnumValue<?> && defaultValue instanceof Enum<?> enumValue) {
             return enumValue.name();
         }
         return defaultValue;
@@ -158,7 +157,7 @@ public final class EssentialsConfigOverrides {
 
     private static String commentFor(List<String> path) {
         Object rawSpecEntry = EssentialsServerConfig.SPEC.getSpec().get(path);
-        if (rawSpecEntry instanceof ForgeConfigSpec.ValueSpec valueSpec) {
+        if (rawSpecEntry instanceof ModConfigSpec.ValueSpec valueSpec) {
             return valueSpec.getComment();
         }
         return null;
@@ -180,18 +179,18 @@ public final class EssentialsConfigOverrides {
         }
     }
 
-    private static Map<String, ForgeConfigSpec.ConfigValue<?>> collectConfigValues() {
-        Map<String, ForgeConfigSpec.ConfigValue<?>> map = new LinkedHashMap<>();
+    private static Map<String, ModConfigSpec.ConfigValue<?>> collectConfigValues() {
+        Map<String, ModConfigSpec.ConfigValue<?>> map = new LinkedHashMap<>();
         collectConfigValues("", EssentialsServerConfig.SPEC.getValues(), map);
         return map;
     }
 
     private static void collectConfigValues(
-            String prefix, UnmodifiableConfig values, Map<String, ForgeConfigSpec.ConfigValue<?>> out) {
+            String prefix, UnmodifiableConfig values, Map<String, ModConfigSpec.ConfigValue<?>> out) {
         for (UnmodifiableConfig.Entry entry : values.entrySet()) {
             String key = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
             Object value = entry.getValue();
-            if (value instanceof ForgeConfigSpec.ConfigValue<?> configValue) {
+            if (value instanceof ModConfigSpec.ConfigValue<?> configValue) {
                 out.put(key, configValue);
             } else if (value instanceof UnmodifiableConfig nested) {
                 collectConfigValues(key, nested, out);
@@ -200,16 +199,16 @@ public final class EssentialsConfigOverrides {
     }
 
     @SuppressWarnings("unchecked")
-    private static void setValue(ForgeConfigSpec.ConfigValue<?> configValue, Object coerced) {
-        ((ForgeConfigSpec.ConfigValue<Object>) configValue).set(coerced);
+    private static void setValue(ModConfigSpec.ConfigValue<?> configValue, Object coerced) {
+        ((ModConfigSpec.ConfigValue<Object>) configValue).set(coerced);
     }
 
-    private static Object coerce(ForgeConfigSpec.ConfigValue<?> configValue, Object rawValue) {
+    private static Object coerce(ModConfigSpec.ConfigValue<?> configValue, Object rawValue) {
         if (rawValue == null) {
             throw new IllegalArgumentException("override value is null");
         }
 
-        if (configValue instanceof ForgeConfigSpec.BooleanValue) {
+        if (configValue instanceof ModConfigSpec.BooleanValue) {
             if (rawValue instanceof Boolean b) {
                 return b;
             }
@@ -219,28 +218,28 @@ public final class EssentialsConfigOverrides {
             throw new IllegalArgumentException("expected a boolean, got " + rawValue.getClass().getSimpleName());
         }
 
-        if (configValue instanceof ForgeConfigSpec.IntValue) {
+        if (configValue instanceof ModConfigSpec.IntValue) {
             if (rawValue instanceof Number n) {
                 return n.intValue();
             }
             throw new IllegalArgumentException("expected an integer, got " + rawValue.getClass().getSimpleName());
         }
 
-        if (configValue instanceof ForgeConfigSpec.LongValue) {
+        if (configValue instanceof ModConfigSpec.LongValue) {
             if (rawValue instanceof Number n) {
                 return n.longValue();
             }
             throw new IllegalArgumentException("expected a long, got " + rawValue.getClass().getSimpleName());
         }
 
-        if (configValue instanceof ForgeConfigSpec.DoubleValue) {
+        if (configValue instanceof ModConfigSpec.DoubleValue) {
             if (rawValue instanceof Number n) {
                 return n.doubleValue();
             }
             throw new IllegalArgumentException("expected a double, got " + rawValue.getClass().getSimpleName());
         }
 
-        if (configValue instanceof ForgeConfigSpec.EnumValue<?> enumValue) {
+        if (configValue instanceof ModConfigSpec.EnumValue<?> enumValue) {
             Enum<?> def = (Enum<?>) enumValue.getDefault();
             if (rawValue instanceof String s) {
                 for (Object constant : def.getDeclaringClass().getEnumConstants()) {

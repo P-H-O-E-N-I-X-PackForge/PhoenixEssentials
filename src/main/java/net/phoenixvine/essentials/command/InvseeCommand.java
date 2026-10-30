@@ -11,9 +11,10 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.MenuType;
-import net.minecraftforge.event.entity.player.PlayerContainerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
 import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.config.EssentialsPermissions;
 
@@ -21,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
+@EventBusSubscriber(modid = PhoenixEssentials.MOD_ID)
 public final class InvseeCommand {
 
     private record Session(UUID targetUuid, SimpleContainer container) {}

@@ -1,9 +1,7 @@
 package net.phoenixvine.essentials.network.packet;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import hotc.mc.net.HcChannel;
 import net.phoenixvine.essentials.client.EssentialsClientCache;
 
 import java.util.ArrayList;
@@ -36,14 +34,14 @@ public class S2CKitsSyncPacket {
         }
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
+    public void handle(Supplier<HcChannel.Context> ctx) {
         ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+                {
                     List<EssentialsClientCache.KitEntry> mapped = entries.stream()
                             .map(e -> new EssentialsClientCache.KitEntry(e.name(), e.cooldownRemainingSeconds()))
                             .toList();
                     EssentialsClientCache.setKits(mapped);
-                }));
+                });
         ctx.get().setPacketHandled(true);
     }
 }

@@ -60,7 +60,7 @@ public final class SpawnRegistry {
             SpawnEntry e = GSON.fromJson(json, SpawnEntry.class);
             if (e == null) return;
             ResourceKey<net.minecraft.world.level.Level> dim =
-                    ResourceKey.create(Registries.DIMENSION, new ResourceLocation(e.dimension));
+                    ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(e.dimension));
             spawn = new NamedLocation(dim, e.x, e.y, e.z, e.yaw, e.pitch);
         } catch (Exception e) {
             e.printStackTrace();

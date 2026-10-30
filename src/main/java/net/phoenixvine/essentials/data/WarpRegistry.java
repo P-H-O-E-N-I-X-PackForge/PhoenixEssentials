@@ -55,7 +55,7 @@ public final class WarpRegistry {
 
     public static Map<String, NamedLocation> getAll() {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
-            // Snapshot (insertion order) of the HC store; callers only read it.
+            
             Map<String, NamedLocation> snapshot = new LinkedHashMap<>();
             String names = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_names();
             if (!names.isEmpty()) {
@@ -108,7 +108,7 @@ public final class WarpRegistry {
 
     private static NamedLocation toLocation(WarpEntry e) {
         ResourceKey<net.minecraft.world.level.Level> dim =
-                ResourceKey.create(Registries.DIMENSION, new ResourceLocation(e.dimension));
+                ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(e.dimension));
         return new NamedLocation(dim, e.x, e.y, e.z, e.yaw, e.pitch);
     }
 }

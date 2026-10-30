@@ -5,7 +5,7 @@ import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 public class KitItemEntry {
 
@@ -22,14 +22,14 @@ public class KitItemEntry {
 
     public ItemStack toStack() {
         ResourceLocation rl = ResourceLocation.tryParse(item);
-        if (rl == null || !ForgeRegistries.ITEMS.containsKey(rl)) return ItemStack.EMPTY;
-        Item i = ForgeRegistries.ITEMS.getValue(rl);
+        if (rl == null || !BuiltInRegistries.ITEM.containsKey(rl)) return ItemStack.EMPTY;
+        Item i = BuiltInRegistries.ITEM.get(rl);
         if (i == null) return ItemStack.EMPTY;
         ItemStack stack = new ItemStack(i, Math.max(1, count));
         if (nbt != null && !nbt.isBlank()) {
             try {
                 CompoundTag tag = TagParser.parseTag(nbt);
-                stack.setTag(tag);
+                stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
             } catch (Exception ignored) {}
         }
         return stack;

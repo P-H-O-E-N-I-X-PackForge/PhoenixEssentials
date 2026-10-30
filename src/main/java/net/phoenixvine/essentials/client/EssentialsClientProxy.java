@@ -1,24 +1,16 @@
 package net.phoenixvine.essentials.client;
 
-import net.minecraftforge.client.ConfigScreenHandler;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.phoenixvine.essentials.PhoenixEssentials;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
-/**
- * All client-only bootstrap lives here so {@link PhoenixEssentials} never references a client class.
- * <p>
- * The class is only ever loaded on the physical client: the {@code value = Dist.CLIENT} subscriber is
- * skipped by Forge before the class is loaded, and {@link #registerConfigScreen()} is only reached
- * through {@code DistExecutor}.
- */
 public final class EssentialsClientProxy {
 
     private EssentialsClientProxy() {}
 
-    public static void registerConfigScreen() {
-        // Client listeners (setup event, key registration, key tick) are registered by the HC port.
-        net.phoenixvine.essentials.hc.hcCompileMerged1.client_construct();
-        ModLoadingContext.get().registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory((mc, screen) -> new EssentialsConfigScreen(screen)));
+    public static void registerConfigScreen(IEventBus modBus, ModContainer container) {
+        net.phoenixvine.essentials.hc.hcCompileMerged1.client_construct(modBus);
+        container.registerExtensionPoint(IConfigScreenFactory.class,
+                (mc, screen) -> new EssentialsConfigScreen(screen));
     }
 }

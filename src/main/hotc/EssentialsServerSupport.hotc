@@ -24,10 +24,10 @@ extern class SupDimKey = "net.minecraft.resources.ResourceKey" {
     fn location(&self) -> ResourceLocation;
 }
 
-extern class SupIntValue = "net.minecraftforge.common.ForgeConfigSpec$IntValue" {
+extern class SupIntValue = "net.neoforged.neoforge.common.ModConfigSpec$IntValue" {
     fn get(&self) -> CfgObject;
 }
-extern class SupBoolValue = "net.minecraftforge.common.ForgeConfigSpec$BooleanValue" {
+extern class SupBoolValue = "net.neoforged.neoforge.common.ModConfigSpec$BooleanValue" {
     fn get(&self) -> CfgObject;
 }
 
@@ -38,7 +38,7 @@ extern class SupKitData = "net.phoenixvine.essentials.capability.PlayerEssential
 extern class SupUuid = "java.util.UUID" {
     static fn fromString(s: String) -> TcUuid;
 }
-extern class SupHooks = "net.minecraftforge.server.ServerLifecycleHooks" {
+extern class SupHooks = "net.neoforged.neoforge.server.ServerLifecycleHooks" {
     static fn getCurrentServer() -> MinecraftServerHc;
 }
 extern class SupPlayerList = "net.minecraft.server.players.PlayerList" {
@@ -49,14 +49,14 @@ extern class SupServer = "net.minecraft.server.MinecraftServer" {
 }
 
 // The mod's public `TeleportEvent.Pre/Post` Forge events (other mods subscribe to them).
-extern class SupPermApi = "net.minecraftforge.server.permission.PermissionAPI" {
+extern class SupPermApi = "net.neoforged.neoforge.server.permission.PermissionAPI" {
     static fn getPermission(player: &ServerPlayer, node: PermissionNodeSrc, contexts: [PermissionDynamicContextSrc]) -> JObjectCmd;
 }
-extern class SupEvent = "net.minecraftforge.eventbus.api.Event" {}
-extern class SupBus = "net.minecraftforge.eventbus.api.IEventBus" interface {
-    fn post(&self, ev: SupEvent) -> Bool;
+extern class SupEvent = "net.neoforged.bus.api.Event" {}
+extern class SupBus = "net.neoforged.bus.api.IEventBus" interface {
+    fn post(&self, ev: SupEvent) -> SupEvent;
 }
-extern class SupForge = "net.minecraftforge.common.MinecraftForge" {
+extern class SupForge = "net.neoforged.neoforge.common.NeoForge" {
     static EVENT_BUS: SupBus;
 }
 extern class SupPreEvent = "net.phoenixvine.essentials.api.event.TeleportEvent$Pre" {
@@ -238,7 +238,7 @@ pub fn sup_kit_cooldown_remaining(data: &EssentialsPlayerDataHc, name: String) -
 
 // "name:secs,name:secs" for every kit, sorted by name ignoring case -- the kits sync payload.
 pub fn sup_kit_sync_csv(player: &ServerPlayer) -> String {
-    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);
     let data_obj = opt.orElse(null);
     let keys = sup_lines(dr_kit_names());
     var names = [""; keys.length];

@@ -54,9 +54,17 @@ extern class WikiThemeHc = "net.phoenixvine.wiki.client.screen.WikiTheme" {
     fn new(bg: Int, panel: Int, header: Int, border: Int, accent: Int, text: Int, textDim: Int, textFaint: Int, done: Int, activeColor: Int) -> Self;
 }
 
+// 1.21: Forge capabilities are gone; the player's data is a NeoForge data attachment, reached through this Java helper
+// (`EssentialsCapabilityProvider.lookup`), which answers an `Optional` so the `.orElse(null)` call sites read as before.
 extern class EssentialsCapabilityProviderHc = "net.phoenixvine.essentials.capability.EssentialsCapabilityProvider" {
-    static PLAYER_ESSENTIALS: CapabilityHc;
+    static fn lookup(player: JObjectEssCap) -> EssOptionalHc;
 }
+
+extern class EssOptionalHc = "java.util.Optional" {
+    fn orElse(&self, other: JObjectEssCap) -> JObjectEssCap;
+}
+
+extern class JObjectEssCap = "java.lang.Object" {}
 
 extern class EssentialsPlayerDataHc = "net.phoenixvine.essentials.capability.PlayerEssentialsData" {
     fn getHome(&self, name: String) -> NamedLocationHc;
@@ -90,8 +98,8 @@ extern class TeleportExecutorHc = "net.phoenixvine.essentials.command.TeleportEx
     static fn forceTeleport(player: ServerPlayer, target: NamedLocationHc, category: String, destinationLabel: String);
 }
 
-extern class ForgeConfigIntValueHc = "net.minecraftforge.common.ForgeConfigSpec$IntValue" {
-    fn get(&self) -> JObjectForgeCap;
+extern class ForgeConfigIntValueHc = "net.neoforged.neoforge.common.ModConfigSpec$IntValue" {
+    fn get(&self) -> JObjectEssCap;
 }
 
 extern class EssentialsServerConfigHc = "net.phoenixvine.essentials.config.EssentialsServerConfig" {

@@ -14,10 +14,14 @@ extern class AtItemEntityHc = "net.minecraft.world.entity.item.ItemEntity" {
     fn discard(&self);
 }
 
-extern class AtPickupEventHc = "net.minecraftforge.event.entity.player.EntityItemPickupEvent" {
-    fn getEntity(&self) -> Player;
-    fn getItem(&self) -> AtItemEntityHc;
-    fn setCanceled(&self, canceled: Bool);
+extern class AtPickupEventHc = "net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent$Pre" {
+    fn getPlayer(&self) -> Player;
+    fn getItemEntity(&self) -> AtItemEntityHc;
+    fn setCanPickup(&self, state: AtTriState);
+}
+
+extern class AtTriState = "net.neoforged.neoforge.common.util.TriState" {
+    static FALSE: AtTriState;
 }
 
 extern class AtInventoryHc = "net.minecraft.world.entity.player.Inventory" {
@@ -28,7 +32,6 @@ extern class AtInventoryHc = "net.minecraft.world.entity.player.Inventory" {
 
 extern class AtPlayerHc = "net.minecraft.world.entity.player.Player" {
     fn getInventory(&self) -> AtInventoryHc;
-    fn getCapability(&self, cap: CapabilityHc) -> LazyOptionalHc;
 }
 
 extern class AtServerPlayerHc = "net.minecraft.server.level.ServerPlayer" {
@@ -40,28 +43,28 @@ extern class AtItemStackHc = "net.minecraft.world.item.ItemStack" {
 }
 
 fn at_player_data(player: &Player) -> EssentialsPlayerDataHc {
-    let opt = (player as AtPlayerHc).getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup((player as AtPlayerHc) as JObjectEssCap);
     let data = opt.orElse(null);
     if data == null { return null; }
     return data as EssentialsPlayerDataHc;
 }
 
 fn at_item_id(stack: &ItemStack) -> ResourceLocation {
-    return ForgeRegistriesItem::ITEMS.getKey(stack.getItem() as JObjectItem);
+    return ForgeRegistriesItem::ITEM.getKey(stack.getItem() as JObjectItem);
 }
 
 fn at_on_pickup(e: JObjectEvent) {
     let ev = e as AtPickupEventHc;
-    let player = ev.getEntity();
+    let player = ev.getPlayer();
     let data = at_player_data(&player);
     if data == null { return; }
     if !data.hasAlwaysTrash() { return; }
-    let entity = ev.getItem();
+    let entity = ev.getItemEntity();
     let stack = entity.getItem();
     let id = at_item_id(&stack);
     if id == null { return; }
     if !data.isAlwaysTrash(id) { return; }
-    ev.setCanceled(true);
+    ev.setCanPickup(AtTriState::FALSE);
     entity.discard();
 }
 
@@ -78,8 +81,7 @@ fn at_sweep_slot(inv: &AtInventoryHc, data: &EssentialsPlayerDataHc, slot: Int) 
 
 fn at_on_player_tick(e: JObjectEvent) {
     let ev = e as PlayerTickEventHc;
-    if ev.phase != TickPhaseHc::END { return; }
-    let who = ev.player;
+    let who = ev.getEntity();
     if !(who is ServerPlayer) { return; }
     if (who as AtServerPlayerHc).tickCount % 10 != 0 { return; }
     let data = at_player_data(&who);
@@ -99,9 +101,9 @@ fn at_on_player_tick(e: JObjectEvent) {
 pub fn register_autotrash_events() {
     let bus = MinecraftForgeHc::EVENT_BUS;
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.entity.player.EntityItemPickupEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent$Pre") as JClassNet,
         |e| { at_on_pickup(e); });
     bus.addListener(EventPriorityHc::NORMAL, false,
-        class("net.minecraftforge.event.TickEvent$PlayerTickEvent") as JClassNet,
+        class("net.neoforged.neoforge.event.tick.PlayerTickEvent$Post") as JClassNet,
         |e| { at_on_player_tick(e); });
 }

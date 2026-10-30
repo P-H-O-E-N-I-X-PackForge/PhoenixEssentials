@@ -1,53 +1,35 @@
 package net.phoenixvine.essentials.capability;
 
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.common.capabilities.*;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.attachment.AttachmentType;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.phoenixvine.essentials.PhoenixEssentials;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import java.util.Optional;
 
-@Mod.EventBusSubscriber(modid = PhoenixEssentials.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
-public class EssentialsCapabilityProvider implements ICapabilitySerializable<CompoundTag> {
+public final class EssentialsCapabilityProvider {
 
-    public static final Capability<PlayerEssentialsData> PLAYER_ESSENTIALS = CapabilityManager.get(new CapabilityToken<>() {});
-    private static final ResourceLocation KEY = new ResourceLocation(PhoenixEssentials.MOD_ID, "player_essentials");
+    private static final DeferredRegister<AttachmentType<?>> ATTACHMENTS =
+            DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, PhoenixEssentials.MOD_ID);
 
-    private final PlayerEssentialsData instance = new PlayerEssentialsData();
-    private final LazyOptional<PlayerEssentialsData> optional = LazyOptional.of(() -> instance);
+    public static final DeferredHolder<AttachmentType<?>, AttachmentType<PlayerEssentialsData>> PLAYER_ESSENTIALS =
+            ATTACHMENTS.register("player_essentials",
+                    () -> AttachmentType.serializable(PlayerEssentialsData::new).copyOnDeath().build());
 
-    @NotNull
-    @Override
-    public <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        return cap == PLAYER_ESSENTIALS ? optional.cast() : LazyOptional.empty();
+    private EssentialsCapabilityProvider() {}
+
+    public static void register(IEventBus modBus) {
+        ATTACHMENTS.register(modBus);
     }
 
-    @Override
-    public CompoundTag serializeNBT() {
-        return instance.serializeNBT();
+    public static PlayerEssentialsData get(Player player) {
+        return player.getData(PLAYER_ESSENTIALS);
     }
 
-    @Override
-    public void deserializeNBT(CompoundTag nbt) {
-        instance.deserializeNBT(nbt);
-    }
-
-    @SubscribeEvent
-    public static void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {
-        if (event.getObject() instanceof Player) {
-            event.addCapability(KEY, new EssentialsCapabilityProvider());
-        }
-    }
-
-    public static void register(RegisterCapabilitiesEvent event) {
-        event.register(PlayerEssentialsData.class);
+    public static Optional<PlayerEssentialsData> lookup(Object player) {
+        return player instanceof Player p ? Optional.of(get(p)) : Optional.empty();
     }
 }

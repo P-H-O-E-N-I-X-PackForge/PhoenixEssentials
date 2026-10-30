@@ -59,7 +59,7 @@ public final class MessageCommand {
             return 0;
         }
 
-        PlayerEssentialsData targetData = target.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
+        PlayerEssentialsData targetData = EssentialsCapabilityProvider.lookup(target)
                 .orElse(null);
         if (targetData != null && targetData.isIgnoring(sender.getUUID())) {
             source.sendFailure(Component.literal("§cThat player isn't receiving messages right now."));

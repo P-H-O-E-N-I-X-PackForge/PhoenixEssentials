@@ -1,9 +1,13 @@
 package net.phoenixvine.essentials;
 
+import hotc.mc.net.HcChannel;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.phoenixvine.essentials.capability.EssentialsCapabilityProvider;
 import net.phoenixvine.essentials.client.EssentialsClientProxy;
 import net.phoenixvine.essentials.hc.hcCompileMerged1;
 
@@ -11,22 +15,23 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 @Mod(PhoenixEssentials.MOD_ID)
-@SuppressWarnings("removal")
 public class PhoenixEssentials {
 
     public static final String MOD_ID = "phoenix_essentials";
     public static final Logger LOGGER = LogManager.getLogger();
 
-    public PhoenixEssentials() {
-        // Everything the constructor and the old @SubscribeEvent methods did (mod/Forge-bus listeners, the
-        // server-config registration) lives in the Hot Chocolate port: src/main/hotc/EssentialsModEntry.hotc.
-        hcCompileMerged1.mod_construct();
+    public PhoenixEssentials(IEventBus modBus, ModContainer container) {
+        EssentialsCapabilityProvider.register(modBus);
+        modBus.addListener(HcChannel::registerAll);
 
-        // Client-only: must stay Java so the client proxy class is never loaded on a dedicated server.
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> EssentialsClientProxy::registerConfigScreen);
+        hcCompileMerged1.mod_construct(modBus, container);
+
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            EssentialsClientProxy.registerConfigScreen(modBus, container);
+        }
     }
 
     public static ResourceLocation id(String path) {
-        return new ResourceLocation(MOD_ID, path);
+        return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
     }
 }

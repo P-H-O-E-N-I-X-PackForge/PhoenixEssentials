@@ -3,7 +3,7 @@
 fn ess_player_data(source: &CommandSourceStackHc) -> EssentialsPlayerDataHc {
     let player = source.getPlayer();
     if player == null { return null; }
-    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);
     let data = opt.orElse(null);
     if data == null { return null; }
     return data as EssentialsPlayerDataHc;
