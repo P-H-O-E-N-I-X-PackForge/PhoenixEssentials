@@ -137,6 +137,12 @@ public final class EssentialsAPI {
         if (perDimension != null) perDimension.remove(dimension);
     }
 
+    /** The feature is on for the dimension, and the shared gate API lets this player use it. */
+    public static boolean isFeatureEnabled(String featureId, ResourceLocation dimension,
+                                           net.minecraft.server.level.ServerPlayer player) {
+        return isFeatureEnabled(featureId, dimension) && EssentialsGates.allowed(player, featureId, dimension);
+    }
+
     public static synchronized boolean isFeatureEnabled(String featureId, ResourceLocation dimension) {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return net.phoenixvine.essentials.hc.hcCompileMerged1.api_is_feature_enabled(featureId, dimension.toString()) != 0;
         warnIfUnknown(featureId);

@@ -18,6 +18,6 @@ public final class EssentialsHcMode {
     }
 
     public static boolean featureEnabled(ServerPlayer player, String feature) {
-        return EssentialsAPI.isFeatureEnabled(feature, player.level().dimension().location());
+        return EssentialsAPI.isFeatureEnabled(feature, player.level().dimension().location(), player);
     }
 }

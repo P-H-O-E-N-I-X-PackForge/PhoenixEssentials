@@ -61,7 +61,7 @@ public final class TeleportExecutor {
             return;
         }
 
-        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_TELEPORT, player.level().dimension().location())) {
+        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_TELEPORT, player.level().dimension().location(), player)) {
             return;
         }
 
@@ -114,7 +114,7 @@ public final class TeleportExecutor {
             net.phoenixvine.essentials.hc.hcCompileMerged1.te_force_teleport(player, target, category, destinationLabel);
             return;
         }
-        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_TELEPORT, player.level().dimension().location())) {
+        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_TELEPORT, player.level().dimension().location(), player)) {
             return;
         }
         executeNow(player, target, category, destinationLabel, null);

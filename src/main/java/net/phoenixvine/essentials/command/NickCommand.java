@@ -28,7 +28,7 @@ public final class NickCommand {
         ServerPlayer player = source.getPlayer();
         if (player == null) return 0;
 
-        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_SOCIAL, player.level().dimension().location())) {
+        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_SOCIAL, player.level().dimension().location(), player)) {
             source.sendFailure(Component.literal("§cSocial commands aren't available here right now."));
             return 0;
         }
@@ -50,7 +50,7 @@ public final class NickCommand {
         ServerPlayer player = source.getPlayer();
         if (player == null) return 0;
 
-        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_SOCIAL, player.level().dimension().location())) {
+        if (!EssentialsAPI.isFeatureEnabled(EssentialsAPI.FEATURE_SOCIAL, player.level().dimension().location(), player)) {
             source.sendFailure(Component.literal("§cSocial commands aren't available here right now."));
             return 0;
         }
