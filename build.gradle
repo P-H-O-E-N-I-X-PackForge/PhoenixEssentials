@@ -137,6 +137,8 @@ sourceSets {
 
 tasks.named('test', Test).configure {
     useJUnitPlatform()
+    // the unit tests cover the Java registries; the Hot Chocolate versions need a bootstrapped Minecraft
+    systemProperty 'phoenix_essentials.use_java', 'true'
 }
 
 tasks.named('processResources', ProcessResources).configure {
