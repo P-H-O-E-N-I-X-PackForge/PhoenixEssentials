@@ -1,14 +1,4 @@
-// --- HC port of EssentialsPermissions (Forge boolean permission nodes) ---
-//
-// Builds the 34 `phoenix_essentials:<path>` boolean `PermissionNode`s (hotc-mc `permission.hc`
-// bindings) and registers them from the `PermissionGatherEvent.Nodes` handler. Defaults are unchanged:
-// everyone for most nodes, op level 2 for the admin ones (`setwarp`, `tpx`, `invsee`, `bypass_cooldown`,
-// ...). Lookup by FIELD NAME ("HOME", "BYPASS_COOLDOWN", ...) is plain HC now (`perm_find`) -- it
-// replaces the reflection (`Class.getField`) the Java `EssentialsHcMode.allowed` used.
-//
-// `EssentialsPermissions.java` stays as a facade: in takeover mode its `gather` handler calls
-// `perm_gather` here, then copies each HC node into its public static field so the remaining Java
-// commands' `EssentialsPermissions.check(source, HOME)` calls keep working with the SAME node objects.
+
 
 extern class PermPlayerHc = "net.minecraft.server.level.ServerPlayer" {
     fn hasPermissions(&self, level: Int) -> Bool;
@@ -22,7 +12,6 @@ static perm_names: [String] = [
 ];
 static perm_nodes: [PermissionNodeSrc] = [null as PermissionNodeSrc; 0];
 
-// Nodes whose default is "op level 2" rather than "everyone".
 fn perm_is_op_default(name: String) -> Bool {
     if name == "SETHOMELIMIT" || name == "SETSPAWN" || name == "SETWARP" || name == "DELWARP" { return true; }
     if name == "WEATHER" || name == "INVSEE" || name == "TPX" || name == "TPFORCE" { return true; }
@@ -36,7 +25,6 @@ extern class PermStr = "java.lang.String" {
     fn compareToIgnoreCase(&self, other: String) -> Int;
 }
 
-// The path is the field name lower-cased ("BYPASS_COOLDOWN" -> "bypass_cooldown").
 fn perm_path(name: String) -> String {
     return (name as PermStr).toLowerCase();
 }
@@ -53,7 +41,6 @@ fn perm_make(path: String, op: Bool) -> PermissionNodeSrc {
     }, [null as PermissionDynamicContextKeySrc; 0]);
 }
 
-// Called by `EssentialsPermissions.gather` (takeover mode): builds and registers every node.
 pub fn perm_gather(gather_ev: PermissionGatherEventNodesHc) {
     var built = [null as PermissionNodeSrc; perm_names.length];
     var i = 0;
@@ -65,7 +52,6 @@ pub fn perm_gather(gather_ev: PermissionGatherEventNodesHc) {
     gather_ev.addNodes(perm_nodes);
 }
 
-// The node for a field name, or `null` if the nodes haven't been gathered yet / unknown name.
 pub fn perm_node(name: String) -> PermissionNodeSrc? {
     var i = 0;
     while i < perm_names.length {
@@ -78,8 +64,6 @@ pub fn perm_node(name: String) -> PermissionNodeSrc? {
     return null;
 }
 
-// The gate every ported command applies via `.requires(...)`: "" = no gate; before the nodes exist (or
-// for a non-player source such as the console) the command is allowed, same as the Java check.
 pub fn perm_allowed(source: CommandSourceStackHc, name: String) -> Bool {
     if name == "" { return true; }
     let node = perm_node(name);

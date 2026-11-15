@@ -29,8 +29,6 @@ fn shl_player_data(player: &ServerPlayer) -> EssentialsPlayerDataHc {
     return data as EssentialsPlayerDataHc;
 }
 
-// `/sethomelimit team <player> <count>` -- the anchor plus every ONLINE teammate (offline members are
-// skipped), via `EssentialsTeamCompat.hotc`'s direct calls into the optional team mods.
 fn hc_set_team_home_limit(source: CommandSourceStackHc, anchor_name: String, count: Int) -> Int {
     let anchor = source.getServer().getPlayerList().getPlayerByName(anchor_name);
     if anchor == null {

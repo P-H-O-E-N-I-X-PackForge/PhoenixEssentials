@@ -114,12 +114,9 @@ extern class EssentialsHcServerBridgeHc = "net.phoenixvine.essentials.Essentials
     
     static fn playerInfo(target: ServerPlayer) -> String?;
     static fn openTrash(player: ServerPlayer);
-    
-    
-    
+
     static fn teleportPlayerTo(player: &ServerPlayer, target: &NamedLocationHc) -> String?;
-    
-    
+
     static fn copyPlayerData(original: Player, entity: Player);
     static fn autoTrashCsv(data: &EssentialsPlayerDataHc) -> String;
     

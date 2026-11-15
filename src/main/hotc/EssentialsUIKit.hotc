@@ -1,13 +1,4 @@
-// --- HC port of EssentialsUIKit (shared drawing helpers for the Essentials screens) ---
-//
-// Same pixels as the Java original: scrim, 1px borders, the modal chrome (panel + header + centered
-// title) and the dropdown / scaled-string helpers. The HC screens call these directly now; the Java
-// `EssentialsUIKit` class stays as a facade for the original Java screens (it delegates here in takeover
-// mode and keeps its original bodies for `use_java=true`).
-// The colors come from `EssentialsThemePaletteHc` (the palette fields stay Java statics -- the Java
-// screens read them directly -- refreshed from the active Phoenix theme by each screen's render).
-// The dropdown takes its row labels as a `[String]` (the Java facade maps its items through the label
-// function first), since a Java `List<T>` / `Function<T,String>` has no HC binding.
+
 
 extern class UkGfx = "net.minecraft.client.gui.GuiGraphics" {
     fn fill(&self, x1: Int, y1: Int, x2: Int, y2: Int, color: Int);
@@ -79,7 +70,6 @@ pub fn uk_draw_modal_chrome(g: &GuiGraphicsHc, font: FontHc, screen_w: Int, scre
         EssentialsThemePaletteHc::BORDER, EssentialsThemePaletteHc::TEXT);
 }
 
-// Returns the hovered row index, or -1. Drawn 300 z-levels up so it sits over the screen's widgets.
 pub fn uk_draw_dropdown(g: &GuiGraphicsHc, font: FontHc, labels: [String], selected: Int,
         x: Int, y: Int, w: Int, row_h: Int, mouse_x: Int, mouse_y: Int) -> Int {
     let ug = g as UkGfx;
@@ -145,13 +135,11 @@ pub fn uk_draw_scaled_centered_string(g: &GuiGraphicsHc, font: FontHc, text: Str
     ug.pose().popPose();
 }
 
-// "#RRGGBB" / "RRGGBB" -> ARGB-style int (the value is truncated to 32 bits like `(int) Long.parseLong`);
-// `fallback` for null / blank / unparsable input.
 pub fn uk_parse_hex_color(value: String?, fallback: Int) -> Int {
     if value == null { return fallback; }
     var text = "";
     text = value;
-    // strip every '#'
+    
     var cleaned = "";
     var i = 0;
     while i < text.length() {
@@ -167,7 +155,6 @@ pub fn uk_parse_hex_color(value: String?, fallback: Int) -> Int {
     }
 }
 
-// "#RRGGBB" (alpha dropped), upper-case hex like `String.format("#%06X", ...)`.
 pub fn uk_format_hex_color(color: Int) -> String {
     let digits = "0123456789ABCDEF";
     var out = "";

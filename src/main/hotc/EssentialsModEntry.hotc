@@ -1,20 +1,4 @@
-// --- HC port of the PhoenixEssentials mod entry's body ---
-//
-// Forge needs the `@Mod` class itself to be Java, so `PhoenixEssentials.java` stays a few lines: its
-// constructor calls `mod_construct()` here (plus the client-only `DistExecutor` hop, which must stay Java
-// so the client proxy class is never loaded on a server). Everything the constructor and its
-// `@SubscribeEvent` methods used to do is here:
-//   * mod bus   -- common setup (network + the HC event listeners, on the main thread via
-//                  `enqueueWork`), capability registration, the server-config (re)load hooks for the
-//                  override file;
-//   * Forge bus -- `ServerStartingEvent` (load the warp/kit/spawn registries) and
-//                  `RegisterCommandsEvent` (register the Java commands + the HC ones);
-//   * `ModLoadingContext.registerConfig(SERVER, SPEC)`.
-// The listeners were `this::` method references / `@SubscribeEvent` methods before; they are plain
-// `addListener(priority, receiveCanceled, eventClass, consumer)` registrations now, made at the same
-// moment (mod construction).
-// `-Dphoenix_essentials.use_java=true` still flips the *behavior* (commands, events, screens) exactly as
-// before; the entry plumbing itself is the same in both modes.
+
 
 extern class MeModBusContext = "net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext" {
     static fn get() -> MeModBusContext;
@@ -36,7 +20,6 @@ extern class MeCommonSetupEvent = "net.minecraftforge.fml.event.lifecycle.FMLCom
 
 extern class MeCapabilityEvent = "net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent" {}
 
-// Java classes the entry still drives.
 extern class MeNetwork = "net.phoenixvine.essentials.network.EssentialsNetwork" {
     static fn init();
 }
@@ -91,9 +74,7 @@ fn me_dispatcher(ev: &RegisterCommandsEventHc) -> CommandDispatcherSrc {
 fn me_on_register_commands(e: JObjectEvent) {
     let ev = e as RegisterCommandsEventHc;
     MeCommands::registerAll(me_dispatcher(&ev));
-    // By default the HC ports own the real command names and are registered by `registerAll`. With
-    // -Dphoenix_essentials.use_java=true the original Java commands are used instead and the HC versions
-    // come up here as `hc`-prefixed twins (/hchome, /hcwarp, ...) for side-by-side comparison.
+
     if !MeMode::takeover() {
         register_real_home_commands(me_dispatcher(&ev));
         register_real_warp_commands(me_dispatcher(&ev));
@@ -132,7 +113,6 @@ fn me_on_config_event(e: JObjectEvent) {
     }
 }
 
-// Called from the `PhoenixEssentials` constructor.
 pub fn mod_construct() {
     let mod_bus = MeModBusContext::get().getModEventBus();
     mod_bus.addListener(EventPriorityHc::NORMAL, false,
