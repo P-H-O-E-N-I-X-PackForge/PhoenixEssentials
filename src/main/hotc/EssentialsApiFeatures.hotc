@@ -1,17 +1,4 @@
-// --- HC port of EssentialsAPI's feature-gate / tier / feature-state machinery + simple data readers ---
-//
-// `EssentialsAPI.java` is the PUBLIC surface other mods compile against (e.g. a dimension mod gating
-// `teleport` per dimension), so its signatures stay exactly as they were -- `ResourceLocation` keys,
-// `BooleanSupplier` gates, the `EssentialsFeatureState` enum. It is now a facade: each method
-// converts those Java types to plain values (a dimension becomes its `toString()`, the enum its ordinal)
-// and calls the `api_*` functions below, which hold the actual state:
-//   * gates  -- feature id -> a `BooleanSupplier` the other mod registered (null = always allowed);
-//   * tiers  -- dimension -> integer tier;       * requirements -- (feature, dimension) -> minimum tier;
-//   * states -- (feature, dimension) -> DISABLED(0) / VISIBLE(1) / ENABLED(2).
-// Thread-safety: the original used ConcurrentHashMaps; other mods may register gates from parallel
-// mod-load dispatch, so every facade method takes one class-level lock (`synchronized`) instead.
-// `getHomes` (Java `Map` copy) and `isIgnoring` (a `UUID`) stay Java in the facade; `getBack` /
-// `getNickname` / `isAfk` / `getPlaytimeTicks` read the player's capability here.
+
 
 extern class FgBooleanSupplier = "java.util.function.BooleanSupplier" interface {
     fn getAsBoolean(&self) -> Bool;
@@ -82,8 +69,6 @@ fn fg_warn_if_unknown(id: String) {
     FgData::logDebug("Feature id '{id}' was queried but has never been gated, tiered, or given an explicit state - defaulting to enabled. Fine if that's intentional; if not, check for a typo against whatever was supposed to configure it.");
 }
 
-// ---- gates ----
-
 fn fg_find_gate(id: String) -> Int {
     var i = 0;
     while i < fg_gates.length {
@@ -131,8 +116,6 @@ fn fg_check_gate(id: String) -> Bool {
     if idx < 0 { return true; }
     return fg_gates[idx].check.getAsBoolean();
 }
-
-// ---- tiers ----
 
 pub fn api_set_tier(dim: String, tier: Int) {
     var i = 0;
@@ -203,8 +186,6 @@ pub fn api_clear_tier_requirement(feature: String, dim: String) {
     fg_reqs = out;
 }
 
-// 1 if the feature is enabled in `dim`: its gate (if any) says yes AND any tier requirement for that
-// dimension is met.
 pub fn api_is_feature_enabled(feature: String, dim: String) -> Int {
     fg_warn_if_unknown(feature);
     if !fg_check_gate(feature) { return 0; }
@@ -218,8 +199,6 @@ pub fn api_is_feature_enabled(feature: String, dim: String) -> Int {
     }
     return 1;
 }
-
-// ---- explicit feature states (0 DISABLED, 1 VISIBLE, 2 ENABLED) ----
 
 pub fn api_set_feature_state(feature: String, dim: String, state_value: Int) {
     fg_add_known(feature);
@@ -250,8 +229,6 @@ pub fn api_get_feature_state(feature: String, dim: String) -> Int {
     }
     return 2;
 }
-
-// ---- player data readers ----
 
 fn fg_data(player: &ServerPlayer) -> EssentialsPlayerDataHc {
     let opt = EssentialsCapabilityProviderHc::lookup(player as JObjectEssCap);

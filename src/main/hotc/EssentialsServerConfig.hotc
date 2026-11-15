@@ -1,12 +1,4 @@
-// --- HC port of EssentialsServerConfig (the ForgeConfigSpec) ---
-//
-// Builds the same spec, key for key and in the same order, with the same defaults / ranges / comments, so
-// `serverconfig/phoenix_essentials-server.toml` is identical. `EssentialsServerConfig.java` keeps its
-// public static `SPEC` and the typed value fields (`TELEPORT_WARMUP_SECONDS`, `ENABLE_HOME`, ...) that
-// every Java reader uses, but now fills them from here: `cfg_spec()` builds the spec, and
-// `cfg_value("teleportWarmupSeconds")` hands back each value object (Java casts to `IntValue` /
-// `BooleanValue` / `ConfigValue<List>`). The HC code reads them through the same static fields as before
-// (`EssentialsServerConfigHc::HOMES_PER_PLAYER`).
+
 
 extern class CfgBuilder = "net.neoforged.neoforge.common.ModConfigSpec$Builder" {
     fn new() -> Self;
@@ -60,7 +52,6 @@ fn cfg_bool(b: &CfgBuilder, key: String, comment: String, def: Bool) {
     cfg_register(key, v as CfgObject);
 }
 
-// The value object registered under `key` (the TOML key, e.g. "teleportWarmupSeconds"), or null.
 pub fn cfg_value(key: String) -> CfgObject? {
     var i = 0;
     while i < cfg_entries.length {

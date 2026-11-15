@@ -1,21 +1,4 @@
-// --- HC port of the client-side entry points ---
-//
-// Replaces the client halves of `EssentialsClientProxy` (the FMLClientSetupEvent handler: theme
-// registration + the five suite-bar buttons), `EssentialsKeyBindings` (key-mapping registration),
-// `EssentialsHcClient` (the second menu key + its tick handler) and `EssentialsInputHandler` (the
-// open-menu key tick handler). `client_construct()` registers all their listeners; the Java
-// `EssentialsClientProxy.registerConfigScreen` (reached through the client-only `DistExecutor` hop from
-// the mod constructor) calls it, so none of this is ever touched on a dedicated server.
-//
-// The two `KeyMapping` objects stay Java statics (`EssentialsKeyBindings.OPEN_MENU` / `OPEN_MENU_HC`):
-// creating one at class-load is a client-only side effect, and the Java config screen reads
-// `OPEN_MENU` directly. HC reads them via GETSTATIC.
-//
-// Key behavior is unchanged: Y opens the HC config screen (the original Java screen with
-// `-Dphoenix_essentials.use_java=true`); H opens the OTHER one for side-by-side comparison. While a
-// screen is open (or there is no player) a Y press is swallowed, like before.
-// The suite-bar settings button still opens the ORIGINAL Java screen with the current screen as its
-// parent, exactly as the Java did.
+
 
 extern class CeKeyMapping = "net.minecraft.client.KeyMapping" {
     fn consumeClick(&self) -> Bool;
@@ -40,7 +23,6 @@ extern class CeMinecraft = "net.minecraft.client.Minecraft" {
 
 extern class CeClientTickEvent = "net.neoforged.neoforge.client.event.ClientTickEvent$Post" {}
 
-// The original Java config screen (the side-by-side fallback / the suite-bar settings button).
 extern class CeJavaConfigScreen = "net.phoenixvine.essentials.client.EssentialsConfigScreen" {
     fn new(parent: ScreenHc) -> Self;
 }
@@ -49,8 +31,6 @@ extern class CePhoenixTheme = "net.phoenixvine.wiki.theme.PhoenixTheme" {
     static fn registerMod(pkg: String, modid: String);
 }
 
-// SuiteHudBar.register has three overloads; extern methods resolve by their DECLARED signature, so each
-// overload gets its own alias of the same class.
 extern class CeSuiteBarSimple = "net.phoenixvine.wiki.client.suite.SuiteHudBar" {
     static PRIORITY_ESSENTIALS: Int;
     static fn register(id: String, priority: Int, icon: ResourceLocation, tooltip: Component, action: &dyn JRunnableNet);
@@ -65,7 +45,6 @@ extern interface CeIntSupplier = "java.util.function.IntSupplier" {
     fn getAsInt(&self) -> Int;
 }
 
-// Java helpers on the suite-bar facade (they read live client state / send the command).
 extern class CeSuiteBarJava = "net.phoenixvine.essentials.client.EssentialsSuiteBarButton" {
     static fn isLocalPlayerOp() -> Bool;
     static fn gamemodeCommand();
@@ -98,8 +77,6 @@ fn ce_register_keys(e: JObjectEvent) {
 fn ce_client_setup(e: JObjectEvent) {
     CeLog::logInfo("[Phoenix Essentials] Client setup complete.");
 
-    // Lets the suite's shared/per-mod theme toggle tell this mod's own code apart from every other
-    // Phoenix mod's when they call the no-arg theme accessors.
     CePhoenixTheme::registerMod("net.phoenixvine.essentials", "phoenix_essentials");
 
     CeSuiteBarSimple::register("phoenix_essentials.settings", CeSuiteBarSimple::PRIORITY_ESSENTIALS,
@@ -139,12 +116,10 @@ fn ce_client_setup(e: JObjectEvent) {
         16, 16, true);
 }
 
-// Both keys, one tick handler (the Java had two handlers with these exact semantics).
 fn ce_client_tick(e: JObjectEvent) {
     let ev = e as CeClientTickEvent;
     let mc = CeMinecraft::getInstance();
 
-    // Y -- the main open-menu key.
     if mc.player == null || mc.screen != null {
         CeKeys::OPEN_MENU.consumeClick();
     } else {
@@ -157,7 +132,6 @@ fn ce_client_tick(e: JObjectEvent) {
         }
     }
 
-    // H -- the other implementation, for side-by-side comparison.
     while CeKeys::OPEN_MENU_HC.consumeClick() {
         if CeMode::takeover() {
             mc.setScreen(CeJavaConfigScreen::new(null as ScreenHc) as ScreenHc);
@@ -167,12 +141,10 @@ fn ce_client_tick(e: JObjectEvent) {
     }
 }
 
-// The HC config screen asks this whether a pressed key is the open-menu key (closing the screen on it).
 pub fn ce_is_open_menu_key(key: Int, scan: Int) -> Bool {
     return CeKeys::OPEN_MENU.matches(key, scan);
 }
 
-// Called (client only) from `EssentialsClientProxy.registerConfigScreen` during mod construction.
 pub fn client_construct(mod_bus: IEventBusHc) {
     mod_bus.addListener(EventPriorityHc::NORMAL, false,
         class("net.neoforged.fml.event.lifecycle.FMLClientSetupEvent") as JClassNet,

@@ -1,13 +1,4 @@
-// --- HC port of EssentialsAutoTrashEvents ---
-//
-// Two Forge listeners (registered from commonSetup in takeover mode via `register_autotrash_events`;
-// the Java class's `@SubscribeEvent` handlers early-return then):
-//   * pickup  -- an item whose registry id is on the player's always-trash list is cancelled and
-//                discarded instead of entering the inventory;
-//   * sweep   -- every 10 ticks, any such item already in the main inventory (slots 0-35) or the
-//                offhand (slot 40) is removed.
-// The list itself (`PlayerEssentialsData.alwaysTrash`, a `Set<ResourceLocation>`) stays Java; HC asks it
-// `hasAlwaysTrash()` / `isAlwaysTrash(id)`.
+
 
 extern class AtItemEntityHc = "net.minecraft.world.entity.item.ItemEntity" {
     fn getItem(&self) -> ItemStack;
@@ -68,7 +59,6 @@ fn at_on_pickup(e: JObjectEvent) {
     entity.discard();
 }
 
-// Returns true if slot `slot` held an always-trashed item and was cleared.
 fn at_sweep_slot(inv: &AtInventoryHc, data: &EssentialsPlayerDataHc, slot: Int) -> Bool {
     let stack = inv.getItem(slot);
     if stack.isEmpty() { return false; }

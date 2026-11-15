@@ -1,19 +1,4 @@
-// --- HC port of EssentialsConfigOverrides (phoenix_essentials-server-overrides.toml) ---
-//
-// Same behavior as the Java original, which stays in place as the `use_java=true` fallback and
-// delegates here in takeover mode (`EssentialsConfigOverrides.apply` -> `ovr_apply`):
-//   * on every server-config (re)load, make sure `config/phoenix_essentials-server-overrides.toml`
-//     exists -- generating it from the spec's CURRENT defaults (with each key's comment, under a
-//     header explaining the file) the first time;
-//   * read it, and for every key whose value DIFFERS from the spec's current default, force that
-//     value onto the live config value ("global override"); unknown keys are warned about, a bad
-//     value is warned about, a value left at its default is ignored.
-// Talks to NightConfig (`CommentedFileConfig`, the same TOML library Forge uses) and to the
-// `ForgeConfigSpec` value tree directly. Disclosed difference: the original's `EnumValue` coercion
-// is not carried over -- this mod's spec has no enum keys (only int / boolean / list).
-//
-// Disclosed shims (`EssentialsHcData.java`): `java.nio.file.Path` handling for the config file and
-// the logger -- `Path`, `Files` and log4j varargs aren't bound.
+
 
 extern class OvPath = "java.nio.file.Path" interface {}
 
@@ -63,7 +48,6 @@ extern class OvArrayList = "java.util.ArrayList" {
     fn add(&self, o: CfgObject) -> Bool;
 }
 
-// NightConfig
 extern class OvEntry = "com.electronwill.nightconfig.core.UnmodifiableConfig$Entry" interface {
     fn getKey(&self) -> String;
     fn getValue(&self) -> CfgObject;
@@ -82,7 +66,6 @@ extern class OvFileConfig = "com.electronwill.nightconfig.core.file.CommentedFil
     fn setComment(&self, path: CfgListI, comment: String) -> String;
 }
 
-// Forge
 extern class OvSpec = "net.neoforged.neoforge.common.ModConfigSpec" {
     fn getValues(&self) -> OvUnmodConfig;
     fn getSpec(&self) -> OvUnmodConfig;
@@ -104,12 +87,9 @@ extern class OvModConfigEvent = "net.neoforged.fml.event.config.ModConfigEvent" 
     fn getConfig(&self) -> OvModConfig;
 }
 
-// `EssentialsServerConfig.SPEC`
 extern class OvServerConfig = "net.phoenixvine.essentials.config.EssentialsServerConfig" {
     static SPEC: OvSpec;
 }
-
-// ---- flat (dotted-path, value) rows ----
 
 struct OvRow {
     path: String,
@@ -134,7 +114,6 @@ fn ov_join(prefix: String, key: String) -> String {
     return "{prefix}.{key}";
 }
 
-// Overrides file: every leaf under `config`, nested tables flattened to dotted paths.
 fn ov_flatten_file(prefix: String, entries: TcSet) {
     let it = entries.iterator();
     while it.hasNext() {
@@ -149,7 +128,6 @@ fn ov_flatten_file(prefix: String, entries: TcSet) {
     }
 }
 
-// Spec: every `ConfigValue` under `SPEC.getValues()`, by dotted path.
 fn ov_collect_values(prefix: String, entries: TcSet) {
     let it = entries.iterator();
     while it.hasNext() {
@@ -181,7 +159,6 @@ fn ov_find(rows: &[OvRow], path: String) -> Int {
     return -1;
 }
 
-// "a.b.c" -> ["a", "b", "c"] as a java.util.List.
 fn ov_split_path(dotted: String) -> CfgListI {
     let list = OvArrayList::new();
     var rest = dotted;
@@ -279,7 +256,6 @@ fn ov_coerce(cv: &CfgObject, raw: CfgObject?) -> OvCoerced {
     return ov_ok(rv);
 }
 
-// Entry point (the `ModConfigEvent.Loading` / `.Reloading` handlers in the Java facade call this).
 pub fn ovr_apply(ev: OvModConfigEvent) {
     if (ev.getConfig().getSpec() as CfgObject) != (OvServerConfig::SPEC as CfgObject) { return; }
 
