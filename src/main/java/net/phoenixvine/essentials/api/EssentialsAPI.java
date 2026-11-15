@@ -137,7 +137,6 @@ public final class EssentialsAPI {
         if (perDimension != null) perDimension.remove(dimension);
     }
 
-    /** The feature is on for the dimension, and the shared gate API lets this player use it. */
     public static boolean isFeatureEnabled(String featureId, ResourceLocation dimension,
                                            net.minecraft.server.level.ServerPlayer player) {
         return isFeatureEnabled(featureId, dimension) && EssentialsGates.allowed(player, featureId, dimension);

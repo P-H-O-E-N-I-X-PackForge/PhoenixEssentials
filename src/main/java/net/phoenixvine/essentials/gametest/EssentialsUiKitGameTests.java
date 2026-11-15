@@ -7,7 +7,6 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.client.EssentialsUIKit;
 
-/** The pure (non-drawing) UIKit helpers: hex color parse / format. */
 @GameTestHolder(PhoenixEssentials.MOD_ID)
 @PrefixGameTestTemplate(false)
 public class EssentialsUiKitGameTests {

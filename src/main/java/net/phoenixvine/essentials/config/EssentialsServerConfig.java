@@ -5,11 +5,6 @@ import net.phoenixvine.essentials.hc.hcCompileMerged1;
 
 import java.util.List;
 
-/**
- * The server config spec. The spec itself (every key, default, range and comment) is built by the Hot
- * Chocolate port in {@code EssentialsServerConfig.hotc}; this class just exposes it and the typed value
- * fields every Java reader uses.
- */
 public class EssentialsServerConfig {
 
     public static final ForgeConfigSpec SPEC;

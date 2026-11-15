@@ -18,11 +18,9 @@ public class PhoenixEssentials {
     public static final Logger LOGGER = LogManager.getLogger();
 
     public PhoenixEssentials() {
-        // Everything the constructor and the old @SubscribeEvent methods did (mod/Forge-bus listeners, the
-        // server-config registration) lives in the Hot Chocolate port: src/main/hotc/EssentialsModEntry.hotc.
+
         hcCompileMerged1.mod_construct();
 
-        // Client-only: must stay Java so the client proxy class is never loaded on a dedicated server.
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> EssentialsClientProxy::registerConfigScreen);
     }
 

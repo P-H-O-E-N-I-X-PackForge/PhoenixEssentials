@@ -55,7 +55,7 @@ public final class WarpRegistry {
 
     public static Map<String, NamedLocation> getAll() {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) {
-            // Snapshot (insertion order) of the HC store; callers only read it.
+            
             Map<String, NamedLocation> snapshot = new LinkedHashMap<>();
             String names = net.phoenixvine.essentials.hc.hcCompileMerged1.dr_warp_names();
             if (!names.isEmpty()) {

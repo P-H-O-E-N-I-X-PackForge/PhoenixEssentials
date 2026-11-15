@@ -10,7 +10,6 @@ import dev.ftb.mods.ftbteams.api.Team;
 
 import java.util.*;
 
-/** The original Java implementation, kept for {@code -Dphoenix_essentials.use_java=true}. */
 final class TeamCompatJava {
 
     private TeamCompatJava() {}

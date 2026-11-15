@@ -51,9 +51,6 @@ public final class EssentialsPermissions {
 
     private EssentialsPermissions() {}
 
-    // The nodes themselves are built and registered by the Hot Chocolate port
-    // (`EssentialsPermissions.hotc`, `perm_gather`); this copies each one into the public static field so
-    // the Java commands' `check(source, HOME)` calls use the very same node objects.
     @SubscribeEvent
     public static void gather(PermissionGatherEvent.Nodes event) {
         hcCompileMerged1.perm_gather(event);

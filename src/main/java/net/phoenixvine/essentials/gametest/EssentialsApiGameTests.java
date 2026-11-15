@@ -9,7 +9,6 @@ import net.phoenixvine.essentials.PhoenixEssentials;
 import net.phoenixvine.essentials.api.EssentialsAPI;
 import net.phoenixvine.essentials.api.EssentialsFeatureState;
 
-/** The public feature-gate / tier / state API (HC-backed in takeover mode, Java otherwise). */
 @GameTestHolder(PhoenixEssentials.MOD_ID)
 @PrefixGameTestTemplate(false)
 public class EssentialsApiGameTests {

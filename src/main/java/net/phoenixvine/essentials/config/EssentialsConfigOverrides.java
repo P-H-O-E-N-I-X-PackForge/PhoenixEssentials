@@ -47,7 +47,6 @@ public final class EssentialsConfigOverrides {
         apply(event);
     }
 
-    /** The original Java implementation, driven by the HC mod entry when {@code use_java=true}. */
     public static void applyJava(ModConfigEvent event) {
         apply(event);
     }

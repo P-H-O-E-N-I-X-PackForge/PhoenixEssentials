@@ -62,8 +62,6 @@ public final class HomeCommand {
         registerLimit(dispatcher);
     }
 
-    // Split out so the Hot Chocolate takeover (EssentialsHcMode) can register the HC /home family
-    // while still keeping this Java-only /sethomelimit.
     public static void registerLimit(CommandDispatcher<CommandSourceStack> dispatcher) {
 
         dispatcher.register(Commands.literal("sethomelimit")
