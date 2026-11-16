@@ -1,0 +1,488 @@
+
+
+fn lbs_panel_w() -> Int { return 280; }
+fn lbs_panel_h() -> Int { return 246; }
+fn lbs_row_h() -> Int { return 14; }
+fn lbs_rows_shown() -> Int { return 8; }
+fn lbs_tab_h() -> Int { return 16; }
+fn lbs_tabs_per_row() -> Int { return 4; }
+
+static lbs_selected_category: Int = 0;
+static lbs_selected_season: Bool = false;
+static lbs_selected_team: Bool = false;
+
+// "Browse all stats" pill state. Picking a stat is intentionally not sticky: leaving this pill
+// for any other one clears it back to the browsing list, per design.
+static lbs_custom_mode: Bool = false;
+static lbs_custom_selected_stat: String = "";
+static lbs_custom_scroll: Int = 0;
+static lbs_custom_query: String = "";
+static lbs_search_focused: Bool = false;
+
+extern class LbsCharUi = "java.lang.Character" {
+    static fn toString(c: Char) -> String;
+}
+
+fn lbs_hov(mx: Int, my: Int, x: Int, y: Int, w: Int, h: Int) -> Bool {
+    return mx >= x && mx < x + w && my >= y && my < y + h;
+}
+
+fn lbs_clamp(v: Int, lo: Int, hi: Int) -> Int {
+    if v < lo { return lo; }
+    if v > hi { return hi; }
+    return v;
+}
+
+// Ids of every category the server says is available, in order. Assumes "all" until the first server reply lands.
+fn lbs_visible_ids() -> [Int] {
+    if !lb_cache_loaded || lb_cache_available_categories.length() == 0 {
+        var all = [0; lb_category_count];
+        var i = 0;
+        while i < lb_category_count {
+            all[i] = i;
+            i = i + 1;
+        }
+        return all;
+    }
+    let parts = lb_cache_available_categories.split(",");
+    var out = [0; parts.length];
+    var i = 0;
+    while i < parts.length {
+        out[i] = DrInt::parseInt(parts[i], 10);
+        i = i + 1;
+    }
+    return out;
+}
+
+fn lbs_team_view_available() -> Bool {
+    if !lb_cache_loaded { return true; }
+    return lb_cache_team_available;
+}
+
+struct LbsLayout {
+    panel_x: Int,
+    panel_y: Int,
+    row_w: Int,
+    tabs_y0: Int,
+    tab_w: Int,
+    custom_tab_y: Int,
+    mode_y: Int,
+    mode_visible: Bool,
+    view_y: Int,
+    view_visible: Bool,
+    list_y: Int,
+}
+
+// `visible_count` is the curated category tabs only; the "Custom" pill always occupies one more slot right after them.
+fn lbs_compute_layout(screen_w: Int, screen_h: Int, visible_count: Int, show_mode_row: Bool, show_view_row: Bool) -> LbsLayout {
+    let panel_w = lbs_panel_w();
+    let panel_h = lbs_panel_h();
+    let panel_x = lbs_clamp((screen_w - panel_w) / 2, 4, screen_w - panel_w - 4);
+    let panel_y = lbs_clamp((screen_h - panel_h) / 2, 4, screen_h - panel_h - 4);
+    let row_w = panel_w - 24;
+    let tabs_y0 = panel_y + 26;
+    let per_row = lbs_tabs_per_row();
+    let total_slots = visible_count + 1;
+    let tab_rows = (total_slots + per_row - 1) / per_row;
+    let tabs_block_h = tab_rows * (lbs_tab_h() + 2);
+    let custom_tab_y = tabs_y0 + (visible_count / per_row) * (lbs_tab_h() + 2);
+
+    var y = tabs_y0 + tabs_block_h + 4;
+    let mode_y = y;
+    if show_mode_row { y = y + lbs_tab_h() + 2; }
+    let view_y = y;
+    let view_visible = show_mode_row && show_view_row;
+    if view_visible { y = y + lbs_tab_h() + 4; }
+    if show_mode_row && !show_view_row { y = y + 2; }
+    let list_y = y;
+
+    return LbsLayout {
+        panel_x: panel_x, panel_y: panel_y, row_w: row_w,
+        tabs_y0: tabs_y0, tab_w: row_w / per_row, custom_tab_y: custom_tab_y,
+        mode_y: mode_y, mode_visible: show_mode_row,
+        view_y: view_y, view_visible: view_visible,
+        list_y: list_y,
+    };
+}
+
+fn lbs_request_current() {
+    ess_send_leaderboard_request(lbs_selected_category, lbs_selected_season, lbs_selected_team);
+}
+
+fn lbs_season_label() -> String {
+    if !lbs_selected_season { return "All-Time"; }
+    let days_left = lb_cache_season_days_left;
+    if days_left < 0L { return "Season (no season configured)"; }
+    return "Season ({days_left}d left)";
+}
+
+fn lbs_view_label() -> String {
+    if lbs_selected_team { return "Teams (FTB Teams / Guilds)"; }
+    return "Players";
+}
+
+fn lbs_tab_row(slot: Int) -> Int {
+    return slot / lbs_tabs_per_row();
+}
+
+fn lbs_tab_col(slot: Int) -> Int {
+    return slot % lbs_tabs_per_row();
+}
+
+fn lbs_tab_y(slot: Int, layout: &LbsLayout) -> Int {
+    return layout.tabs_y0 + lbs_tab_row(slot) * (lbs_tab_h() + 2);
+}
+
+fn lbs_enter_custom_mode() {
+    lbs_custom_mode = true;
+    lbs_custom_selected_stat = "";
+    lbs_custom_scroll = 0;
+    lbs_custom_query = "";
+    lbs_search_focused = false;
+}
+
+fn lbs_leave_custom_mode() {
+    lbs_custom_mode = false;
+    lbs_custom_selected_stat = "";
+    lbs_custom_scroll = 0;
+    lbs_custom_query = "";
+    lbs_search_focused = false;
+}
+
+fn lbs_matches_query(label: String, query: String) -> Bool {
+    if query.length() == 0 { return true; }
+    let q = (query as PermStr).toLowerCase();
+    let hay = (label as PermStr).toLowerCase();
+    return hay.indexOf(q) >= 0;
+}
+
+// Every stat id whose display label matches the current search query, in their original order.
+fn lbs_filtered_stat_ids() -> [String] {
+    if lbs_custom_query.length() == 0 { return lb_custom_stat_ids; }
+    var out = [""; lb_custom_stat_ids.length];
+    var n = 0;
+    var i = 0;
+    while i < lb_custom_stat_ids.length {
+        let id = lb_custom_stat_ids[i];
+        if lbs_matches_query(lb_custom_stat_label(id), lbs_custom_query) {
+            out[n] = id;
+            n = n + 1;
+        }
+        i = i + 1;
+    }
+    var trimmed = [""; n];
+    var k = 0;
+    while k < n {
+        trimmed[k] = out[k];
+        k = k + 1;
+    }
+    return trimmed;
+}
+
+fn lbs_pick_custom_stat(stat_id: String) {
+    lbs_custom_selected_stat = stat_id;
+    lb_custom_cache_loaded = false;
+    ess_send_custom_stat_request(stat_id);
+}
+
+fn lbs_render_curated(gfx: &GuiGraphicsHc, layout: &LbsLayout, x: Int, panel_w: Int) {
+    let fresh = lb_cache_loaded && lb_cache_category == lbs_selected_category && lb_cache_season == lbs_selected_season && lb_cache_team == lbs_selected_team;
+    if !fresh {
+        gfx.drawCenteredString(Minecraft::getInstance().font, "§8Loading...", layout.panel_x + panel_w / 2, layout.list_y + 20, EssentialsThemePaletteHc::TEXT_FAINT);
+        return;
+    }
+    let rows = lb_parse_raw(lb_cache_csv);
+    if rows.length == 0 {
+        var empty_msg = "§8No data yet - go play!";
+        if lbs_selected_team { empty_msg = "§8No teams found - join an FTB Team or Phoenix Guild."; }
+        gfx.drawCenteredString(Minecraft::getInstance().font, empty_msg, layout.panel_x + panel_w / 2, layout.list_y + 20, EssentialsThemePaletteHc::TEXT_FAINT);
+    }
+    var ly = layout.list_y;
+    var i = 0;
+    let shown = lbs_rows_shown();
+    while i < rows.length && i < shown {
+        let row = rows[i];
+        let rank = i + 1;
+        var suffix = "";
+        if lbs_selected_team {
+            suffix = " §8({row.crowns})";
+        } else {
+            if row.crowns > 0 { suffix = " §6x{row.crowns}"; }
+        }
+        gfx.drawString(Minecraft::getInstance().font, "§7#{rank} §f{row.name}{suffix}", x, ly + 1, EssentialsThemePaletteHc::TEXT);
+        let value_w = Minecraft::getInstance().font.width(row.value);
+        gfx.drawString(Minecraft::getInstance().font, "§a{row.value}", x + layout.row_w - value_w, ly + 1, EssentialsThemePaletteHc::TEXT);
+        ly = ly + lbs_row_h();
+        i = i + 1;
+    }
+}
+
+fn lbs_render_custom(gfx: &GuiGraphicsHc, layout: &LbsLayout, x: Int, mx: Int, my: Int) {
+    if lbs_custom_selected_stat == "" {
+        let search_h = lbs_row_h() + 3;
+        gfx.fill(x - 2, layout.list_y, x + layout.row_w, layout.list_y + search_h, EssentialsThemePaletteHc::HEADER);
+        var search_border = EssentialsThemePaletteHc::BORDER;
+        if lbs_search_focused { search_border = EssentialsThemePaletteHc::ACCENT; }
+        uk_draw_border(gfx, x - 2, layout.list_y, layout.row_w + 2, search_h, search_border);
+        var query_display = "§8Click to search...";
+        if lbs_search_focused && lbs_custom_query.length() == 0 { query_display = "§8Type to search..."; }
+        if lbs_custom_query.length() > 0 { query_display = "§f{lbs_custom_query}§7_"; }
+        gfx.drawString(Minecraft::getInstance().font, query_display, x + 2, layout.list_y + 2, EssentialsThemePaletteHc::TEXT);
+
+        let ids = lbs_filtered_stat_ids();
+        let list_top = layout.list_y + search_h + 3;
+        let max_scroll = lbs_custom_max_scroll(ids.length);
+        if lbs_custom_scroll > max_scroll { lbs_custom_scroll = max_scroll; }
+        if ids.length == 0 {
+            gfx.drawString(Minecraft::getInstance().font, "§8No stats match \"{lbs_custom_query}\".", x, list_top + 1, EssentialsThemePaletteHc::TEXT_FAINT);
+            return;
+        }
+        var ly = list_top;
+        var i = lbs_custom_scroll;
+        let bottom = list_top + lbs_custom_browse_rows() * lbs_row_h();
+        while i < ids.length && ly + lbs_row_h() <= bottom {
+            let hov = lbs_hov(mx, my, x, ly, layout.row_w, lbs_row_h());
+            if hov {
+                gfx.fill(x - 2, ly, x + layout.row_w, ly + lbs_row_h(), 587202560);
+            }
+            var color = EssentialsThemePaletteHc::TEXT_DIM;
+            if hov { color = EssentialsThemePaletteHc::TEXT; }
+            gfx.drawString(Minecraft::getInstance().font, "§7{lb_custom_stat_label(ids[i])}", x, ly + 1, color);
+            ly = ly + lbs_row_h();
+            i = i + 1;
+        }
+        return;
+    }
+
+    gfx.drawString(Minecraft::getInstance().font, "§8« Choose a different stat", x, layout.list_y, EssentialsThemePaletteHc::TEXT_FAINT);
+    let label = lb_custom_stat_label(lbs_custom_selected_stat);
+    gfx.drawString(Minecraft::getInstance().font, "§7{label} §8(online players)", x, layout.list_y + lbs_row_h(), EssentialsThemePaletteHc::TEXT_DIM);
+
+    let fresh = lb_custom_cache_loaded && lb_custom_cache_stat_id == lbs_custom_selected_stat;
+    let rows_top = layout.list_y + lbs_row_h() * 2 + 2;
+    if !fresh {
+        gfx.drawCenteredString(Minecraft::getInstance().font, "§8Loading...", layout.panel_x + lbs_panel_w() / 2, rows_top + 10, EssentialsThemePaletteHc::TEXT_FAINT);
+        return;
+    }
+    let rows = lb_parse_raw(lb_custom_cache_csv);
+    if rows.length == 0 {
+        gfx.drawCenteredString(Minecraft::getInstance().font, "§8No players online.", layout.panel_x + lbs_panel_w() / 2, rows_top + 10, EssentialsThemePaletteHc::TEXT_FAINT);
+        return;
+    }
+    var ly = rows_top;
+    var i = 0;
+    while i < rows.length && i < lbs_rows_shown() {
+        let row = rows[i];
+        let rank = i + 1;
+        gfx.drawString(Minecraft::getInstance().font, "§7#{rank} §f{row.name}", x, ly + 1, EssentialsThemePaletteHc::TEXT);
+        let value_w = Minecraft::getInstance().font.width(row.value);
+        gfx.drawString(Minecraft::getInstance().font, "§a{row.value}", x + layout.row_w - value_w, ly + 1, EssentialsThemePaletteHc::TEXT);
+        ly = ly + lbs_row_h();
+        i = i + 1;
+    }
+}
+
+struct HcEssentialsLeaderboardScreen extends ScreenHc {}
+
+impl HcEssentialsLeaderboardScreen {
+    override fn render(&self, gfx: GuiGraphicsHc, mx: Int, my: Int, partial_tick: Float) {
+        EssentialsThemePaletteHc::refresh(PhoenixThemeHc::current());
+        let window = Minecraft::getInstance().getWindow();
+        let ids = lbs_visible_ids();
+        let show_mode_row = !lbs_custom_mode;
+        let show_view_row = lbs_team_view_available();
+        let layout = lbs_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight(), ids.length, show_mode_row, show_view_row);
+        let panel_w = lbs_panel_w();
+        let panel_h = lbs_panel_h();
+        let x = layout.panel_x + 12;
+
+        uk_draw_modal_chrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
+            layout.panel_x, layout.panel_y, panel_w, panel_h, 18, "§fLeaderboards");
+
+        var slot = 0;
+        while slot < ids.length {
+            let c = ids[slot];
+            let col = lbs_tab_col(slot);
+            let tab_y = lbs_tab_y(slot, &layout);
+            let tab_x = x + col * layout.tab_w;
+            let active = !lbs_custom_mode && c == lbs_selected_category;
+            let hov = lbs_hov(mx, my, tab_x, tab_y, layout.tab_w, lbs_tab_h());
+            var fill_color = EssentialsThemePaletteHc::HEADER;
+            if active { fill_color = EssentialsThemePaletteHc::ACCENT; }
+            if hov && !active { fill_color = 872363007; }
+            gfx.fill(tab_x, tab_y, tab_x + layout.tab_w - 2, tab_y + lbs_tab_h(), fill_color);
+            var prefix = "§7";
+            if active { prefix = "§f"; }
+            gfx.drawCenteredString(Minecraft::getInstance().font, "{prefix}{lb_category_short_label(c)}", tab_x + (layout.tab_w - 2) / 2, tab_y + 4, EssentialsThemePaletteHc::TEXT);
+            slot = slot + 1;
+        }
+
+        let custom_col = lbs_tab_col(ids.length);
+        let custom_tab_x = x + custom_col * layout.tab_w;
+        let custom_active = lbs_custom_mode;
+        let custom_hov = lbs_hov(mx, my, custom_tab_x, layout.custom_tab_y, layout.tab_w, lbs_tab_h());
+        var custom_fill = EssentialsThemePaletteHc::HEADER;
+        if custom_active { custom_fill = EssentialsThemePaletteHc::ACCENT; }
+        if custom_hov && !custom_active { custom_fill = 872363007; }
+        gfx.fill(custom_tab_x, layout.custom_tab_y, custom_tab_x + layout.tab_w - 2, layout.custom_tab_y + lbs_tab_h(), custom_fill);
+        var custom_prefix = "§7";
+        if custom_active { custom_prefix = "§f"; }
+        gfx.drawCenteredString(Minecraft::getInstance().font, "{custom_prefix}Custom", custom_tab_x + (layout.tab_w - 2) / 2, layout.custom_tab_y + 4, EssentialsThemePaletteHc::TEXT);
+
+        if layout.mode_visible {
+            let mode_hov = lbs_hov(mx, my, x, layout.mode_y, layout.row_w, lbs_tab_h());
+            if mode_hov {
+                gfx.fill(x - 2, layout.mode_y, x + layout.row_w, layout.mode_y + lbs_tab_h(), 587202560);
+            }
+            gfx.drawString(Minecraft::getInstance().font, "§7Mode: §f{lbs_season_label()} §8(click)", x, layout.mode_y + 4, EssentialsThemePaletteHc::TEXT);
+        }
+
+        if layout.view_visible {
+            let view_hov = lbs_hov(mx, my, x, layout.view_y, layout.row_w, lbs_tab_h());
+            if view_hov {
+                gfx.fill(x - 2, layout.view_y, x + layout.row_w, layout.view_y + lbs_tab_h(), 587202560);
+            }
+            gfx.drawString(Minecraft::getInstance().font, "§7View: §f{lbs_view_label()} §8(click)", x, layout.view_y + 4, EssentialsThemePaletteHc::TEXT);
+        }
+
+        if lbs_custom_mode {
+            lbs_render_custom(&gfx, &layout, x, mx, my);
+        } else {
+            lbs_render_curated(&gfx, &layout, x, panel_w);
+        }
+
+        let esc_label = "Esc to close";
+        gfx.drawString(Minecraft::getInstance().font, "§8{esc_label}", layout.panel_x + panel_w - Minecraft::getInstance().font.width(esc_label) - 8, layout.panel_y + 6, EssentialsThemePaletteHc::TEXT_FAINT);
+    }
+
+    override fn mouseClicked(&self, mx: Double, my: Double, button: Int) -> Bool {
+        let window = Minecraft::getInstance().getWindow();
+        let ids = lbs_visible_ids();
+        let show_mode_row = !lbs_custom_mode;
+        let show_view_row = lbs_team_view_available();
+        let layout = lbs_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight(), ids.length, show_mode_row, show_view_row);
+        let x = layout.panel_x + 12;
+        let ix = mx as Int;
+        let iy = my as Int;
+
+        var slot = 0;
+        while slot < ids.length {
+            let c = ids[slot];
+            let col = lbs_tab_col(slot);
+            let tab_y = lbs_tab_y(slot, &layout);
+            let tab_x = x + col * layout.tab_w;
+            if lbs_hov(ix, iy, tab_x, tab_y, layout.tab_w, lbs_tab_h()) {
+                lbs_leave_custom_mode();
+                lbs_selected_category = c;
+                lb_cache_loaded = false;
+                lbs_request_current();
+                return true;
+            }
+            slot = slot + 1;
+        }
+
+        let custom_col = lbs_tab_col(ids.length);
+        let custom_tab_x = x + custom_col * layout.tab_w;
+        if lbs_hov(ix, iy, custom_tab_x, layout.custom_tab_y, layout.tab_w, lbs_tab_h()) {
+            if !lbs_custom_mode { lbs_enter_custom_mode(); }
+            return true;
+        }
+
+        if layout.mode_visible && lbs_hov(ix, iy, x, layout.mode_y, layout.row_w, lbs_tab_h()) {
+            lbs_selected_season = !lbs_selected_season;
+            lb_cache_loaded = false;
+            lbs_request_current();
+            return true;
+        }
+
+        if layout.view_visible && lbs_hov(ix, iy, x, layout.view_y, layout.row_w, lbs_tab_h()) {
+            lbs_selected_team = !lbs_selected_team;
+            lb_cache_loaded = false;
+            lbs_request_current();
+            return true;
+        }
+
+        if lbs_custom_mode {
+            if lbs_custom_selected_stat == "" {
+                let search_h = lbs_row_h() + 3;
+                if lbs_hov(ix, iy, x - 2, layout.list_y, layout.row_w + 2, search_h) {
+                    lbs_search_focused = true;
+                    return true;
+                }
+                lbs_search_focused = false;
+
+                let list_top = layout.list_y + search_h + 3;
+                let bottom = list_top + lbs_custom_browse_rows() * lbs_row_h();
+                let ids = lbs_filtered_stat_ids();
+                if ix >= x && ix < x + layout.row_w && iy >= list_top && iy < bottom {
+                    let visible_index = (iy - list_top) / lbs_row_h();
+                    let picked = lbs_custom_scroll + visible_index;
+                    if picked >= 0 && picked < ids.length {
+                        lbs_pick_custom_stat(ids[picked]);
+                        return true;
+                    }
+                }
+            } else {
+                if lbs_hov(ix, iy, x, layout.list_y, layout.row_w, lbs_row_h()) {
+                    lbs_custom_selected_stat = "";
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    override fn mouseScrolled(&self, mx: Double, my: Double, scroll_x: Double, delta: Double) -> Bool {
+        if !lbs_custom_mode || lbs_custom_selected_stat != "" { return false; }
+        let max_scroll = lbs_custom_max_scroll(lbs_filtered_stat_ids().length);
+        var next = lbs_custom_scroll - (delta as Int);
+        if next < 0 { next = 0; }
+        if next > max_scroll { next = max_scroll; }
+        lbs_custom_scroll = next;
+        return true;
+    }
+
+    override fn charTyped(&self, chr: Char, modifiers: Int) -> Bool {
+        if !lbs_custom_mode || lbs_custom_selected_stat != "" || !lbs_search_focused { return false; }
+        let ch = LbsCharUi::toString(chr);
+        lbs_custom_query = "{lbs_custom_query}{ch}";
+        lbs_custom_scroll = 0;
+        return true;
+    }
+
+    override fn keyPressed(&self, key_code: Int, scan_code: Int, modifiers: Int) -> Bool {
+        if key_code == 256 {
+            open_essentials_config_screen_hc();
+            return true;
+        }
+        if lbs_custom_mode && lbs_custom_selected_stat == "" && lbs_search_focused && key_code == 259 && lbs_custom_query.length() > 0 {
+            lbs_custom_query = lbs_custom_query.substring(0, lbs_custom_query.length() - 1);
+            lbs_custom_scroll = 0;
+            return true;
+        }
+        return false;
+    }
+
+    override fn isPauseScreen(&self) -> Bool {
+        return false;
+    }
+}
+
+fn lbs_custom_browse_rows() -> Int { return lbs_rows_shown() + 1; }
+
+fn lbs_custom_max_scroll(count: Int) -> Int {
+    var max_scroll = count - lbs_custom_browse_rows();
+    if max_scroll < 0 { max_scroll = 0; }
+    return max_scroll;
+}
+
+pub fn open_essentials_leaderboard_screen_hc() {
+    lbs_selected_category = 0;
+    lbs_selected_season = false;
+    lbs_selected_team = false;
+    lbs_leave_custom_mode();
+    lb_cache_loaded = false;
+    lbs_request_current();
+    let screen = HcEssentialsLeaderboardScreen::new(Component::literal("Leaderboards") as Component);
+    Minecraft::getInstance().setScreen(screen as ScreenHc);
+}
