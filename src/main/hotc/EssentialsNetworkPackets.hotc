@@ -54,6 +54,40 @@ struct HomesSyncPacket { csv: String, cap: Int }
 struct WarpsSyncPacket { csv: String }
 struct KitsSyncPacket { csv: String }
 struct AutoTrashSyncPacket { csv: String }
+struct LeaderboardRequestPacket { category: Int, season: Bool, team: Bool }
+struct LeaderboardSyncPacket { category: Int, season: Bool, team: Bool, csv: String, season_days_left: Long, available_categories: String, team_available: Bool }
+struct CustomStatRequestPacket { stat_id: String }
+struct CustomStatSyncPacket { stat_id: String, csv: String }
+
+pub static lb_cache_category: Int = 0;
+pub static lb_cache_season: Bool = false;
+pub static lb_cache_team: Bool = false;
+pub static lb_cache_csv: String = "";
+pub static lb_cache_season_days_left: Long = -1L;
+pub static lb_cache_available_categories: String = "";
+pub static lb_cache_team_available: Bool = false;
+pub static lb_cache_loaded: Bool = false;
+
+pub static lb_custom_cache_stat_id: String = "";
+pub static lb_custom_cache_csv: String = "";
+pub static lb_custom_cache_loaded: Bool = false;
+
+fn lb_cache_apply(category: Int, season: Bool, team: Bool, csv: String, season_days_left: Long, available_categories: String, team_available: Bool) {
+    lb_cache_category = category;
+    lb_cache_season = season;
+    lb_cache_team = team;
+    lb_cache_csv = csv;
+    lb_cache_season_days_left = season_days_left;
+    lb_cache_available_categories = available_categories;
+    lb_cache_team_available = team_available;
+    lb_cache_loaded = true;
+}
+
+fn lb_custom_cache_apply(stat_id: String, csv: String) {
+    lb_custom_cache_stat_id = stat_id;
+    lb_custom_cache_csv = csv;
+    lb_custom_cache_loaded = true;
+}
 
 impl RequestSyncPacket {
     fn encode(&self, buf: FriendlyByteBuf) { buf.writeVarInt(self.kind); }
@@ -103,6 +137,60 @@ impl AutoTrashSyncPacket {
     fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.csv); }
     static fn decode(buf: FriendlyByteBuf) -> AutoTrashSyncPacket { return AutoTrashSyncPacket { csv: buf.readUtf() }; }
     fn on_received(&self) { ess_cache_set_trash(self.csv); }
+}
+
+impl LeaderboardRequestPacket {
+    fn encode(&self, buf: FriendlyByteBuf) {
+        buf.writeVarInt(self.category);
+        buf.writeBoolean(self.season);
+        buf.writeBoolean(self.team);
+    }
+    static fn decode(buf: FriendlyByteBuf) -> LeaderboardRequestPacket {
+        let category = buf.readVarInt();
+        let season = buf.readBoolean();
+        let team = buf.readBoolean();
+        return LeaderboardRequestPacket { category: category, season: season, team: team };
+    }
+    fn on_received(&self, sender: ServerPlayer) { ess_handle_leaderboard_request(sender, self.category, self.season, self.team); }
+}
+
+impl LeaderboardSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) {
+        buf.writeVarInt(self.category);
+        buf.writeBoolean(self.season);
+        buf.writeBoolean(self.team);
+        buf.writeUtf(self.csv);
+        buf.writeLong(self.season_days_left);
+        buf.writeUtf(self.available_categories);
+        buf.writeBoolean(self.team_available);
+    }
+    static fn decode(buf: FriendlyByteBuf) -> LeaderboardSyncPacket {
+        let category = buf.readVarInt();
+        let season = buf.readBoolean();
+        let team = buf.readBoolean();
+        let csv = buf.readUtf();
+        let days_left = buf.readLong();
+        let available_categories = buf.readUtf();
+        let team_available = buf.readBoolean();
+        return LeaderboardSyncPacket { category: category, season: season, team: team, csv: csv, season_days_left: days_left, available_categories: available_categories, team_available: team_available };
+    }
+    fn on_received(&self) { lb_cache_apply(self.category, self.season, self.team, self.csv, self.season_days_left, self.available_categories, self.team_available); }
+}
+
+impl CustomStatRequestPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.stat_id); }
+    static fn decode(buf: FriendlyByteBuf) -> CustomStatRequestPacket { return CustomStatRequestPacket { stat_id: buf.readUtf() }; }
+    fn on_received(&self, sender: ServerPlayer) { ess_handle_custom_stat_request(sender, self.stat_id); }
+}
+
+impl CustomStatSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.stat_id).writeUtf(self.csv); }
+    static fn decode(buf: FriendlyByteBuf) -> CustomStatSyncPacket {
+        let stat_id = buf.readUtf();
+        let csv = buf.readUtf();
+        return CustomStatSyncPacket { stat_id: stat_id, csv: csv };
+    }
+    fn on_received(&self) { lb_custom_cache_apply(self.stat_id, self.csv); }
 }
 
 fn ess_send_to_player(player: ServerPlayer, msg: PhoenixObject4Net) {
@@ -163,6 +251,27 @@ fn ess_handle_gui_teleport(player: ServerPlayer, kind: Int, name: String) {
         return;
     }
     TeleportExecutorHc::request(player, back, "back", "your previous location");
+}
+
+fn ess_handle_leaderboard_request(player: ServerPlayer, category: Int, season: Bool, team: Bool) {
+    var safe_category = category;
+    if !LbMgrHc::isCategoryAvailable(safe_category) { safe_category = lb_category_playtime; }
+    var safe_team = team;
+    if !LbMgrHc::teamSupportAvailable() { safe_team = false; }
+
+    let csv = lb_display_csv(safe_category, season, safe_team, 10);
+    let days_left = LbMgrHc::seasonDaysLeft();
+    let available_categories = LbMgrHc::availableCategoriesCsv();
+    let team_available = LbMgrHc::teamSupportAvailable();
+    ess_send_to_player(player, LeaderboardSyncPacket {
+        category: safe_category, season: season, team: safe_team, csv: csv, season_days_left: days_left,
+        available_categories: available_categories, team_available: team_available,
+    } as PhoenixObject4Net);
+}
+
+fn ess_handle_custom_stat_request(player: ServerPlayer, stat_id: String) {
+    let csv = LbMgrHc::rawCsvForCustomStat(stat_id, 10);
+    ess_send_to_player(player, CustomStatSyncPacket { stat_id: stat_id, csv: csv } as PhoenixObject4Net);
 }
 
 fn ess_handle_claim_kit(player: ServerPlayer, name: String) {
@@ -282,6 +391,56 @@ fn ess_reg_s2c_trash(channel: &SimpleChannel, id: Int) {
         ess_dir_client());
 }
 
+fn ess_reg_c2s_leaderboard_request(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("LeaderboardRequestPacket") as JClassNet,
+        |pkt, buf| { (pkt as LeaderboardRequestPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return LeaderboardRequestPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let sender = real_ctx.getSender();
+            let packet = pkt as LeaderboardRequestPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(sender); });
+        },
+        ess_dir_server());
+}
+
+fn ess_reg_s2c_leaderboard_sync(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("LeaderboardSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as LeaderboardSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return LeaderboardSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as LeaderboardSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        },
+        ess_dir_client());
+}
+
+fn ess_reg_c2s_custom_stat_request(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("CustomStatRequestPacket") as JClassNet,
+        |pkt, buf| { (pkt as CustomStatRequestPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return CustomStatRequestPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let sender = real_ctx.getSender();
+            let packet = pkt as CustomStatRequestPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(sender); });
+        },
+        ess_dir_server());
+}
+
+fn ess_reg_s2c_custom_stat_sync(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("CustomStatSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as CustomStatSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return CustomStatSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as CustomStatSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        },
+        ess_dir_client());
+}
+
 pub fn setup_hc_networking() {
     let channel = NetworkRegistry::newSimpleChannel(
         ResourceLocation::fromNamespaceAndPath("phoenix_essentials", "main_hc"),
@@ -297,7 +456,23 @@ pub fn setup_hc_networking() {
     ess_reg_s2c_warps(channel, 5);
     ess_reg_s2c_kits(channel, 6);
     ess_reg_s2c_trash(channel, 7);
+    ess_reg_c2s_leaderboard_request(channel, 8);
+    ess_reg_s2c_leaderboard_sync(channel, 9);
+    ess_reg_c2s_custom_stat_request(channel, 10);
+    ess_reg_s2c_custom_stat_sync(channel, 11);
     set_hc_channel(channel);
+}
+
+pub fn ess_send_leaderboard_request(category: Int, season: Bool, team: Bool) {
+    let chan = ess_hc_channel;
+    if chan == null { return; }
+    chan.sendToServer(LeaderboardRequestPacket { category: category, season: season, team: team } as PhoenixObject4Net);
+}
+
+pub fn ess_send_custom_stat_request(stat_id: String) {
+    let chan = ess_hc_channel;
+    if chan == null { return; }
+    chan.sendToServer(CustomStatRequestPacket { stat_id: stat_id } as PhoenixObject4Net);
 }
 
 pub fn ess_send_request_sync(kind: Int) {

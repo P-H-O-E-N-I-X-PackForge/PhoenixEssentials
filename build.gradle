@@ -131,6 +131,7 @@ dependencies {
     // (FTB Chunks: its login handler sends a payload a game-test mock player cannot receive)
 
     compileOnly("net.phoenixvine.domains:phoenix_domains:${phoenix_domains_version}") { transitive = false }
+    compileOnly("net.phoenixvine.chronicles:phoenix_chronicles-neoforge:${phoenix_chronicles_version}") { transitive = false }
 
     implementation("net.phoenixvine.wiki:neoforge:${phoenix_wiki_version}")
 

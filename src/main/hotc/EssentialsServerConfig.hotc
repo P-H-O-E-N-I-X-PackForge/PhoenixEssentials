@@ -117,6 +117,11 @@ pub fn cfg_spec() -> CfgSpec {
     cfg_bool(&b, "enableTop", "If false, disables /top entirely.", true);
     cfg_bool(&b, "enableTpx", "If false, disables /tpx entirely.", true);
     cfg_bool(&b, "enableTpforce", "If false, disables /tpforce and /tphere entirely.", true);
+    cfg_bool(&b, "enableLeaderboards", "If false, disables /leaderboards and the leaderboards GUI entirely.", true);
+    b.pop();
+
+    b.push("leaderboards");
+    cfg_int(&b, "leaderboardSeasonDays", "Days per leaderboard season before it rolls over and crowns the top player in each category. 0 = no seasons (all-time only).", 7, 0, 365);
     b.pop();
 
     return b.build();

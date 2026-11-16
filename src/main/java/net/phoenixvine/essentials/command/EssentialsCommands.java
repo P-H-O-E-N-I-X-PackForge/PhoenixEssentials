@@ -84,6 +84,9 @@ public final class EssentialsCommands {
         if (!configLoaded || EssentialsServerConfig.ENABLE_TPFORCE.get()) {
             if (hc) hcCompileMerged1.register_real_tpforce_commands(dispatcher); else TpForceCommand.register(dispatcher);
         }
+        if (hc && (!configLoaded || EssentialsServerConfig.ENABLE_LEADERBOARDS.get())) {
+            hcCompileMerged1.register_real_leaderboards_command(dispatcher);
+        }
 
         if (hc) {
             hcCompileMerged1.register_real_trash_commands(dispatcher);
