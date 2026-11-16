@@ -33,6 +33,16 @@ fn ess_on_player_clone(e: JObjectEvent) {
     EssentialsHcServerBridgeHc::copyPlayerData(ev.getOriginal(), ev.getEntity());
 }
 
+static lb_last_tick_check_ms: Long = 0L;
+
+fn ess_maybe_refresh_leaderboards(player: ServerPlayer, data: &EssentialsPlayerDataHc) {
+    let now = SupSystem::currentTimeMillis();
+    if now - lb_last_tick_check_ms < 60000L { return; }
+    lb_last_tick_check_ms = now;
+    LbMgrHc::refresh(&player, data.getPlaytimeTicks());
+    LbMgrHc::maybeRollover(SupHooks::getCurrentServer());
+}
+
 fn ess_on_player_tick(e: JObjectEvent) {
     let ev = e as PlayerTickEventHc;
     if ev.phase != TickPhaseHc::END { return; }
@@ -42,19 +52,34 @@ fn ess_on_player_tick(e: JObjectEvent) {
     let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
     let data_obj = opt.orElse(null);
     if data_obj == null { return; }
-    (data_obj as EssentialsPlayerDataHc).addPlaytimeTicks(1L);
+    let data = data_obj as EssentialsPlayerDataHc;
+    data.addPlaytimeTicks(1L);
+    ess_maybe_refresh_leaderboards(player, &data);
 }
 
 fn ess_on_player_logged_in(e: JObjectEvent) {
     let who = (e as PlayerLoggedInEventHc).getEntity();
     if !(who is ServerPlayer) { return; }
-    sup_record_seen(who as ServerPlayer);
+    let player = who as ServerPlayer;
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data_obj = opt.orElse(null);
+    if data_obj != null {
+        LbMgrHc::refresh(&player, (data_obj as EssentialsPlayerDataHc).getPlaytimeTicks());
+    }
+    sup_record_seen(player);
 }
 
 fn ess_on_player_logged_out(e: JObjectEvent) {
     let who = (e as PlayerLoggedOutEventHc).getEntity();
     if !(who is ServerPlayer) { return; }
-    sup_record_seen(who as ServerPlayer);
+    let player = who as ServerPlayer;
+    let opt = player.getCapability(EssentialsCapabilityProviderHc::PLAYER_ESSENTIALS);
+    let data_obj = opt.orElse(null);
+    if data_obj != null {
+        LbMgrHc::refresh(&player, (data_obj as EssentialsPlayerDataHc).getPlaytimeTicks());
+    }
+    sup_record_seen(player);
+    LbMgrHc::persist();
 }
 
 fn ess_on_living_death(e: JObjectEvent) {

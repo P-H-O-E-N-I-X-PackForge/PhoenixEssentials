@@ -1,0 +1,158 @@
+
+
+fn lbs_panel_w() -> Int { return 280; }
+fn lbs_panel_h() -> Int { return 252; }
+fn lbs_row_h() -> Int { return 16; }
+fn lbs_tab_h() -> Int { return 18; }
+
+static lbs_selected_category: Int = 0;
+static lbs_selected_season: Bool = false;
+
+fn lbs_hov(mx: Int, my: Int, x: Int, y: Int, w: Int, h: Int) -> Bool {
+    return mx >= x && mx < x + w && my >= y && my < y + h;
+}
+
+struct LbsLayout {
+    panel_x: Int,
+    panel_y: Int,
+    row_w: Int,
+    tabs_y: Int,
+    tab_w: Int,
+    toggle_y: Int,
+    list_y: Int,
+}
+
+fn lbs_compute_layout(screen_w: Int, screen_h: Int) -> LbsLayout {
+    let panel_w = lbs_panel_w();
+    let panel_h = lbs_panel_h();
+    let panel_x = (screen_w - panel_w) / 2;
+    let panel_y = (screen_h - panel_h) / 2;
+    let row_w = panel_w - 24;
+    let tabs_y = panel_y + 28;
+    let toggle_y = tabs_y + lbs_tab_h() + 6;
+    let list_y = toggle_y + lbs_tab_h() + 6;
+    return LbsLayout { panel_x: panel_x, panel_y: panel_y, row_w: row_w, tabs_y: tabs_y, tab_w: row_w / lb_category_count, toggle_y: toggle_y, list_y: list_y };
+}
+
+fn lbs_request_current() {
+    ess_send_leaderboard_request(lbs_selected_category, lbs_selected_season);
+}
+
+fn lbs_season_label() -> String {
+    if !lbs_selected_season { return "All-Time"; }
+    let days_left = lb_cache_season_days_left;
+    if days_left < 0L { return "Season (no season configured)"; }
+    return "Season ({days_left}d left)";
+}
+
+struct HcEssentialsLeaderboardScreen extends ScreenHc {}
+
+impl HcEssentialsLeaderboardScreen {
+    override fn render(&self, gfx: GuiGraphicsHc, mx: Int, my: Int, partial_tick: Float) {
+        EssentialsThemePaletteHc::refresh(PhoenixThemeHc::current());
+        let window = Minecraft::getInstance().getWindow();
+        let layout = lbs_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        let panel_w = lbs_panel_w();
+        let panel_h = lbs_panel_h();
+        let x = layout.panel_x + 12;
+
+        uk_draw_modal_chrome(&gfx, Minecraft::getInstance().font, window.getGuiScaledWidth(), window.getGuiScaledHeight(),
+            layout.panel_x, layout.panel_y, panel_w, panel_h, 20, "§fLeaderboards");
+
+        var c = 0;
+        while c < lb_category_count {
+            let tab_x = x + c * layout.tab_w;
+            let active = c == lbs_selected_category;
+            let hov = lbs_hov(mx, my, tab_x, layout.tabs_y, layout.tab_w, lbs_tab_h());
+            var fill_color = EssentialsThemePaletteHc::HEADER;
+            if active { fill_color = EssentialsThemePaletteHc::ACCENT; }
+            if hov && !active { fill_color = 872363007; }
+            gfx.fill(tab_x, layout.tabs_y, tab_x + layout.tab_w - 2, layout.tabs_y + lbs_tab_h(), fill_color);
+            var prefix = "§7";
+            if active { prefix = "§f"; }
+            gfx.drawCenteredString(Minecraft::getInstance().font, "{prefix}{lb_category_short_label(c)}", tab_x + (layout.tab_w - 2) / 2, layout.tabs_y + 5, EssentialsThemePaletteHc::TEXT);
+            c = c + 1;
+        }
+
+        let toggle_hov = lbs_hov(mx, my, x, layout.toggle_y, layout.row_w, lbs_tab_h());
+        if toggle_hov {
+            gfx.fill(x - 2, layout.toggle_y, x + layout.row_w, layout.toggle_y + lbs_tab_h(), 587202560);
+        }
+        gfx.drawString(Minecraft::getInstance().font, "§7Mode: §f{lbs_season_label()} §8(click to toggle)", x, layout.toggle_y + 5, EssentialsThemePaletteHc::TEXT);
+
+        let fresh = lb_cache_loaded && lb_cache_category == lbs_selected_category && lb_cache_season == lbs_selected_season;
+        if !fresh {
+            gfx.drawCenteredString(Minecraft::getInstance().font, "§8Loading...", layout.panel_x + panel_w / 2, layout.list_y + 20, EssentialsThemePaletteHc::TEXT_FAINT);
+        } else {
+            let rows = lb_parse_raw(lb_cache_csv);
+            if rows.length == 0 {
+                gfx.drawCenteredString(Minecraft::getInstance().font, "§8No data yet - go play!", layout.panel_x + panel_w / 2, layout.list_y + 20, EssentialsThemePaletteHc::TEXT_FAINT);
+            }
+            var ly = layout.list_y;
+            var i = 0;
+            while i < rows.length {
+                let row = rows[i];
+                let rank = i + 1;
+                var crown = "";
+                if row.crowns > 0 { crown = " §6x{row.crowns}"; }
+                gfx.drawString(Minecraft::getInstance().font, "§7#{rank} §f{row.name}{crown}", x, ly + 2, EssentialsThemePaletteHc::TEXT);
+                let value_w = Minecraft::getInstance().font.width(row.value);
+                gfx.drawString(Minecraft::getInstance().font, "§a{row.value}", x + layout.row_w - value_w, ly + 2, EssentialsThemePaletteHc::TEXT);
+                ly = ly + lbs_row_h();
+                i = i + 1;
+            }
+        }
+
+        let esc_label = "Esc to close";
+        gfx.drawString(Minecraft::getInstance().font, "§8{esc_label}", layout.panel_x + panel_w - Minecraft::getInstance().font.width(esc_label) - 8, layout.panel_y + 7, EssentialsThemePaletteHc::TEXT_FAINT);
+    }
+
+    override fn mouseClicked(&self, mx: Double, my: Double, button: Int) -> Bool {
+        let window = Minecraft::getInstance().getWindow();
+        let layout = lbs_compute_layout(window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        let x = layout.panel_x + 12;
+        let ix = mx as Int;
+        let iy = my as Int;
+
+        var c = 0;
+        while c < lb_category_count {
+            let tab_x = x + c * layout.tab_w;
+            if lbs_hov(ix, iy, tab_x, layout.tabs_y, layout.tab_w, lbs_tab_h()) {
+                lbs_selected_category = c;
+                lb_cache_loaded = false;
+                lbs_request_current();
+                return true;
+            }
+            c = c + 1;
+        }
+
+        if lbs_hov(ix, iy, x, layout.toggle_y, layout.row_w, lbs_tab_h()) {
+            lbs_selected_season = !lbs_selected_season;
+            lb_cache_loaded = false;
+            lbs_request_current();
+            return true;
+        }
+        return false;
+    }
+
+    override fn keyPressed(&self, key_code: Int, scan_code: Int, modifiers: Int) -> Bool {
+        if key_code == 256 {
+            open_essentials_config_screen_hc();
+            return true;
+        }
+        return false;
+    }
+
+    override fn isPauseScreen(&self) -> Bool {
+        return false;
+    }
+}
+
+pub fn open_essentials_leaderboard_screen_hc() {
+    lbs_selected_category = 0;
+    lbs_selected_season = false;
+    lb_cache_loaded = false;
+    lbs_request_current();
+    let screen = HcEssentialsLeaderboardScreen::new(Component::literal("Leaderboards") as Component);
+    Minecraft::getInstance().setScreen(screen as ScreenHc);
+}

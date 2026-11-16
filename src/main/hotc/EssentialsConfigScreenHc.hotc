@@ -2,7 +2,7 @@
 
 fn ess_row_h() -> Int { return 18; }
 fn ess_panel_w() -> Int { return 260; }
-fn ess_panel_h() -> Int { return 238; }
+fn ess_panel_h() -> Int { return 260; }
 
 struct EssLayout {
     panel_x: Int,
@@ -19,6 +19,7 @@ struct EssLayout {
     warps_y: Int,
     kits_y: Int,
     trash_y: Int,
+    leaderboards_y: Int,
 }
 
 fn ess_compute_layout(screen_w: Int, screen_h: Int) -> EssLayout {
@@ -47,12 +48,15 @@ fn ess_compute_layout(screen_w: Int, screen_h: Int) -> EssLayout {
     let kits_y = ty;
     ty = ty + row_h + 4;
     let trash_y = ty;
+    ty = ty + row_h + 4;
+    let leaderboards_y = ty;
 
     return EssLayout {
         panel_x: panel_x, panel_y: panel_y, row_w: row_w,
         theme_row_y: theme_row_y, theme_links_y: theme_links_y,
         edit_x: edit_x, edit_w: edit_w, wiki_x: wiki_x, wiki_w: wiki_w,
         afk_row_y: afk_row_y, homes_y: homes_y, warps_y: warps_y, kits_y: kits_y, trash_y: trash_y,
+        leaderboards_y: leaderboards_y,
     };
 }
 
@@ -130,6 +134,7 @@ impl HcEssentialsConfigScreen {
         ess_draw_menu_button(&gfx, x, layout.warps_y, layout.row_w, "Warps", mx, my);
         ess_draw_menu_button(&gfx, x, layout.kits_y, layout.row_w, "Kits", mx, my);
         ess_draw_menu_button(&gfx, x, layout.trash_y, layout.row_w, "Auto-Trash", mx, my);
+        ess_draw_menu_button(&gfx, x, layout.leaderboards_y, layout.row_w, "Leaderboards", mx, my);
     }
 
     override fn mouseClicked(&self, mx: Double, my: Double, button: Int) -> Bool {
@@ -172,6 +177,10 @@ impl HcEssentialsConfigScreen {
         }
         if ess_hov(ix, iy, x, layout.trash_y, layout.row_w) {
             ess_open_list(self as ScreenHc, ess_list_kind_trash, "Auto-Trash");
+            return true;
+        }
+        if ess_hov(ix, iy, x, layout.leaderboards_y, layout.row_w) {
+            open_essentials_leaderboard_screen_hc();
             return true;
         }
         return false;

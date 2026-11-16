@@ -47,6 +47,8 @@ public class EssentialsServerConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_TOP;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TPX;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TPFORCE;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_LEADERBOARDS;
+    public static final ForgeConfigSpec.IntValue LEADERBOARD_SEASON_DAYS;
 
     static {
         SPEC = hcCompileMerged1.cfg_spec();
@@ -89,6 +91,8 @@ public class EssentialsServerConfig {
         ENABLE_TOP = value("enableTop");
         ENABLE_TPX = value("enableTpx");
         ENABLE_TPFORCE = value("enableTpforce");
+        ENABLE_LEADERBOARDS = value("enableLeaderboards");
+        LEADERBOARD_SEASON_DAYS = value("leaderboardSeasonDays");
     }
 
     @SuppressWarnings("unchecked")

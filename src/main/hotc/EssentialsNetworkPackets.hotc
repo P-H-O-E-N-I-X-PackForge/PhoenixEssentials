@@ -54,6 +54,22 @@ struct HomesSyncPacket { csv: String, cap: Int }
 struct WarpsSyncPacket { csv: String }
 struct KitsSyncPacket { csv: String }
 struct AutoTrashSyncPacket { csv: String }
+struct LeaderboardRequestPacket { category: Int, season: Bool }
+struct LeaderboardSyncPacket { category: Int, season: Bool, csv: String, season_days_left: Long }
+
+pub static lb_cache_category: Int = 0;
+pub static lb_cache_season: Bool = false;
+pub static lb_cache_csv: String = "";
+pub static lb_cache_season_days_left: Long = -1L;
+pub static lb_cache_loaded: Bool = false;
+
+fn lb_cache_apply(category: Int, season: Bool, csv: String, season_days_left: Long) {
+    lb_cache_category = category;
+    lb_cache_season = season;
+    lb_cache_csv = csv;
+    lb_cache_season_days_left = season_days_left;
+    lb_cache_loaded = true;
+}
 
 impl RequestSyncPacket {
     fn encode(&self, buf: FriendlyByteBuf) { buf.writeVarInt(self.kind); }
@@ -103,6 +119,36 @@ impl AutoTrashSyncPacket {
     fn encode(&self, buf: FriendlyByteBuf) { buf.writeUtf(self.csv); }
     static fn decode(buf: FriendlyByteBuf) -> AutoTrashSyncPacket { return AutoTrashSyncPacket { csv: buf.readUtf() }; }
     fn on_received(&self) { ess_cache_set_trash(self.csv); }
+}
+
+impl LeaderboardRequestPacket {
+    fn encode(&self, buf: FriendlyByteBuf) {
+        buf.writeVarInt(self.category);
+        buf.writeBoolean(self.season);
+    }
+    static fn decode(buf: FriendlyByteBuf) -> LeaderboardRequestPacket {
+        let category = buf.readVarInt();
+        let season = buf.readBoolean();
+        return LeaderboardRequestPacket { category: category, season: season };
+    }
+    fn on_received(&self, sender: ServerPlayer) { ess_handle_leaderboard_request(sender, self.category, self.season); }
+}
+
+impl LeaderboardSyncPacket {
+    fn encode(&self, buf: FriendlyByteBuf) {
+        buf.writeVarInt(self.category);
+        buf.writeBoolean(self.season);
+        buf.writeUtf(self.csv);
+        buf.writeLong(self.season_days_left);
+    }
+    static fn decode(buf: FriendlyByteBuf) -> LeaderboardSyncPacket {
+        let category = buf.readVarInt();
+        let season = buf.readBoolean();
+        let csv = buf.readUtf();
+        let days_left = buf.readLong();
+        return LeaderboardSyncPacket { category: category, season: season, csv: csv, season_days_left: days_left };
+    }
+    fn on_received(&self) { lb_cache_apply(self.category, self.season, self.csv, self.season_days_left); }
 }
 
 fn ess_send_to_player(player: ServerPlayer, msg: PhoenixObject4Net) {
@@ -163,6 +209,12 @@ fn ess_handle_gui_teleport(player: ServerPlayer, kind: Int, name: String) {
         return;
     }
     TeleportExecutorHc::request(player, back, "back", "your previous location");
+}
+
+fn ess_handle_leaderboard_request(player: ServerPlayer, category: Int, season: Bool) {
+    let csv = lb_display_csv(category, season, 10);
+    let days_left = LbMgrHc::seasonDaysLeft();
+    ess_send_to_player(player, LeaderboardSyncPacket { category: category, season: season, csv: csv, season_days_left: days_left } as PhoenixObject4Net);
 }
 
 fn ess_handle_claim_kit(player: ServerPlayer, name: String) {
@@ -282,6 +334,31 @@ fn ess_reg_s2c_trash(channel: &SimpleChannel, id: Int) {
         ess_dir_client());
 }
 
+fn ess_reg_c2s_leaderboard_request(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("LeaderboardRequestPacket") as JClassNet,
+        |pkt, buf| { (pkt as LeaderboardRequestPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return LeaderboardRequestPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let sender = real_ctx.getSender();
+            let packet = pkt as LeaderboardRequestPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(sender); });
+        },
+        ess_dir_server());
+}
+
+fn ess_reg_s2c_leaderboard_sync(channel: &SimpleChannel, id: Int) {
+    channel.registerMessage(id, class("LeaderboardSyncPacket") as JClassNet,
+        |pkt, buf| { (pkt as LeaderboardSyncPacket).encode(buf as FriendlyByteBuf); },
+        |buf| { return LeaderboardSyncPacket::decode(buf as FriendlyByteBuf) as PhoenixObject4Net; },
+        |pkt, ctx| {
+            let real_ctx = EssentialsNetUnwrapHc::unwrapSupplier(ctx) as NetworkEventContextHc;
+            let packet = pkt as LeaderboardSyncPacket;
+            real_ctx.enqueueWork(|| { packet.on_received(); });
+        },
+        ess_dir_client());
+}
+
 pub fn setup_hc_networking() {
     let channel = NetworkRegistry::newSimpleChannel(
         ResourceLocation::new("phoenix_essentials", "main_hc"),
@@ -297,7 +374,15 @@ pub fn setup_hc_networking() {
     ess_reg_s2c_warps(channel, 5);
     ess_reg_s2c_kits(channel, 6);
     ess_reg_s2c_trash(channel, 7);
+    ess_reg_c2s_leaderboard_request(channel, 8);
+    ess_reg_s2c_leaderboard_sync(channel, 9);
     set_hc_channel(channel);
+}
+
+pub fn ess_send_leaderboard_request(category: Int, season: Bool) {
+    let chan = ess_hc_channel;
+    if chan == null { return; }
+    chan.sendToServer(LeaderboardRequestPacket { category: category, season: season } as PhoenixObject4Net);
 }
 
 pub fn ess_send_request_sync(kind: Int) {

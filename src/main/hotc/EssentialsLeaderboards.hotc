@@ -1,0 +1,148 @@
+
+
+extern class LbMgrHc = "net.phoenixvine.essentials.EssentialsLeaderboardManager" {
+    static fn refresh(player: &ServerPlayer, playtime_ticks: Long);
+    static fn persist();
+    static fn rawCsvFor(category: Int, season: Bool, limit: Int) -> String;
+    static fn seasonDaysConfigured() -> Int;
+    static fn seasonDaysLeft() -> Long;
+    static fn maybeRollover(server: MinecraftServerHc);
+}
+
+pub static lb_category_count: Int = 5;
+pub static lb_category_playtime: Int = 0;
+pub static lb_category_kills: Int = 1;
+pub static lb_category_deaths: Int = 2;
+pub static lb_category_mined: Int = 3;
+pub static lb_category_distance: Int = 4;
+
+pub fn lb_category_label(category: Int) -> String {
+    if category == lb_category_playtime { return "Playtime"; }
+    if category == lb_category_kills { return "Mob Kills"; }
+    if category == lb_category_deaths { return "Deaths"; }
+    if category == lb_category_mined { return "Blocks Mined"; }
+    return "Distance Traveled";
+}
+
+pub fn lb_category_short_label(category: Int) -> String {
+    if category == lb_category_playtime { return "Time"; }
+    if category == lb_category_kills { return "Kills"; }
+    if category == lb_category_deaths { return "Deaths"; }
+    if category == lb_category_mined { return "Mined"; }
+    return "Dist";
+}
+
+pub fn lb_category_from_name(name: String) -> Int {
+    let n = name.toLowerCase();
+    if n == "playtime" || n == "time" { return lb_category_playtime; }
+    if n == "kills" || n == "kill" || n == "mobkills" { return lb_category_kills; }
+    if n == "deaths" || n == "death" { return lb_category_deaths; }
+    if n == "mined" || n == "blocks" || n == "blocksmined" { return lb_category_mined; }
+    if n == "distance" || n == "dist" || n == "traveled" { return lb_category_distance; }
+    return -1;
+}
+
+pub fn lb_format_value(category: Int, value: Long) -> String {
+    if category == lb_category_playtime {
+        let hours = value / 3600L;
+        let minutes = (value % 3600L) / 60L;
+        let seconds = value % 60L;
+        if hours > 0L { return "{hours}h {minutes}m"; }
+        if minutes > 0L { return "{minutes}m {seconds}s"; }
+        return "{seconds}s";
+    }
+    if category == lb_category_distance { return "{value} blocks"; }
+    return "{value}";
+}
+
+struct LbDisplayRow {
+    name: String,
+    value: String,
+    crowns: Int,
+}
+
+fn lb_parse_raw(raw: String) -> [LbDisplayRow] {
+    if raw.length() == 0 { return [LbDisplayRow { name: "", value: "", crowns: 0 }; 0]; }
+    let parts = raw.split(",");
+    var out = [LbDisplayRow { name: "", value: "", crowns: 0 }; parts.length];
+    var i = 0;
+    while i < parts.length {
+        let f = parts[i].split(":");
+        out[i] = LbDisplayRow { name: f[0], value: f[1], crowns: DrInt::parseInt(f[2], 10) };
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn lb_rows(category: Int, season: Bool, limit: Int) -> [LbDisplayRow] {
+    let raw = LbMgrHc::rawCsvFor(category, season, limit);
+    return lb_parse_raw(raw);
+}
+
+pub fn lb_display_csv(category: Int, season: Bool, limit: Int) -> String {
+    let rows = lb_rows(category, season, limit);
+    var out = "";
+    var i = 0;
+    while i < rows.length {
+        if i > 0 { out = "{out},"; }
+        let num = DrLong::parseLong(rows[i].value, 10);
+        let disp = lb_format_value(category, num);
+        out = "{out}{rows[i].name}:{disp}:{rows[i].crowns}";
+        i = i + 1;
+    }
+    return out;
+}
+
+fn lb_print_board(source: CommandSourceStackHc, category: Int) -> Int {
+    let rows = lb_rows(category, false, 10);
+    let label = lb_category_label(category);
+    if rows.length == 0 {
+        source.sendSuccess(|| { return Component::literal("§7No {label} leaderboard data yet.") as JObjectCmd; }, false);
+        return 1;
+    }
+    source.sendSuccess(|| { return Component::literal("§6--- {label} leaderboard ---") as JObjectCmd; }, false);
+    var i = 0;
+    while i < rows.length {
+        let row = rows[i];
+        let rank = i + 1;
+        let num = DrLong::parseLong(row.value, 10);
+        let disp = lb_format_value(category, num);
+        var crown = "";
+        if row.crowns > 0 { crown = " §6(x{row.crowns})"; }
+        let line = "§7#{rank} §f{row.name} §8- §a{disp}{crown}";
+        source.sendSuccess(|| { return Component::literal(line) as JObjectCmd; }, false);
+        i = i + 1;
+    }
+    return 1;
+}
+
+fn lb_command_default(source: CommandSourceStackHc) -> Int {
+    return lb_print_board(source, lb_category_playtime);
+}
+
+fn lb_command_named(source: CommandSourceStackHc, category_name: String) -> Int {
+    let category = lb_category_from_name(category_name);
+    if category < 0 {
+        source.sendFailure(Component::literal("Unknown leaderboard \"{category_name}\". Try: playtime, kills, deaths, mined, distance.") as Component);
+        return 0;
+    }
+    return lb_print_board(source, category);
+}
+
+pub fn register_real_leaderboards_command(dispatcher: CommandDispatcherSrc) {
+    let category_arg = CommandsHc::argument("category", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return lb_command_named(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "category"));
+    });
+    let leaderboards_builder = ess_literal("leaderboards", "hcleaderboards", "LEADERBOARDS")
+        .executes(|ctx| { return lb_command_default(ctx.getSource() as CommandSourceStackHc); })
+        .then(category_arg);
+    dispatcher.register(leaderboards_builder as LiteralArgumentBuilderSrc);
+
+    let category_arg2 = CommandsHc::argument("category", StringArgumentTypeSrc::word() as ArgumentTypeSrc).executes(|ctx| {
+        return lb_command_named(ctx.getSource() as CommandSourceStackHc, StringArgumentTypeSrc::getString(ctx, "category"));
+    });
+    let lb_builder = ess_literal("lb", "hclb", "LEADERBOARDS")
+        .executes(|ctx| { return lb_command_default(ctx.getSource() as CommandSourceStackHc); })
+        .then(category_arg2);
+    dispatcher.register(lb_builder as LiteralArgumentBuilderSrc);
+}
