@@ -6,27 +6,36 @@ import com.google.gson.reflect.TypeToken;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.stats.Stat;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.level.block.Block;
+import net.minecraftforge.server.ServerLifecycleHooks;
+import net.phoenixvine.essentials.compat.PhoenixChroniclesCompat;
 import net.phoenixvine.essentials.config.EssentialsServerConfig;
+import net.phoenixvine.essentials.team.TeamCompat;
 
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Tracks the cached, persisted leaderboard data: one row per player who has ever been
- * seen, refreshed from their live vanilla stats + playtime while online. Rows store both
- * an all-time value and a "season baseline" snapshot, so a season's value is just
- * current - baseline; rolling the season over resets the baseline and hands out crowns.
+ * seen, refreshed from their live vanilla stats + playtime (+ Phoenix Chronicles quest
+ * progress, if that mod is loaded) while online. Rows store both an all-time value and a
+ * "season baseline" snapshot, so a season's value is just current - baseline; rolling the
+ * season over resets the baseline and hands out crowns. Rows also cache the player's FTB
+ * Teams / Phoenix Guilds team (via {@link TeamCompat}), so values can be rolled up per team.
  */
 public final class EssentialsLeaderboardManager {
 
@@ -37,7 +46,13 @@ public final class EssentialsLeaderboardManager {
         MOB_KILLS("Mob Kills"),
         DEATHS("Deaths"),
         BLOCKS_MINED("Blocks Mined"),
-        DISTANCE("Distance Traveled");
+        DISTANCE("Distance Traveled"),
+        ANIMALS_BRED("Animals Bred"),
+        FISH_CAUGHT("Fish Caught"),
+        ITEMS_ENCHANTED("Items Enchanted"),
+        RAID_WINS("Raids Won"),
+        JUMPS("Jumps"),
+        QUESTS_COMPLETED("Quests Completed");
 
         public final String label;
 
@@ -53,16 +68,30 @@ public final class EssentialsLeaderboardManager {
 
     private static final class Row {
         String name = "";
+        String teamId = "";
+        String teamName = "";
         long playtime;
         long kills;
         long deaths;
         long mined;
         long distance;
+        long animalsBred;
+        long fishCaught;
+        long itemsEnchanted;
+        long raidWins;
+        long jumps;
+        long questsCompleted;
         long basePlaytime;
         long baseKills;
         long baseDeaths;
         long baseMined;
         long baseDistance;
+        long baseAnimalsBred;
+        long baseFishCaught;
+        long baseItemsEnchanted;
+        long baseRaidWins;
+        long baseJumps;
+        long baseQuestsCompleted;
         int crowns;
     }
 
@@ -167,9 +196,30 @@ public final class EssentialsLeaderboardManager {
         return cm / 100L;
     }
 
+    private static long statAnimalsBred(ServerPlayer player) {
+        return player.getStats().getValue(Stats.CUSTOM.get(Stats.ANIMALS_BRED));
+    }
+
+    private static long statFishCaught(ServerPlayer player) {
+        return player.getStats().getValue(Stats.CUSTOM.get(Stats.FISH_CAUGHT));
+    }
+
+    private static long statItemsEnchanted(ServerPlayer player) {
+        return player.getStats().getValue(Stats.CUSTOM.get(Stats.ENCHANT_ITEM));
+    }
+
+    private static long statRaidWins(ServerPlayer player) {
+        return player.getStats().getValue(Stats.CUSTOM.get(Stats.RAID_WIN));
+    }
+
+    private static long statJumps(ServerPlayer player) {
+        return player.getStats().getValue(Stats.CUSTOM.get(Stats.JUMP));
+    }
+
     /**
-     * Refreshes one online player's cached row in memory from their live stats. Cheap and safe
-     * to call often; call {@link #persist()} separately to actually write it to disk.
+     * Refreshes one online player's cached row in memory from their live stats, Phoenix
+     * Chronicles quest progress and FTB Teams / Phoenix Guilds team. Cheap and safe to call
+     * often; call {@link #persist()} separately to actually write it to disk.
      */
     public static void refresh(ServerPlayer player, long playtimeTicks) {
         ensureLoaded();
@@ -179,6 +229,12 @@ public final class EssentialsLeaderboardManager {
             fresh.baseDeaths = statDeaths(player);
             fresh.baseMined = statBlocksMined(player);
             fresh.baseDistance = statDistanceBlocks(player);
+            fresh.baseAnimalsBred = statAnimalsBred(player);
+            fresh.baseFishCaught = statFishCaught(player);
+            fresh.baseItemsEnchanted = statItemsEnchanted(player);
+            fresh.baseRaidWins = statRaidWins(player);
+            fresh.baseJumps = statJumps(player);
+            fresh.baseQuestsCompleted = PhoenixChroniclesCompat.questsCompleted(player);
             return fresh;
         });
         row.name = player.getGameProfile().getName();
@@ -187,6 +243,21 @@ public final class EssentialsLeaderboardManager {
         row.deaths = statDeaths(player);
         row.mined = statBlocksMined(player);
         row.distance = statDistanceBlocks(player);
+        row.animalsBred = statAnimalsBred(player);
+        row.fishCaught = statFishCaught(player);
+        row.itemsEnchanted = statItemsEnchanted(player);
+        row.raidWins = statRaidWins(player);
+        row.jumps = statJumps(player);
+        row.questsCompleted = PhoenixChroniclesCompat.questsCompleted(player);
+
+        Optional<String> teamId = TeamCompat.getTeamId(player);
+        if (teamId.isPresent()) {
+            row.teamId = teamId.get();
+            row.teamName = TeamCompat.getTeamName(player).orElse(teamId.get());
+        } else {
+            row.teamId = "";
+            row.teamName = "";
+        }
     }
 
     private static long currentValue(Row row, Category category) {
@@ -196,6 +267,12 @@ public final class EssentialsLeaderboardManager {
             case DEATHS -> row.deaths;
             case BLOCKS_MINED -> row.mined;
             case DISTANCE -> row.distance;
+            case ANIMALS_BRED -> row.animalsBred;
+            case FISH_CAUGHT -> row.fishCaught;
+            case ITEMS_ENCHANTED -> row.itemsEnchanted;
+            case RAID_WINS -> row.raidWins;
+            case JUMPS -> row.jumps;
+            case QUESTS_COMPLETED -> row.questsCompleted;
         };
     }
 
@@ -206,6 +283,12 @@ public final class EssentialsLeaderboardManager {
             case DEATHS -> row.baseDeaths;
             case BLOCKS_MINED -> row.baseMined;
             case DISTANCE -> row.baseDistance;
+            case ANIMALS_BRED -> row.baseAnimalsBred;
+            case FISH_CAUGHT -> row.baseFishCaught;
+            case ITEMS_ENCHANTED -> row.baseItemsEnchanted;
+            case RAID_WINS -> row.baseRaidWins;
+            case JUMPS -> row.baseJumps;
+            case QUESTS_COMPLETED -> row.baseQuestsCompleted;
         };
     }
 
@@ -243,6 +326,97 @@ public final class EssentialsLeaderboardManager {
         List<Entry> entries = top(category, season, limit);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) sb.append(',');
+            Entry entry = entries.get(i);
+            sb.append(entry.name).append(':').append(entry.value).append(':').append(entry.crowns);
+        }
+        return sb.toString();
+    }
+
+    private static final class TeamAccumulator {
+        String name;
+        long value;
+        int members;
+    }
+
+    /**
+     * Rolls every row with a known team (FTB Teams or Phoenix Guilds, via {@link TeamCompat})
+     * up into one entry per team, summing the category's value across every teammate whose row
+     * is cached. Players with no team are left out of this view entirely.
+     */
+    public static List<Entry> topTeams(Category category, boolean season, int limit) {
+        ensureLoaded();
+        Map<String, TeamAccumulator> teams = new LinkedHashMap<>();
+        for (Row row : ROWS.values()) {
+            if (row.name.isEmpty() || row.teamId.isEmpty()) continue;
+            TeamAccumulator acc = teams.computeIfAbsent(row.teamId, id -> new TeamAccumulator());
+            acc.name = row.teamName.isEmpty() ? row.teamId : row.teamName;
+            acc.value += seasonOrAllTime(row, category, season);
+            acc.members++;
+        }
+        return teams.values().stream()
+                .sorted((a, b) -> Long.compare(b.value, a.value))
+                .limit(Math.max(0, limit))
+                .map(acc -> new Entry(acc.name, acc.value, acc.members))
+                .collect(Collectors.toList());
+    }
+
+    /** Same shape as {@link #rawCsvFor}, but the third field is the team's member count, not crowns. */
+    public static String rawCsvForTeams(int categoryId, boolean season, int limit) {
+        Category category = Category.byId(categoryId);
+        List<Entry> entries = topTeams(category, season, limit);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) sb.append(',');
+            Entry entry = entries.get(i);
+            sb.append(entry.name).append(':').append(entry.value).append(':').append(entry.crowns);
+        }
+        return sb.toString();
+    }
+
+    /** False for a category backed by an optional mod that isn't currently loaded. */
+    public static boolean isCategoryAvailable(int categoryId) {
+        Category category = Category.byId(categoryId);
+        if (category == Category.QUESTS_COMPLETED) return PhoenixChroniclesCompat.isLoaded();
+        return true;
+    }
+
+    public static boolean teamSupportAvailable() {
+        return TeamCompat.isAnyBackendLoaded();
+    }
+
+    /** Comma-separated ids of every category whose backing mod (if any) is currently loaded. */
+    public static String availableCategoriesCsv() {
+        StringBuilder sb = new StringBuilder();
+        for (Category category : Category.values()) {
+            if (!isCategoryAvailable(category.ordinal())) continue;
+            if (sb.length() > 0) sb.append(',');
+            sb.append(category.ordinal());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Ranks currently-ONLINE players by an arbitrary vanilla (or mod-added) custom stat the
+     * player picked from the "browse all stats" pill, by id (e.g. "minecraft:mob_kills"). This
+     * is a live, uncached view - it is not persisted and does not support seasons or teams,
+     * unlike the curated {@link Category} leaderboards. Returns "" for an unknown stat id.
+     */
+    public static String rawCsvForCustomStat(String statId, int limit) {
+        ResourceLocation id = ResourceLocation.tryParse(statId);
+        if (id == null || !BuiltInRegistries.CUSTOM_STAT.containsKey(id)) return "";
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return "";
+        Stat<ResourceLocation> stat = Stats.CUSTOM.get(id);
+
+        List<Entry> entries = new ArrayList<>();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            entries.add(new Entry(player.getGameProfile().getName(), player.getStats().getValue(stat), 0));
+        }
+        entries.sort((a, b) -> Long.compare(b.value, a.value));
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(limit, entries.size()); i++) {
             if (i > 0) sb.append(',');
             Entry entry = entries.get(i);
             sb.append(entry.name).append(':').append(entry.value).append(':').append(entry.crowns);
@@ -296,6 +470,12 @@ public final class EssentialsLeaderboardManager {
             row.baseDeaths = row.deaths;
             row.baseMined = row.mined;
             row.baseDistance = row.distance;
+            row.baseAnimalsBred = row.animalsBred;
+            row.baseFishCaught = row.fishCaught;
+            row.baseItemsEnchanted = row.itemsEnchanted;
+            row.baseRaidWins = row.raidWins;
+            row.baseJumps = row.jumps;
+            row.baseQuestsCompleted = row.questsCompleted;
         }
         seasonStartMs = System.currentTimeMillis();
         persist();

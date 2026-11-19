@@ -120,6 +120,9 @@ dependencies {
     modCompileOnly('net.phoenixvine.domains:phoenix_domains:2.4')
     modRuntimeOnly('net.phoenixvine.domains:phoenix_domains:2.4')
 
+    modCompileOnly('net.phoenixvine.chronicles:phoenix_chronicles:7.0.5')
+    modRuntimeOnly('net.phoenixvine.chronicles:phoenix_chronicles:7.0.5')
+
 
    modImplementation("net.phoenixvine.wiki:phoenix_wiki:0.6.0")
 
