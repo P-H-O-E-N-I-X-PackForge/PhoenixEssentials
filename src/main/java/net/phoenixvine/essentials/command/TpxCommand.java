@@ -40,7 +40,7 @@ public final class TpxCommand {
         NamedLocation target = new NamedLocation(targetLevel.dimension(), x + 0.5, y, z + 0.5,
                 player.getYRot(), player.getXRot());
 
-        int cooldown = EssentialsServerConfig.TPX_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.TPX_COOLDOWN_SECONDS);
         TeleportExecutor.request(player, target, "tpx", targetLevel.dimension().location().toString(), null, false, cooldown);
         return 1;
     }

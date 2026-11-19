@@ -29,16 +29,16 @@ public final class RtpCommand {
 
         if (!(player.level() instanceof ServerLevel level)) return 0;
 
-        var allowedDims = EssentialsServerConfig.RTP_ALLOWED_DIMENSIONS.get();
+        var allowedDims = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.RTP_ALLOWED_DIMENSIONS);
         if (!allowedDims.isEmpty() && !allowedDims.contains(level.dimension().location().toString())) {
             source.sendFailure(Component.literal("§c/rtp isn't allowed in this dimension."));
             return 0;
         }
 
         BlockPos origin = player.blockPosition();
-        int minRadius = EssentialsServerConfig.RTP_MIN_RADIUS.get();
-        int maxRadius = EssentialsServerConfig.RTP_MAX_RADIUS.get();
-        int maxAttempts = EssentialsServerConfig.RTP_MAX_ATTEMPTS.get();
+        int minRadius = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.RTP_MIN_RADIUS);
+        int maxRadius = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.RTP_MAX_RADIUS);
+        int maxAttempts = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.RTP_MAX_ATTEMPTS);
 
         RtpFinder.Result result = RtpFinder.find(level, origin, player, minRadius, maxRadius, maxAttempts);
         if (result == null) {
@@ -57,7 +57,7 @@ public final class RtpCommand {
         String detail = distance + " blocks away, " + result.attempts() + " " +
                 (result.attempts() == 1 ? "try" : "tries");
 
-        int cooldown = EssentialsServerConfig.RTP_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.RTP_COOLDOWN_SECONDS);
         TeleportExecutor.request(player, target, "rtp", "a random location", detail, false, cooldown);
         return 1;
     }

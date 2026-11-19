@@ -71,7 +71,7 @@ public final class TpaCommand {
             return 0;
         }
 
-        int timeoutSeconds = EssentialsServerConfig.TPA_TIMEOUT_SECONDS.get();
+        int timeoutSeconds = net.phoenixvine.essentials.config.EssentialsPolicy.get(requester, EssentialsServerConfig.TPA_TIMEOUT_SECONDS);
         PENDING.put(target.getUUID(), new Request(requester.getUUID(), requester.getName().getString(), here,
                 System.currentTimeMillis() + timeoutSeconds * 1000L));
 
@@ -106,10 +106,10 @@ public final class TpaCommand {
             return 1;
         }
 
-        boolean bypassDelay = EssentialsServerConfig.TPA_TEAMMATE_BYPASS_DELAY.get() &&
+        boolean bypassDelay = net.phoenixvine.essentials.config.EssentialsPolicy.get(requester, EssentialsServerConfig.TPA_TEAMMATE_BYPASS_DELAY) &&
                 TeamCompat.areTeammates(requester, target);
 
-        int cooldown = EssentialsServerConfig.TPA_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(requester, EssentialsServerConfig.TPA_COOLDOWN_SECONDS);
 
         if (req.here()) {
             TeleportExecutor.request(target, NamedLocation.of(requester), "tpa", requester.getName().getString(),

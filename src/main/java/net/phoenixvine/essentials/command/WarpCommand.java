@@ -44,12 +44,12 @@ public final class WarpCommand {
         if (player == null) return 0;
 
         NamedLocation warp = WarpRegistry.get(name);
-        if (warp == null) {
+        if (warp == null || !net.phoenixvine.essentials.config.EssentialsGateRules.warpAllowed(player, name)) {
             source.sendFailure(Component.literal("§cNo warp named \"" + name + "\"."));
             return 0;
         }
 
-        int cooldown = EssentialsServerConfig.WARP_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.WARP_COOLDOWN_SECONDS);
         TeleportExecutor.request(player, warp, "warp", "warp \"" + name + "\"", null, false, cooldown);
         return 1;
     }
@@ -74,7 +74,9 @@ public final class WarpCommand {
     }
 
     private static int listWarps(CommandSourceStack source) {
-        List<String> names = WarpRegistry.getAll().keySet().stream().sorted().toList();
+        ServerPlayer viewer = source.getPlayer();
+        List<String> names = WarpRegistry.getAll().keySet().stream()
+                .filter(n -> viewer == null || net.phoenixvine.essentials.config.EssentialsGateRules.warpAllowed(viewer, n)).sorted().toList();
         if (names.isEmpty()) {
             source.sendSuccess(() -> Component.literal("§7No warps have been set."), false);
         } else {

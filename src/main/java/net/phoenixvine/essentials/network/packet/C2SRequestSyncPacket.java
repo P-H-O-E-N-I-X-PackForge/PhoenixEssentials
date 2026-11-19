@@ -46,10 +46,11 @@ public class C2SRequestSyncPacket {
                     List<String> names = data == null ? List.of() :
                             data.getHomes().keySet().stream().sorted().toList();
                     EssentialsNetwork.CHANNEL.send(HcPacketDistributor.PLAYER.with(() -> player),
-                            new S2CHomesSyncPacket(names, EssentialsServerConfig.HOMES_PER_PLAYER.get()));
+                            new S2CHomesSyncPacket(names, net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.HOMES_PER_PLAYER)));
                 }
                 case WARPS -> {
-                    List<String> names = WarpRegistry.getAll().keySet().stream().sorted().toList();
+                    List<String> names = WarpRegistry.getAll().keySet().stream()
+                            .filter(n -> net.phoenixvine.essentials.config.EssentialsGateRules.warpAllowed(player, n)).sorted().toList();
                     EssentialsNetwork.CHANNEL.send(HcPacketDistributor.PLAYER.with(() -> player),
                             new S2CWarpsSyncPacket(names));
                 }
@@ -58,6 +59,7 @@ public class C2SRequestSyncPacket {
                             .orElse(null);
                     List<S2CKitsSyncPacket.Entry> entries = new ArrayList<>();
                     for (KitDefinition kit : KitRegistry.getAll().values()) {
+                        if (!net.phoenixvine.essentials.config.EssentialsGateRules.kitAllowed(player, kit.name)) continue;
                         long lastClaimedMs = data == null ? 0 : data.getKitLastClaimedMs(kit.name);
                         long remainingMs = kit.cooldownSeconds * 1000L - (System.currentTimeMillis() - lastClaimedMs);
                         int remainingSeconds = lastClaimedMs <= 0 || remainingMs <= 0 ?

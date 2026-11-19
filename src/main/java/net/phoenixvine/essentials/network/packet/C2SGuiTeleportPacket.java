@@ -50,7 +50,7 @@ public class C2SGuiTeleportPacket {
                 }
                 case WARP -> {
                     NamedLocation warp = WarpRegistry.get(name);
-                    if (warp == null) return;
+                    if (warp == null || !net.phoenixvine.essentials.config.EssentialsGateRules.warpAllowed(player, name)) return;
                     TeleportExecutor.request(player, warp, "warp", "warp \"" + name + "\"");
                 }
                 case BACK -> {

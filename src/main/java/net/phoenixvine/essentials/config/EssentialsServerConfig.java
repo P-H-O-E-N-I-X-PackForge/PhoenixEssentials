@@ -97,7 +97,9 @@ public class EssentialsServerConfig {
 
     @SuppressWarnings("unchecked")
     private static <T> T value(String key) {
-        return (T) hcCompileMerged1.cfg_value(key);
+        Object v = hcCompileMerged1.cfg_value(key);
+        if (v instanceof ModConfigSpec.ConfigValue<?> config) EssentialsPolicy.register(key, config);
+        return (T) v;
     }
 
     private EssentialsServerConfig() {}

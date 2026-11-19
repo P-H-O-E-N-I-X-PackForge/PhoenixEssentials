@@ -43,7 +43,7 @@ public final class KitCommand {
         }
 
         KitDefinition kit = KitRegistry.get(name);
-        if (kit == null) {
+        if (kit == null || !net.phoenixvine.essentials.config.EssentialsGateRules.kitAllowed(player, name)) {
             source.sendFailure(Component.literal("§cNo kit named \"" + name + "\"."));
             return 0;
         }
@@ -73,7 +73,9 @@ public final class KitCommand {
     }
 
     private static int list(CommandSourceStack source) {
-        List<String> names = KitRegistry.getAll().keySet().stream().sorted().toList();
+        ServerPlayer viewer = source.getPlayer();
+        List<String> names = KitRegistry.getAll().keySet().stream()
+                .filter(n -> viewer == null || net.phoenixvine.essentials.config.EssentialsGateRules.kitAllowed(viewer, n)).sorted().toList();
         if (names.isEmpty()) {
             source.sendSuccess(() -> Component.literal("§7No kits are configured."), false);
         } else {
