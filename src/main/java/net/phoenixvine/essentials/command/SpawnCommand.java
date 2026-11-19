@@ -33,7 +33,7 @@ public final class SpawnCommand {
         ServerLevel overworld = source.getServer().overworld();
         NamedLocation spawn = SpawnRegistry.getOrDefault(overworld);
 
-        int cooldown = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS);
         TeleportExecutor.request(player, spawn, "spawn", "spawn", null, false, cooldown);
         return 1;
     }

@@ -41,7 +41,7 @@ public class C2SGuiClaimKitPacket {
             }
 
             KitDefinition kit = KitRegistry.get(name);
-            if (kit == null) return;
+            if (kit == null || !net.phoenixvine.essentials.config.EssentialsGateRules.kitAllowed(player, name)) return;
 
             PlayerEssentialsData data = player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
                     .orElse(null);

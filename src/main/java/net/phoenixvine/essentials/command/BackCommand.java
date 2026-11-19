@@ -35,7 +35,7 @@ public final class BackCommand {
             return 0;
         }
 
-        int cooldown = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS);
         TeleportExecutor.request(player, back, "back", "your previous location", null, false, cooldown);
         return 1;
     }

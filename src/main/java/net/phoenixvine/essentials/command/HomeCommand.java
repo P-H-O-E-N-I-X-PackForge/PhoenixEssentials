@@ -163,7 +163,7 @@ public final class HomeCommand {
             return 0;
         }
 
-        int cooldown = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS);
         TeleportExecutor.request(player, home, "home", "home \"" + name + "\"", null, false, cooldown);
         return 1;
     }
@@ -175,7 +175,7 @@ public final class HomeCommand {
         PlayerEssentialsData data = data(player);
         if (data == null) return 0;
 
-        int limit = effectiveHomeLimit(data);
+        int limit = effectiveHomeLimit(player, data);
         if (data.getHome(name) == null && data.getHomes().size() >= limit) {
             source.sendFailure(Component.literal("§cYou've reached your limit of " +
                     limit + " homes - delete one with /delhome first."));
@@ -215,7 +215,7 @@ public final class HomeCommand {
             source.sendSuccess(() -> Component.literal("§7You have no homes set. Use /sethome <name>."), false);
         } else {
             source.sendSuccess(() -> Component.literal("§7Homes (" + names.size() + "/" +
-                    effectiveHomeLimit(data) + "): §f" + String.join("§7, §f", names)), false);
+                    effectiveHomeLimit(player, data) + "): §f" + String.join("§7, §f", names)), false);
         }
         return 1;
     }
@@ -224,8 +224,8 @@ public final class HomeCommand {
         return player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS).orElse(null);
     }
 
-    private static int effectiveHomeLimit(PlayerEssentialsData data) {
+    private static int effectiveHomeLimit(ServerPlayer player, PlayerEssentialsData data) {
         int override = data.getHomeLimitOverride();
-        return override >= 0 ? override : EssentialsServerConfig.HOMES_PER_PLAYER.get();
+        return override >= 0 ? override : net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.HOMES_PER_PLAYER);
     }
 }

@@ -47,7 +47,7 @@ public final class TeleportExecutor {
     public static void request(ServerPlayer player, NamedLocation target, String category, String destinationLabel,
                                String successDetail, boolean bypassWarmupAndCooldown) {
         
-        int defaultCooldown = EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS.get();
+        int defaultCooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.TELEPORT_COOLDOWN_SECONDS);
         request(player, target, category, destinationLabel, successDetail, bypassWarmupAndCooldown, defaultCooldown);
     }
 
@@ -87,7 +87,7 @@ public final class TeleportExecutor {
         MinecraftForge.EVENT_BUS.post(pre);
         if (pre.isCanceled()) return;
 
-        int warmupSeconds = bypassWarmupAndCooldown ? 0 : EssentialsServerConfig.TELEPORT_WARMUP_SECONDS.get();
+        int warmupSeconds = bypassWarmupAndCooldown ? 0 : net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.TELEPORT_WARMUP_SECONDS);
         if (warmupSeconds <= 0) {
             executeNow(player, target, category, destinationLabel, successDetail);
             return;
@@ -165,7 +165,7 @@ public final class TeleportExecutor {
             }
 
             Pending pending = entry.getValue();
-            if (EssentialsServerConfig.CANCEL_ON_MOVE.get() && hasMoved(player, pending)) {
+            if (net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.CANCEL_ON_MOVE) && hasMoved(player, pending)) {
                 player.sendSystemMessage(Component.literal("§cTeleport to §f" + pending.destinationLabel() +
                         " §ccancelled - you moved."));
                 it.remove();
@@ -183,8 +183,8 @@ public final class TeleportExecutor {
     @SubscribeEvent
     public static void onDamage(LivingHurtEvent event) {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return;
-        if (!EssentialsServerConfig.CANCEL_ON_DAMAGE.get()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.CANCEL_ON_DAMAGE)) return;
         Pending removed = PENDING.remove(player.getUUID());
         if (removed != null) {
             player.sendSystemMessage(Component.literal("§cTeleport to §f" + removed.destinationLabel() +

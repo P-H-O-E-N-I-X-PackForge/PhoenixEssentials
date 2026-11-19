@@ -34,7 +34,7 @@ public final class TopCommand {
         NamedLocation target = new NamedLocation(level.dimension(), x + 0.5, y, z + 0.5,
                 player.getYRot(), player.getXRot());
 
-        int cooldown = EssentialsServerConfig.TOP_COOLDOWN_SECONDS.get();
+        int cooldown = net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.TOP_COOLDOWN_SECONDS);
         TeleportExecutor.request(player, target, "top", "the surface", null, false, cooldown);
         return 1;
     }

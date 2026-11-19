@@ -52,8 +52,8 @@ public class EssentialsPlayerEvents {
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
         if (net.phoenixvine.essentials.EssentialsHcMode.takeover()) return; 
-        if (!EssentialsServerConfig.BACK_AFTER_DEATH.get()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!net.phoenixvine.essentials.config.EssentialsPolicy.get(player, EssentialsServerConfig.BACK_AFTER_DEATH)) return;
         player.getCapability(EssentialsCapabilityProvider.PLAYER_ESSENTIALS)
                 .ifPresent(data -> data.setBack(NamedLocation.of(player)));
     }
