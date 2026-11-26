@@ -8,7 +8,7 @@ static perm_names: [String] = [
     "HOME", "SETHOME", "DELHOME", "HOMES", "SETHOMELIMIT", "SPAWN", "SETSPAWN", "WARP", "SETWARP",
     "DELWARP", "WARPS", "BACK", "RTP", "TPA", "MSG", "NICK", "IGNORE", "AFK", "PLAYERINFO", "SEEN",
     "PLAYTIME", "KIT", "HEAL", "FEED", "INVSEE", "GOD", "FLY", "GAMEMODE", "TOP", "TPX", "TPFORCE",
-    "WEATHER", "BYPASS_COOLDOWN", "BYPASS_WARMUP", "LEADERBOARDS"
+    "WEATHER", "BYPASS_COOLDOWN", "BYPASS_WARMUP", "LEADERBOARDS", "TRASH", "AUTOTRASH"
 ];
 static perm_nodes: [PermissionNodeSrc] = [null as PermissionNodeSrc; 0];
 

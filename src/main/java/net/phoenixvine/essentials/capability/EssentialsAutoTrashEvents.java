@@ -25,7 +25,9 @@ public final class EssentialsAutoTrashEvents {
         PlayerEssentialsData data = EssentialsCapabilityProvider.get(player);
         if (data.getAlwaysTrash().isEmpty()) return;
 
-        ResourceLocation id = BuiltInRegistries.ITEM.getKey(event.getItemEntity().getItem().getItem());
+        ItemStack picked = event.getItemEntity().getItem();
+        if (!isTrashable(picked)) return;
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(picked.getItem());
         if (!data.isAlwaysTrash(id)) return;
 
         event.setCanPickup(TriState.FALSE);
@@ -44,21 +46,47 @@ public final class EssentialsAutoTrashEvents {
         if (data.getAlwaysTrash().isEmpty()) return;
 
         Inventory inv = player.getInventory();
-        boolean changed = sweepList(inv.items, data) | sweepList(inv.offhand, data);
-        if (changed) inv.setChanged();
+        int removed = sweepList(inv.items, data) + sweepList(inv.offhand, data);
+        if (removed > 0) {
+            inv.setChanged();
+            player.sendSystemMessage(net.minecraft.network.chat.Component
+                    .literal("\u00a77Auto-trashed " + removed + " item" + (removed == 1 ? "" : "s") + "."));
+        }
     }
 
-    private static boolean sweepList(java.util.List<ItemStack> slots, PlayerEssentialsData data) {
-        boolean changed = false;
-        for (int i = 0; i < slots.size(); i++) {
-            ItemStack stack = slots.get(i);
-            if (stack.isEmpty()) continue;
-            ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
-            if (data.isAlwaysTrash(id)) {
-                slots.set(i, ItemStack.EMPTY);
-                changed = true;
+    /**
+     * Only plain stacks are ever trashed. A stack with data on it (an enchanted book, a configured circuit, a named
+     * or damaged item) is left alone, because the item id covers far more than the player meant.
+     */
+    public static boolean isTrashable(ItemStack stack) {
+        return !stack.isEmpty() && stack.isComponentsPatchEmpty();
+    }
+
+    /** How many items of this kind the player has that auto-trash would delete. */
+    public static int countTrashable(Player player, ResourceLocation id) {
+        Inventory inv = player.getInventory();
+        int total = 0;
+        for (var list : java.util.List.of(inv.items, inv.offhand)) {
+            for (ItemStack stack : list) {
+                if (isTrashable(stack) && id.equals(BuiltInRegistries.ITEM.getKey(stack.getItem()))) {
+                    total += stack.getCount();
+                }
             }
         }
-        return changed;
+        return total;
+    }
+
+    private static int sweepList(java.util.List<ItemStack> slots, PlayerEssentialsData data) {
+        int removed = 0;
+        for (int i = 0; i < slots.size(); i++) {
+            ItemStack stack = slots.get(i);
+            if (!isTrashable(stack)) continue;
+            ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+            if (data.isAlwaysTrash(id)) {
+                removed += stack.getCount();
+                slots.set(i, ItemStack.EMPTY);
+            }
+        }
+        return removed;
     }
 }
