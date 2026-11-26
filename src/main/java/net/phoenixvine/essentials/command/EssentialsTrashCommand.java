@@ -20,6 +20,8 @@ public final class EssentialsTrashCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("essentialstrash")
+                .requires(source -> net.phoenixvine.essentials.config.EssentialsPermissions.check(source,
+                        net.phoenixvine.essentials.config.EssentialsPermissions.TRASH))
                 .executes(EssentialsTrashCommand::open));
     }
 

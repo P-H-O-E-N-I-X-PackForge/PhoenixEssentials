@@ -7,12 +7,12 @@ fn hc_open_trash(source: CommandSourceStackHc) -> Int {
     return 1;
 }
 
-fn hc_toggle_held_autotrash(source: CommandSourceStackHc) -> Int {
+fn hc_toggle_held_autotrash(source: CommandSourceStackHc, confirmed: Bool) -> Int {
     let player = source.getPlayer();
     if player == null { return 0; }
     let held = player.getMainHandItem();
     if held.isEmpty() {
-        player.sendSystemMessage(Component::literal("Hold an item first.") as Component);
+        player.sendSystemMessage(Component::literal("§cHold an item first.") as Component);
         return 0;
     }
     let id = ForgeRegistriesItem::ITEMS.getKey(held.getItem() as JObjectItem);
@@ -20,11 +20,18 @@ fn hc_toggle_held_autotrash(source: CommandSourceStackHc) -> Int {
     let data = ess_player_data(&source);
     if data == null { return 0; }
     let id_text = id.toString();
-    if data.toggleAlwaysTrash(id) {
-        player.sendSystemMessage(Component::literal("Will now auto-trash \"{id_text}\" on pickup.") as Component);
-    } else {
-        player.sendSystemMessage(Component::literal("No longer auto-trashing \"{id_text}\".") as Component);
+    if data.isAlwaysTrash(id) {
+        data.removeAlwaysTrash(id);
+        player.sendSystemMessage(Component::literal("§7No longer auto-trashing \"{id_text}\".") as Component);
+        return 1;
     }
+    let have = at_count_trashable(&player, id.toString());
+    if have > 0 && !confirmed {
+        player.sendSystemMessage(Component::literal("§eAuto-trash deletes the {have} \"{id_text}\" you carry now, and every one you pick up. Items with data on them (enchanted, named, configured) are kept. Run §f/essentialsautotrash confirm§e to turn it on.") as Component);
+        return 0;
+    }
+    data.toggleAlwaysTrash(id);
+    player.sendSystemMessage(Component::literal("§aWill now auto-trash \"{id_text}\".") as Component);
     return 1;
 }
 
@@ -35,7 +42,7 @@ fn hc_remove_autotrash(source: CommandSourceStackHc, id: ResourceLocation) -> In
     if data == null { return 0; }
     let id_text = id.toString();
     data.removeAlwaysTrash(id);
-    player.sendSystemMessage(Component::literal("No longer auto-trashing \"{id_text}\".") as Component);
+    player.sendSystemMessage(Component::literal("§7No longer auto-trashing \"{id_text}\".") as Component);
     return 1;
 }
 
@@ -48,7 +55,7 @@ fn hc_suggest_autotrash_ids(ctx: CommandContextSrc, builder: SuggestionsBuilderH
 }
 
 pub fn register_real_trash_commands(dispatcher: CommandDispatcherSrc) {
-    let trash_builder = ess_literal("essentialstrash", "hctrash", "").executes(|ctx| {
+    let trash_builder = ess_literal("essentialstrash", "hctrash", "TRASH").executes(|ctx| {
         return hc_open_trash(ctx.getSource() as CommandSourceStackHc);
     });
     dispatcher.register(trash_builder as LiteralArgumentBuilderSrc);
@@ -59,8 +66,11 @@ pub fn register_real_trash_commands(dispatcher: CommandDispatcherSrc) {
         return hc_remove_autotrash(ctx.getSource() as CommandSourceStackHc, ResourceLocationArgumentSrc::getId(ctx, "item"));
     });
     let remove_literal = CommandsHc::literal("remove").then(item_arg);
-    let autotrash_builder = ess_literal("essentialsautotrash", "hcautotrash", "")
-        .executes(|ctx| { return hc_toggle_held_autotrash(ctx.getSource() as CommandSourceStackHc); })
+    let autotrash_builder = ess_literal("essentialsautotrash", "hcautotrash", "AUTOTRASH")
+        .executes(|ctx| { return hc_toggle_held_autotrash(ctx.getSource() as CommandSourceStackHc, false); })
+        .then(CommandsHc::literal("confirm").executes(|ctx| {
+            return hc_toggle_held_autotrash(ctx.getSource() as CommandSourceStackHc, true);
+        }))
         .then(remove_literal);
     dispatcher.register(autotrash_builder as LiteralArgumentBuilderSrc);
 }

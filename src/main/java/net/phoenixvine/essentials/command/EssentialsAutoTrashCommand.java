@@ -20,13 +20,16 @@ public final class EssentialsAutoTrashCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("essentialsautotrash")
-                .executes(EssentialsAutoTrashCommand::toggleHeld)
+                .requires(source -> net.phoenixvine.essentials.config.EssentialsPermissions.check(source,
+                        net.phoenixvine.essentials.config.EssentialsPermissions.AUTOTRASH))
+                .executes(ctx -> toggleHeld(ctx, false))
+                .then(Commands.literal("confirm").executes(ctx -> toggleHeld(ctx, true)))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("item", ResourceLocationArgument.id())
                                 .executes(EssentialsAutoTrashCommand::removeItem))));
     }
 
-    private static int toggleHeld(CommandContext<CommandSourceStack> ctx) {
+    private static int toggleHeld(CommandContext<CommandSourceStack> ctx, boolean confirmed) {
         ServerPlayer player = ctx.getSource().getPlayer();
         if (player == null) return 0;
 
@@ -43,10 +46,20 @@ public final class EssentialsAutoTrashCommand {
                 .orElse(null);
         if (data == null) return 0;
 
-        boolean nowTrashed = data.toggleAlwaysTrash(id);
-        player.sendSystemMessage(Component.literal(nowTrashed
-                ? "§aWill now auto-trash \"" + id + "\" on pickup."
-                : "§7No longer auto-trashing \"" + id + "\"."));
+        if (data.isAlwaysTrash(id)) {
+            data.removeAlwaysTrash(id);
+            player.sendSystemMessage(Component.literal("§7No longer auto-trashing \"" + id + "\"."));
+            return 1;
+        }
+        int have = net.phoenixvine.essentials.capability.EssentialsAutoTrashEvents.countTrashable(player, id);
+        if (have > 0 && !confirmed) {
+            player.sendSystemMessage(Component.literal("§eAuto-trash deletes the " + have + " \"" + id +
+                    "\" you carry now, and every one you pick up. Items with data on them (enchanted, named, " +
+                    "configured) are kept. Run §f/essentialsautotrash confirm§e to turn it on."));
+            return 0;
+        }
+        data.toggleAlwaysTrash(id);
+        player.sendSystemMessage(Component.literal("§aWill now auto-trash \"" + id + "\"."));
         return 1;
     }
 

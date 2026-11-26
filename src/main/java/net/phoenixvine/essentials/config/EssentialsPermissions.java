@@ -31,6 +31,8 @@ public final class EssentialsPermissions {
     public static PermissionNode<Boolean> NICK;
     public static PermissionNode<Boolean> IGNORE;
     public static PermissionNode<Boolean> AFK;
+    public static PermissionNode<Boolean> TRASH;
+    public static PermissionNode<Boolean> AUTOTRASH;
     public static PermissionNode<Boolean> PLAYERINFO;
     public static PermissionNode<Boolean> SEEN;
     public static PermissionNode<Boolean> PLAYTIME;
@@ -72,6 +74,8 @@ public final class EssentialsPermissions {
         NICK = node("NICK");
         IGNORE = node("IGNORE");
         AFK = node("AFK");
+        TRASH = node("TRASH");
+        AUTOTRASH = node("AUTOTRASH");
         PLAYERINFO = node("PLAYERINFO");
         SEEN = node("SEEN");
         PLAYTIME = node("PLAYTIME");

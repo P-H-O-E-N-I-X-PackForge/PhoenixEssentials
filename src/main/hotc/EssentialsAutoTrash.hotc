@@ -28,6 +28,15 @@ extern class AtServerPlayerHc = "net.minecraft.server.level.ServerPlayer" {
 
 extern class AtItemStackHc = "net.minecraft.world.item.ItemStack" {
     static EMPTY: ItemStack;
+    fn hasTag(&self) -> Bool;
+    fn getCount(&self) -> Int;
+}
+
+// only plain stacks are trashed; one with data on it (enchanted, named, configured) is left alone
+fn at_trashable(stack: &ItemStack) -> Bool {
+    if stack.isEmpty() { return false; }
+    if (stack as AtItemStackHc).hasTag() { return false; }
+    return true;
 }
 
 fn at_player_data(player: &Player) -> EssentialsPlayerDataHc {
@@ -49,6 +58,7 @@ fn at_on_pickup(e: JObjectEvent) {
     if !data.hasAlwaysTrash() { return; }
     let entity = ev.getItem();
     let stack = entity.getItem();
+    if !at_trashable(&stack) { return; }
     let id = at_item_id(&stack);
     if id == null { return; }
     if !data.isAlwaysTrash(id) { return; }
@@ -56,14 +66,35 @@ fn at_on_pickup(e: JObjectEvent) {
     entity.discard();
 }
 
-fn at_sweep_slot(inv: &AtInventoryHc, data: &EssentialsPlayerDataHc, slot: Int) -> Bool {
+fn at_sweep_slot(inv: &AtInventoryHc, data: &EssentialsPlayerDataHc, slot: Int) -> Int {
     let stack = inv.getItem(slot);
-    if stack.isEmpty() { return false; }
+    if !at_trashable(&stack) { return 0; }
     let id = at_item_id(&stack);
-    if id == null { return false; }
-    if !data.isAlwaysTrash(id) { return false; }
+    if id == null { return 0; }
+    if !data.isAlwaysTrash(id) { return 0; }
+    let count = (stack as AtItemStackHc).getCount();
     inv.setItem(slot, AtItemStackHc::EMPTY);
-    return true;
+    return count;
+}
+
+// how many of this item the player carries that auto-trash would delete
+pub fn at_count_trashable(player: &ServerPlayer, id_text: String) -> Int {
+    let inv = (player as AtPlayerHc).getInventory();
+    var total = 0;
+    var slot = 0;
+    while slot < 41 {
+        if slot < 36 || slot == 40 {
+            let stack = inv.getItem(slot);
+            if at_trashable(&stack) {
+                let found = at_item_id(&stack);
+                if found != null && found.toString() == id_text {
+                    total = total + (stack as AtItemStackHc).getCount();
+                }
+            }
+        }
+        slot = slot + 1;
+    }
+    return total;
 }
 
 fn at_on_player_tick(e: JObjectEvent) {
@@ -76,14 +107,17 @@ fn at_on_player_tick(e: JObjectEvent) {
     if data == null { return; }
     if !data.hasAlwaysTrash() { return; }
     let inv = (who as AtPlayerHc).getInventory();
-    var changed = false;
+    var removed = 0;
     var slot = 0;
     while slot < 36 {
-        if at_sweep_slot(&inv, &data, slot) { changed = true; }
+        removed = removed + at_sweep_slot(&inv, &data, slot);
         slot = slot + 1;
     }
-    if at_sweep_slot(&inv, &data, 40) { changed = true; }
-    if changed { inv.setChanged(); }
+    removed = removed + at_sweep_slot(&inv, &data, 40);
+    if removed > 0 {
+        inv.setChanged();
+        (who as ServerPlayer).sendSystemMessage(Component::literal("§7Auto-trashed {removed} item(s).") as Component);
+    }
 }
 
 pub fn register_autotrash_events() {
